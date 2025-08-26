@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guía de Instalación de Django</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+            line-height: 1.6;
+        }
+        .header {
+            background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+            color: white;
+            padding: 3rem 0;
+            margin-bottom: 2rem;
+            border-radius: 0 0 20px 20px;
+        }
+        .step-card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+        .step-card:hover {
+            transform: translateY(-5px);
+        }
+        .step-number {
+            width: 50px;
+            height: 50px;
+            background-color: #0d6efd;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.5rem;
+            margin: -25px auto 15px;
+        }
+        .code-block {
+            background-color: #2d2d2d;
+            color: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+        .note {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .folder-structure {
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+        }
+        .command {
+            color: #0dcaf0;
+        }
+        .folder {
+            color: #ff6b6b;
+        }
+        .file {
+            color: #20c997;
+        }
+        .footer {
+            background-color: #212529;
+            color: white;
+            padding: 2rem 0;
+            margin-top: 3rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="header text-center">
+        <div class="container">
+            <h1 class="display-4"><i class="fab fa-python me-2"></i>Instalación de Django</h1>
+            <p class="lead">Guía paso a paso para configurar Django con tu template BizLand</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-8 mx-auto">
+                <div class="step-card card">
+                    <div class="card-body">
+                        <div class="step-number">1</div>
+                        <h3 class="card-title">Crear entorno virtual</h3>
+                        <p>Un entorno virtual aísla las dependencias de tu proyecto.</p>
+                        <div class="code-block">
+                            <span class="command">python -m venv myenv</span>
+                        </div>
+                        <div class="code-block">
+                            <span class="command"># Windows</span><br>
+                            <span class="command">myenv\Scripts\activate</span><br><br>
+                            <span class="command"># macOS/Linux</span><br>
+                            <span class="command">source myenv/bin/activate</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step-card card">
+                    <div class="card-body">
+                        <div class="step-number">2</div>
+                        <h3 class="card-title">Instalar Django</h3>
+                        <p>Instala Django usando pip dentro de tu entorno virtual.</p>
+                        <div class="code-block">
+                            <span class="command">pip install django</span>
+                        </div>
+                        <div class="note">
+                            <strong>Nota:</strong> También puedes instalar una versión específica con <code>pip install django==4.2.3</code>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step-card card">
+                    <div class="card-body">
+                        <div class="step-number">3</div>
+                        <h3 class="card-title">Crear proyecto Django</h3>
+                        <p>Inicia un nuevo proyecto Django.</p>
+                        <div class="code-block">
+                            <span class="command">django-admin startproject myproject .</span>
+                        </div>
+                        <div class="note">
+                            <strong>Nota:</strong> El punto al final crea el proyecto en el directorio actual en lugar de crear una subcarpeta.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step-card card">
+                    <div class="card-body">
+                        <div class="step-number">4</div>
+                        <h3 class="card-title">Crear una aplicación</h3>
+                        <p>Crea una aplicación dentro de tu proyecto.</p>
+                        <div class="code-block">
+                            <span class="command">python manage.py startapp myapp</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step-card card">
+                    <div class="card-body">
+                        <div class="step-number">5</div>
+                        <h3 class="card-title">Estructura de carpetas</h3>
+                        <p>Crea manualmente las carpetas necesarias para tu template.</p>
+                        <div class="folder-structure">
+                            <span class="folder">myproject/</span><br>
+                            &nbsp;&nbsp;<span class="folder">templates/</span><br>
+                            &nbsp;&nbsp;<span class="folder">static/</span><br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;<span class="folder">css/</span><br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;<span class="folder">js/</span><br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;<span class="folder">images/</span><br>
+                            &nbsp;&nbsp;<span class="file">manage.py</span><br>
+                            &nbsp;&nbsp;<span class="folder">myapp/</span><br>
+                            &nbsp;&nbsp;<span class="folder">myproject/</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step-card card">
+                    <div class="card-body">
+                        <div class="step-number">6</div>
+                        <h3 class="card-title">Configurar settings.py</h3>
+                        <p>Edita el archivo de configuración para incluir tu app y configurar los directorios.</p>
+                        <div class="code-block">
+                            <span class="command"># Agregar tu aplicación</span><br>
+                            <span class="command">INSTALLED_APPS = [</span><br>
+                            &nbsp;&nbsp;<span class="command">'myapp',</span><br>
+                            <span class="command">]</span><br><br>
+                            <span class="command"># Configurar templates</span><br>
+                            <span class="command">import os</span><br>
+                            <span class="command">TEMPLATES = [</span><br>
+                            &nbsp;&nbsp;<span class="command">{</span><br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;<span class="command">'DIRS': [os.path.join(BASE_DIR, 'templates')],</span><br>
+                            &nbsp;&nbsp;<span class="command">}</span><br>
+                            <span class="command">]</span><br><br>
+                            <span class="command"># Configurar archivos estáticos</span><br>
+                            <span class="command">STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step-card card">
+                    <div class="card-body">
+                        <div class="step-number">7</div>
+                        <h3 class="card-title">Ejecutar migraciones</h3>
+                        <p>Configura la base de datos inicial de Django.</p>
+                        <div class="code-block">
+                            <span class="command">python manage.py migrate</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step-card card">
+                    <div class="card-body">
+                        <div class="step-number">8</div>
+                        <h3 class="card-title">Ejecutar el servidor</h3>
+                        <p>Inicia el servidor de desarrollo de Django.</p>
+                        <div class="code-block">
+                            <span class="command">python manage.py runserver</span>
+                        </div>
+                        <div class="note">
+                            <strong>Nota:</strong> Ahora puedes acceder a tu proyecto en <a href="http://localhost:8000" target="_blank">http://localhost:8000</a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-center my-5">
+                    <h2>¿Necesitas más ayuda?</h2>
+                    <p>Visita la <a href="https://docs.djangoproject.com/" target="_blank">documentación oficial de Django</a> para más información.</p>
+                    <div class="d-grid gap-2 col-md-6 mx-auto">
+                        <a href="https://www.djangoproject.com/start/" class="btn btn-primary btn-lg" target="_blank">Tutorial Oficial de Django</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer text-center">
+        <div class="container">
+            <p>Guía de instalación de Django para el template BizLand</p>
+            <p>© 2023 - Todos los derechos reservados</p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
