@@ -1954,3 +1954,24 @@ section,
 .starter-section {
   /* Add your styles here */
 }
+
+.gift {
+  display: inline-block;
+  background-color: #1E6DEB;   /* azul de marca */
+  color: #fff;
+  font-weight: 700;            /* negrita */
+  font-size: 1.25rem;          /* texto grande */
+  padding: 1rem 3rem;          /* alto y ancho */
+  border: none;
+  border-radius: 999px;        /* pill completo */
+  text-decoration: none;
+  line-height: 1.2;
+  box-shadow: none;            /* sin sombra */
+  transition: background-color 0.2s ease-in-out, transform 0.2s ease-in-out;
+}
+
+.gift:hover {
+  background-color: #1556b9;   /* un poco más oscuro al hover */
+  transform: translateY(-2px);
+}
+
