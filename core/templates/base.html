@@ -25,6 +25,7 @@
   <!-- Main CSS -->
   <link href="{% static 'css/main.css' %}" rel="stylesheet">
   <link href="{% static 'css/gifters.css' %}" rel="stylesheet">
+  <link href="{% static 'css/perfil.css' %}" rel="stylesheet">
 
   <style>
     /* Poppins global */
@@ -38,6 +39,7 @@
     }
     .login-btn-standalone:hover{ filter:brightness(.92); color:#fff; }
   </style>
+  <link href="{% static 'css/gifters.css' %}" rel="stylesheet">
 
   {% block extra_css %}{% endblock %}
 </head>
@@ -61,7 +63,7 @@
     </div>
 
 <div class="branding d-flex align-items-center">
-  <div class="container d-flex align-items-center justify-content-between gap-3">
+  <div class="container position-relative d-flex align-items-center" style="min-height:84px;">
 
     <!-- IZQUIERDA: Marca + Buscador -->
     <div class="brand-left d-flex align-items-center gap-3 flex-shrink-0">
@@ -89,7 +91,7 @@
     <nav id="navmenu" class="navmenu d-none d-lg-block mx-auto">
       <ul>
         <li><a href="{% url 'home' %}#hero" class="active">Inicio</a></li>
-        <li><a href="{% url 'home' %}#about">Categorías</a></li>
+        <li><a href="{% url 'home' %}#clients">Categorías</a></li>
         <li><a href="{% url 'home' %}#services">Amigos</a></li>
         <li><a href="{% url 'home' %}#portfolio">Regalos</a></li>
       </ul>
@@ -97,7 +99,7 @@
     </nav>
 
     <!-- DERECHA: Login -->
-    <a href="{% url 'detallesPortfolio' %}" class="login-btn-standalone">Iniciar Sesión</a>
+    <a href="{% url 'login' %}" class="login-btn-standalone">Iniciar Sesión</a>
   </div>
 </div>
 
@@ -119,7 +121,7 @@
             <span class="sitename">Gifter's</span>
           </a>
           <div class="footer-contact pt-3">
-            <p>A108 Adam Street</p>
+            <p>Viena 998</p>
             <p>New York, NY 535022</p>
             <p class="mt-3"><strong>Teléfono:</strong> <span>+1 234 567 8900</span></p>
             <p><strong>Email:</strong> <span>info@gifters.com</span></p>

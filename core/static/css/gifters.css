@@ -76,6 +76,16 @@ body, h1, h2, h3, h4, h5, h6, p, a, button {
   display: block;
   object-fit: contain;
 }
+.clients .swiper-slide {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #444;
+  text-align: center;
+  padding: 1rem;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
 
 
 
@@ -86,18 +96,18 @@ body, h1, h2, h3, h4, h5, h6, p, a, button {
 }
 
 .login-btn {
-  background-color: #6c63ff !important;
+  background-color: #1970ea !important;
   color: white !important;
   padding: 0.5rem 1.5rem !important;
   border-radius: 25px !important;
   font-weight: 600 !important;
   transition: all 0.3s ease !important;
-  border: 2px solid #6c63ff !important;
+  border: 2px solid #1970ea !important;
 }
 
 .login-btn:hover {
-  background-color: #5752d3 !important;
-  border-color: #5752d3 !important;
+  background-color: #1970ea !important;
+  border-color: #1970ea !important;
   color: white !important;
   transform: translateY(-2px);
 }
@@ -113,21 +123,21 @@ body, h1, h2, h3, h4, h5, h6, p, a, button {
 }
 
 .login-btn-standalone {
-  background-color: #6c63ff !important;
+  background-color: #1970ea !important;
   color: white !important;
   padding: 0.5rem 1.5rem !important;
   border-radius: 25px !important;
   font-weight: 600 !important;
   transition: all 0.3s ease !important;
-  border: 2px solid #6c63ff !important;
+  border: 2px solid #1970ea !important;
   text-decoration: none !important;
   display: inline-block !important;
   margin-right: -9rem !important;
 }
 
 .login-btn-standalone:hover {
-  background-color: #5752d3 !important;
-  border-color: #5752d3 !important;
+  background-color: #1970ea !important;
+  border-color: #1970ea !important;
   color: white !important;
   transform: translateY(-2px);
   text-decoration: none !important;
@@ -214,3 +224,223 @@ body, h1, h2, h3, h4, h5, h6, p, a, button {
 
 /* Un pequeño respiro para el menú al centro */
 #navmenu{ margin: 0 1rem; }
+
+
+/* Empuja la marca a la izquierda (solo en pantallas grandes) */
+@media (min-width: 992px){ /* lg+ */
+  .brand-text{
+    margin-left: calc(var(--bs-gutter-x, 1.5rem) * -0.5); /* anula el padding-left del .container */
+  }
+}
+
+/* Estilo para los textos del carrusel de categorías */
+.clients .swiper-slide {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1970ea;
+  background: #eaf1ff;
+  border-radius: 1.5rem;      /* redondeado cómodo */
+  padding: 0.6rem 1.2rem;
+  margin: 0.5rem;
+
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  transition: all 0.25s ease-in-out;
+  text-align: center;
+  line-height: 1.2;           /* mejor legibilidad */
+  min-width: 200px;           /* ancho mínimo */
+  max-width: 200px;           /* evita que se estire demasiado */
+  white-space: normal;        /* permite saltos de línea */
+ 
+}
+
+/* Hover */
+.clients .swiper-slide:hover {
+  background: #1970ea;
+  color: #fff;
+  transform: translateY(-2px);
+  cursor: pointer;
+}
+/* 0) Arregla el botón: quita el margen negativo y hazlo compacto en móvil */
+.login-btn-standalone{ margin-right: 0 !important; }
+@media (max-width: 991.98px){
+  .login-btn-standalone{
+    padding: .4rem .8rem !important;
+    font-size: .875rem !important;
+    border-width: 1px !important;
+  }
+}
+
+/* 1) Layout centrado perfecto en desktop: 3 columnas simétricas */
+@media (min-width: 992px){
+  .branding .container{
+    display: grid;                 /* en móvil seguirá usando tu flex */
+    grid-template-columns: 1fr auto 1fr;  /* izq | centro | der */
+    align-items: center;
+    gap: 1rem;
+  }
+  /* asigna cada bloque a su columna sin tocar el HTML */
+  .branding .container > .brand-left{ grid-column: 1; }
+  .branding .container > #navmenu{ grid-column: 2; justify-self: center; }
+  .branding .container > .login-btn-standalone{ grid-column: 3; justify-self: end; }
+}
+
+/* 2) El buscador ya se oculta en <lg; mantenlo fluido en desktop */
+.site-search{ flex: 1 1 520px; max-width: 560px; }
+@media (max-width: 991.98px){ .site-search{ display:none !important; } }
+
+/* 3) Ajustes finos para que el logo no desborde en móvil */
+@media (max-width: 575.98px){
+  .brand-text{ font-size: 1.375rem; } /* ~22px */
+  .brand-mark{ height: 1.5rem; }
+}
+
+
+
+
+/* Login
+    /* Fondo de la sección */
+    #login-details{
+      background-image: url("{% static 'img/Gifters/fondo.png' %}");
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      padding: 40px 0;
+      min-height: 80vh;
+      display: flex;
+      align-items: center;
+    }
+    /* Caja del formulario */
+    #login-details .container{
+      background-color:#fff; border-radius:10px; padding:30px;
+      box-shadow:0 0 15px rgba(0,0,0,.1); max-width:500px;
+    }
+    .login-form{ padding:20px 0; }
+    .form-group{ margin-bottom:20px; }
+    .form-control{ padding:12px 15px; border-radius:8px; border:1px solid #ddd; }
+    .btn-login{
+      background-color:#6c63ff; border:none; color:#fff; padding:12px;
+      border-radius:8px; width:100%; font-weight:600; transition:background-color .3s;
+    }
+    .btn-login:hover{ background-color:#5752d3; }
+    .login-header{ text-align:center; margin-bottom:30px; }
+    .login-header h2{ color:#333; font-weight:700; }
+    .login-header p{ color:#666; }
+    .divider{ display:flex; align-items:center; margin:20px 0; }
+    .divider::before, .divider::after{ content:""; flex:1; border-bottom:1px solid #ddd; }
+    .divider span{ padding:0 10px; color:#777; font-size:14px; }
+    .social-login{ display:flex; justify-content:center; gap:15px; margin-bottom:20px; }
+    .social-btn{
+      width:45px; height:45px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center;
+      border:1px solid #ddd; background:#fff; transition:all .3s;
+    }
+    .social-btn:hover{ background:#f5f5f5; }
+    .signup-link{ text-align:center; margin-top:20px; color:#666; }
+    .signup-link a{ color:#6c63ff; text-decoration:none; font-weight:600; }
+
+    /* REGISTER
+
+      /* Fondo de la sección */
+    #register-details {
+      background-image: url("{% static 'img/Gifters/fondo.png' %}");
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      padding: 40px 0;
+      min-height: 80vh;
+      display: flex;
+      align-items: center;
+    }
+    /* Caja del formulario */
+    #register-details .container {
+      background-color: #fff;
+      border-radius: 10px;
+      padding: 30px;
+      box-shadow: 0 0 15px rgba(0,0,0,.1);
+      max-width: 500px;
+    }
+    .register-form {
+      padding: 20px 0;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-control {
+      padding: 12px 15px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+    }
+    .btn-register {
+      background-color: #6c63ff;
+      border: none;
+      color: #fff;
+      padding: 12px;
+      border-radius: 8px;
+      width: 100%;
+      font-weight: 600;
+      transition: background-color .3s;
+    }
+    .btn-register:hover {
+      background-color: #5752d3;
+    }
+    .register-header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .register-header h2 {
+      color: #333;
+      font-weight: 700;
+    }
+    .register-header p {
+      color: #666;
+    }
+    .divider {
+      display: flex;
+      align-items: center;
+      margin: 20px 0;
+    }
+    .divider::before, .divider::after {
+      content: "";
+      flex: 1;
+      border-bottom: 1px solid #ddd;
+    }
+    .divider span {
+      padding: 0 10px;
+      color: #777;
+      font-size: 14px;
+    }
+    .social-register {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    .social-btn {
+      width: 45px;
+      height: 45px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #ddd;
+      background: #fff;
+      transition: all .3s;
+    }
+    .social-btn:hover {
+      background: #f5f5f5;
+    }
+    .login-link {
+      text-align: center;
+      margin-top: 20px;
+      color: #666;
+    }
+    .login-link a {
+      color: #6c63ff;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    

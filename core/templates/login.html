@@ -1,0 +1,55 @@
+{# templates/login.html #}
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Iniciar Sesión - Gifter's{% endblock %}
+{% block body_class %}login-page{% endblock %}
+
+{% block extra_css %}
+{% endblock %}
+
+{% block content %}
+
+<section id="login-details" class="login-details section">
+  <div class="container" data-aos="fade-up" data-aos-delay="100">
+    <div class="login-header">
+      <i class="bi bi-person-circle" style="font-size:3rem; color:#6c63ff;"></i>
+      <h2>Iniciar Sesión</h2>
+      <p>Ingresa a tu cuenta para descubrir y compartir regalos perfectos</p>
+    </div>
+
+    <form class="login-form">
+      <div class="form-group">
+        <label for="email" class="form-label">Correo electrónico</label>
+        <input type="email" class="form-control" id="email" placeholder="nombre@ejemplo.com">
+      </div>
+
+      <div class="form-group">
+        <label for="password" class="form-label">Contraseña</label>
+        <input type="password" class="form-control" id="password" placeholder="Ingresa tu contraseña">
+      </div>
+
+      <div class="form-group form-check">
+        <input type="checkbox" class="form-check-input" id="remember">
+        <label class="form-check-label" for="remember">Recordarme</label>
+        <a href="#" style="float:right; color:#6c63ff;">¿Olvidaste tu contraseña?</a>
+      </div>
+
+      <button type="submit" class="btn btn-login">Iniciar Sesión</button>
+
+      <div class="divider"><span>O continúa con</span></div>
+
+      <div class="social-login">
+        <a href="#" class="social-btn"><i class="bi bi-google"></i></a>
+        <a href="#" class="social-btn"><i class="bi bi-facebook"></i></a>
+        <a href="#" class="social-btn"><i class="bi bi-twitter-x"></i></a>
+      </div>
+
+      <div class="signup-link">
+        ¿No tienes una cuenta? <a href="{% url 'register' %}">Regístrate ahora</a>
+      </div>
+    </form>
+  </div>
+</section>
+
+{% endblock %}

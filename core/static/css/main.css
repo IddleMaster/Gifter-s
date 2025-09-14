@@ -814,13 +814,14 @@ section,
   font-weight: 700;
   padding: 8px 20px;
   margin: 0;
-  background: color-mix(in srgb, var(--accent-color), transparent 90%);
-  color: var(--accent-color);
+  background: var(--accent-color);  /* ahora el fondo es azul sólido */
+  color: #fff;                      /* letras blancas */
   display: inline-block;
   text-transform: uppercase;
   border-radius: 50px;
   font-family: var(--default-font);
 }
+
 
 .section-title p {
   color: var(--heading-color);

@@ -1,0 +1,80 @@
+{# templates/register.html #}
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Registrarse - Gifter's{% endblock %}
+{% block body_class %}register-page{% endblock %}
+
+{% block extra_css %}
+{% endblock %}
+
+{% block content %}
+
+<section id="register-details" class="register-details section">
+  <div class="container" data-aos="fade-up" data-aos-delay="100">
+    <div class="register-header">
+      <i class="bi bi-person-plus" style="font-size: 3rem; color: #6c63ff;"></i>
+      <h2>Crear Cuenta</h2>
+      <p>Únete a Gifter's y descubre el mundo de los regalos perfectos</p>
+    </div>
+
+    <form class="register-form">
+      <div class="form-group">
+        <label for="nombre" class="form-label">Nombre completo</label>
+        <input type="text" class="form-control" id="nombre" placeholder="Tu nombre completo">
+      </div>
+
+      <!-- Nuevo: Nombre de usuario -->
+      <div class="form-group">
+        <label for="username" class="form-label">Nombre de usuario</label>
+        <input type="text" class="form-control" id="username" placeholder="Elige un nombre de usuario">
+      </div>
+
+      <!-- Nuevo: Fecha de nacimiento -->
+      <div class="form-group">
+        <label for="birthdate" class="form-label">Fecha de nacimiento</label>
+        <input type="date" class="form-control" id="birthdate">
+      </div>
+
+      <div class="form-group">
+        <label for="email" class="form-label">Correo electrónico</label>
+        <input type="email" class="form-control" id="email" placeholder="nombre@ejemplo.com">
+      </div>
+
+      <div class="form-group">
+        <label for="password" class="form-label">Contraseña</label>
+        <input type="password" class="form-control" id="password" placeholder="Crea una contraseña segura">
+      </div>
+
+      <div class="form-group">
+        <label for="confirm-password" class="form-label">Confirmar contraseña</label>
+        <input type="password" class="form-control" id="confirm-password" placeholder="Repite tu contraseña">
+      </div>
+
+      <div class="form-group form-check">
+        <input type="checkbox" class="form-check-input" id="terms">
+        <label class="form-check-label" for="terms">
+          Acepto los <a href="#" style="color: #6c63ff;">términos y condiciones</a>
+        </label>
+      </div>
+
+      <button type="submit" class="btn btn-register">Crear Cuenta</button>
+
+      <div class="divider">
+        <span>O regístrate con</span>
+      </div>
+
+      <div class="social-register">
+        <a href="#" class="social-btn"><i class="bi bi-google"></i></a>
+        <a href="#" class="social-btn"><i class="bi bi-facebook"></i></a>
+        <a href="#" class="social-btn"><i class="bi bi-twitter-x"></i></a>
+      </div>
+
+      <div class="login-link">
+        ¿Ya tienes una cuenta? <a href="{% url 'login' %}">Inicia sesión aquí</a>
+      </div>
+    </form>
+  </div>
+</section>
+
+{% endblock %}

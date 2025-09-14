@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Gifter’s{% endblock %}
+{% block body_class %}index-page{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'css/perfil.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="profile-header">
+  <div class="profile-info">
+    <div class="avatar">
+      <img src="{% static 'img/favicongift.jpg' %}" alt="Usuario">
+    </div>
+    <div class="user-details">
+      <h2>Usuario</h2>
+      <p class="description">"Descripción"</p>
+    </div>
+    <div class="edit-profile">
+      <button class="btn-edit">Editar perfil ✎</button>
+    </div>
+  </div>
+
+  <nav class="profile-nav">
+    <ul>
+      <li><a href="#" class="active" data-tab="wishlist">Wishlist</a></li>
+      <li><a href="#" data-tab="recibidos">Regalos recibidos</a></li>
+      <li><a href="#" data-tab="eventos">Eventos importantes</a></li>
+      <li><a href="#" data-tab="amigos">Amigos</a></li>
+    </ul>
+  </nav>
+</div>
+
+<div class="profile-content">
+
+  <!-- Wishlist -->
+  <section id="wishlist" class="tab-content active">
+    <h3>A “usuario” le encantaría</h3>
+    <div class="gift-grid">
+      <div class="gift-card">
+        <img src="{% static 'img/logo.png' %}" alt="Producto">
+        <div class="gift-info">
+          <h4>Nestle Trencito</h4>
+          <p>Chocolate de leche</p>
+        </div>
+        <div class="gift-actions">
+          <button title="Marcar">✔</button>
+          <button title="Ver">🔍</button>
+          <button title="Copiar enlace">🔗</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Regalos recibidos -->
+  <section id="recibidos" class="tab-content">
+    <h3>“Usuario” ya recibió</h3>
+    <div class="gift-grid">
+      <div class="gift-card">
+        <img src="{% static 'img/logo.png' %}" alt="Producto recibido">
+        <div class="gift-info">
+          <h4>Nestle Trencito</h4>
+          <p>Chocolate de leche</p>
+        </div>
+        <div class="gift-actions">
+          <button title="Ver">🔍</button>
+          <button title="Copiar enlace">🔗</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Eventos importantes -->
+<section id="eventos" class="tab-content">
+  <h3>Eventos importantes de “usuario”</h3>
+
+  <div class="events-list">
+    <div class="event-item">
+      <div class="event-bar">
+        <span class="event-name">Mi Cumpleaños</span>
+      </div>
+      <span class="event-date">12 de noviembre</span>
+      <button class="event-edit" title="Editar">✎</button>
+    </div>
+
+    <div class="event-item">
+      <div class="event-bar">
+        <span class="event-name">Otro evento</span>
+      </div>
+      <span class="event-date">“fecha”</span>
+      <button class="event-edit" title="Editar">✎</button>
+    </div>
+
+    <div class="event-item">
+      <div class="event-bar">
+        <span class="event-name">Otro evento</span>
+      </div>
+      <span class="event-date">“fecha”</span>
+      <button class="event-edit" title="Editar">✎</button>
+    </div>
+  </div>
+</section>
+
+
+
+  <!-- Amigos -->
+  <section id="amigos" class="tab-content">
+    <h3>Amigos</h3>
+    <div class="friends-grid">
+      <div class="friend-card">
+        <div class="avatar"><img src="{% static 'img/avatar-placeholder.png' %}" alt=""></div>
+        <h4>Carla Soto</h4>
+        <p>@carli</p>
+        <button class="btn-primary">👁 Ver perfil</button>
+        <button class="btn-primary">🎁 Regalar</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+  const tabs = document.querySelectorAll(".profile-nav a");
+  const sections = document.querySelectorAll(".tab-content");
+
+  tabs.forEach(tab => {
+    tab.addEventListener("click", e => {
+      e.preventDefault();
+      // desactivar todo
+      tabs.forEach(t => t.classList.remove("active"));
+      sections.forEach(s => s.classList.remove("active"));
+
+      // activar seleccionado
+      tab.classList.add("active");
+      const target = tab.getAttribute("data-tab");
+      document.getElementById(target).classList.add("active");
+    });
+  });
+});
+</script>
+{% endblock %}
