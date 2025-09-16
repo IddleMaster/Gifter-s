@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Verifica tu cuenta</title>
+</head>
+<body>
+    <h2>¡Hola {{ user.first_name }}!</h2>
+    <p>Gracias por registrarte en {{ site_name }}. Para activar tu cuenta, haz clic en el siguiente enlace:</p>
+    
+    <p>
+        <a href="{{ verification_url }}" style="background-color: #6c63ff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">
+            Verificar mi cuenta
+        </a>
+    </p>
+    
+    <p>O copia y pega este enlace en tu navegador:</p>
+    <p>{{ verification_url }}</p>
+    
+    <p>Este enlace expirará en 24 horas.</p>
+    
+    <p>Si no te registraste en {{ site_name }}, ignora este mensaje.</p>
+    
+    <p>¡Gracias!<br>El equipo de {{ site_name }}</p>
+</body>
+</html>

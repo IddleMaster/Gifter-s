@@ -103,6 +103,19 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
+#Email Configurations
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'  # O tu servidor SMTP
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'tu_email@gmail.com'  # Cambia por tu email
+EMAIL_HOST_PASSWORD = 'tu_contraseña_de_app'  # Contraseña de aplicación
+DEFAULT_FROM_EMAIL = 'Gifter\'s <noreply@gifters.com>'
+
+# Site URL for email verification
+SITE_URL = 'http://localhost:8000'  # Cambia en producción cuando tengamos el dominio
+
 # Internationalization
 # https://docs.djangoproject.com/en/3.1/topics/i18n/
 

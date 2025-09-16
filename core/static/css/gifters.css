@@ -1,28 +1,35 @@
 /* Título + marca */
 #hero h1 {
   font-weight: 600;
-  font-size: clamp(2.5rem, 7vw, 5rem); /* más grande en todos los tamaños */
+  font-size: clamp(2.5rem, 7vw, 5rem);
+  /* más grande en todos los tamaños */
   color: #545454;
   margin-bottom: .25rem;
-  text-shadow: 2px 2px 6px rgba(0,0,0,0.25); /* sombra suave */
+  text-shadow: 2px 2px 6px rgba(0, 0, 0, 0.25);
+  /* sombra suave */
 }
 
-#hero .brand { 
-  color: #1970ea; /* azul de marca */
+#hero .brand {
+  color: #1970ea;
+  /* azul de marca */
 }
 
 /* Subtítulo */
 #hero p {
-  color: #1970ea;             /* azul consistente */
-  font-size: 1.5rem;          /* corregido */
+  color: #1970ea;
+  /* azul consistente */
+  font-size: 1.5rem;
+  /* corregido */
   margin: .25rem 0 1rem;
-  font-weight: 900;           /* máximo grosor disponible */
+  font-weight: 900;
+  /* máximo grosor disponible */
 }
 
 /* Botón tipo pastilla */
 .gift {
   display: inline-block;
-  background: #1970ea;        /* azul consistente */
+  background: #1970ea;
+  /* azul consistente */
   color: #fff;
   font-weight: 700;
   font-size: 1.25rem;
@@ -31,17 +38,28 @@
   text-decoration: none;
   line-height: 1.2;
 }
-.gift:hover { 
-  background: #145bcc;        /* azul más oscuro para hover */
+
+.gift:hover {
+  background: #145bcc;
+  /* azul más oscuro para hover */
 }
 
 /* Centrado cómodo del hero */
-#hero .col-lg-12 { 
-  min-height: 60vh; 
+#hero .col-lg-12 {
+  min-height: 60vh;
 }
 
 /* Forzar fuente global a Poppins */
-body, h1, h2, h3, h4, h5, h6, p, a, button {
+body,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+a,
+button {
   font-family: 'Poppins', sans-serif !important;
 }
 
@@ -56,26 +74,33 @@ body, h1, h2, h3, h4, h5, h6, p, a, button {
   content: "";
   position: absolute;
   inset: 0;
-  background: rgba(255,255,255,0.85); /* capa blanca translúcida para suavizar */
+  background: rgba(255, 255, 255, 0.85);
+  /* capa blanca translúcida para suavizar */
   z-index: -1;
 }
 
 /* Ajuste de logo al lado del título */
 .inline-logo {
-  height: 5.5rem;           /* prueba más proporcionado al h1 */
-  margin-left: 0.15rem;   /* separa lo justo del texto */
-  vertical-align: middle; /* lo alinea con la línea del texto */
+  height: 5.5rem;
+  /* prueba más proporcionado al h1 */
+  margin-left: 0.15rem;
+  /* separa lo justo del texto */
+  vertical-align: middle;
+  /* lo alinea con la línea del texto */
   position: relative;
-  top: -0.2rem;           /* lo sube un poquito para emparejar con las letras */
+  top: -0.2rem;
+  /* lo sube un poquito para emparejar con las letras */
 }
 
 
 .logo-img {
-  height: 70px;   /* ajusta el tamaño según lo que necesites */
+  height: 70px;
+  /* ajusta el tamaño según lo que necesites */
   width: auto;
   display: block;
   object-fit: contain;
 }
+
 .clients .swiper-slide {
   font-size: 1.1rem;
   font-weight: 600;
@@ -84,7 +109,7 @@ body, h1, h2, h3, h4, h5, h6, p, a, button {
   padding: 1rem;
   background: #fff;
   border-radius: 8px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 
 
@@ -142,94 +167,202 @@ body, h1, h2, h3, h4, h5, h6, p, a, button {
   transform: translateY(-2px);
   text-decoration: none !important;
 }
+
 /*fin barralogin
 
 /* Marca en el navbar */
-.brand-text{
+.brand-text {
   font-family: 'Poppins', system-ui, -apple-system, sans-serif;
   font-weight: 700;
-  font-size: 1.75rem;         /* ≈28px en móviles */
+  font-size: 1.75rem;
+  /* ≈28px en móviles */
   line-height: 1;
-  color: #8a9aff;             /* azul marca */
+  color: #8a9aff;
+  /* azul marca */
   letter-spacing: .2px;
   margin-right: .35rem;
 }
 
-.brand-mark{
-  height: 1.75rem;            /* 28px; mismo alto visual del texto */
+.brand-mark {
+  height: 1.75rem;
+  /* 28px; mismo alto visual del texto */
   width: auto;
-  vertical-align: middle;     /* alinea con el texto */
+  vertical-align: middle;
+  /* alinea con el texto */
   display: inline-block;
-  margin-left: .1rem;         /* bien pegado */
+  margin-left: .1rem;
+  /* bien pegado */
 }
 
 /* Sube un poco el tamaño en pantallas grandes */
-@media (min-width: 992px){
-  .brand-text{ font-size: 2.1rem; }  /* ≈34px */
-  .brand-mark{ height: 2rem; }       /* 32px */
+@media (min-width: 992px) {
+  .brand-text {
+    font-size: 2.1rem;
+  }
+
+  /* ≈34px */
+  .brand-mark {
+    height: 2rem;
+  }
+
+  /* 32px */
 }
 
 /* Si tenías reglas previas para .logo-img, que no afecten a esta marca */
-.logo .logo-img{ display:none; }  /* opcional: oculta el antiguo logo si estaba */
+.logo .logo-img {
+  display: none;
+}
+
+/* opcional: oculta el antiguo logo si estaba */
 
 
 /* Layout general del header */
-.branding .container { gap: 1rem; }
+.branding .container {
+  gap: 1rem;
+}
 
 /* Buscador del navbar (UI) */
-.site-search { flex: 1 1 520px; max-width: 560px; }
-.search-pill { border: 2px solid #6383ff; border-radius: 9999px; overflow: hidden; }
-.search-input { border: 0; padding: .65rem 1rem; box-shadow: none; }
-.search-input:focus { outline: none; box-shadow: none; }
-.btn-search { background: transparent; border: 0; padding: .55rem .9rem; }
-.btn-search i { font-size: 1.1rem; }
+.site-search {
+  flex: 1 1 520px;
+  max-width: 560px;
+}
+
+.search-pill {
+  border: 2px solid #6383ff;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.search-input {
+  border: 0;
+  padding: .65rem 1rem;
+  box-shadow: none;
+}
+
+.search-input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.btn-search {
+  background: transparent;
+  border: 0;
+  padding: .55rem .9rem;
+}
+
+.btn-search i {
+  font-size: 1.1rem;
+}
 
 /* En móviles ocultamos el buscador por ahora */
-@media (max-width: 991.98px){
-  .site-search { display: none !important; }
+@media (max-width: 991.98px) {
+  .site-search {
+    display: none !important;
+  }
 }
 
 /* ----- Layout del header con FLEX ----- */
-.branding .container{
-  display:flex; align-items:center; justify-content:space-between; gap:1rem;
+.branding .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
 }
-.brand-left{ display:flex; align-items:center; gap:1rem; flex:0 1 auto; }
+
+.brand-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 0 1 auto;
+}
 
 /* Buscador pegado al logo */
-.site-search{ flex:0 1 420px; max-width:520px; }
-@media (max-width: 1199.98px){ .site-search{ flex-basis:360px; max-width:420px; } }
-@media (max-width: 991.98px){ .site-search{ display:none !important; } }
+.site-search {
+  flex: 0 1 420px;
+  max-width: 520px;
+}
 
-.search-pill{ border:2px solid #6383ff; border-radius:9999px; overflow:hidden; }
-.search-input{ border:0; padding:.65rem 1rem; box-shadow:none; }
-.search-input:focus{ outline:none; box-shadow:none; }
-.btn-search{ background:transparent; border:0; padding:.55rem .9rem; }
-.btn-search i{ font-size:1.1rem; }
+@media (max-width: 1199.98px) {
+  .site-search {
+    flex-basis: 360px;
+    max-width: 420px;
+  }
+}
+
+@media (max-width: 991.98px) {
+  .site-search {
+    display: none !important;
+  }
+}
+
+.search-pill {
+  border: 2px solid #6383ff;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.search-input {
+  border: 0;
+  padding: .65rem 1rem;
+  box-shadow: none;
+}
+
+.search-input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.btn-search {
+  background: transparent;
+  border: 0;
+  padding: .55rem .9rem;
+}
+
+.btn-search i {
+  font-size: 1.1rem;
+}
 
 /* Asegurar que el nav no sea absoluto y pueda centrarse */
-#navmenu{ position:static !important; transform:none !important; }
+#navmenu {
+  position: static !important;
+  transform: none !important;
+}
 
 
 /* El bloque de la izquierda puede crecer */
-.brand-left{ flex: 1 1 auto; }
+.brand-left {
+  flex: 1 1 auto;
+}
 
 /* El buscador crece fluido sin límite */
-.site-search{
+.site-search {
   flex: 1 1 auto;
   max-width: none;
-  min-width: 260px;   /* opcional para que no quede muy chico */
+  min-width: 260px;
+  /* opcional para que no quede muy chico */
 }
-.search-pill{ width:100%; }
-.search-input{ width:100%; }
+
+.search-pill {
+  width: 100%;
+}
+
+.search-input {
+  width: 100%;
+}
 
 /* Un pequeño respiro para el menú al centro */
-#navmenu{ margin: 0 1rem; }
+#navmenu {
+  margin: 0 1rem;
+}
 
 
 /* Empuja la marca a la izquierda (solo en pantallas grandes) */
-@media (min-width: 992px){ /* lg+ */
-  .brand-text{
-    margin-left: calc(var(--bs-gutter-x, 1.5rem) * -0.5); /* anula el padding-left del .container */
+@media (min-width: 992px) {
+
+  /* lg+ */
+  .brand-text {
+    margin-left: calc(var(--bs-gutter-x, 1.5rem) * -0.5);
+    /* anula el padding-left del .container */
   }
 }
 
@@ -243,18 +376,23 @@ body, h1, h2, h3, h4, h5, h6, p, a, button {
   font-weight: 600;
   color: #1970ea;
   background: #eaf1ff;
-  border-radius: 1.5rem;      /* redondeado cómodo */
+  border-radius: 1.5rem;
+  /* redondeado cómodo */
   padding: 0.6rem 1.2rem;
   margin: 0.5rem;
 
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
   transition: all 0.25s ease-in-out;
   text-align: center;
-  line-height: 1.2;           /* mejor legibilidad */
-  min-width: 200px;           /* ancho mínimo */
-  max-width: 200px;           /* evita que se estire demasiado */
-  white-space: normal;        /* permite saltos de línea */
- 
+  line-height: 1.2;
+  /* mejor legibilidad */
+  min-width: 200px;
+  /* ancho mínimo */
+  max-width: 200px;
+  /* evita que se estire demasiado */
+  white-space: normal;
+  /* permite saltos de línea */
+
 }
 
 /* Hover */
@@ -264,10 +402,14 @@ body, h1, h2, h3, h4, h5, h6, p, a, button {
   transform: translateY(-2px);
   cursor: pointer;
 }
+
 /* 0) Arregla el botón: quita el margen negativo y hazlo compacto en móvil */
-.login-btn-standalone{ margin-right: 0 !important; }
-@media (max-width: 991.98px){
-  .login-btn-standalone{
+.login-btn-standalone {
+  margin-right: 0 !important;
+}
+
+@media (max-width: 991.98px) {
+  .login-btn-standalone {
     padding: .4rem .8rem !important;
     font-size: .875rem !important;
     border-width: 1px !important;
@@ -275,27 +417,54 @@ body, h1, h2, h3, h4, h5, h6, p, a, button {
 }
 
 /* 1) Layout centrado perfecto en desktop: 3 columnas simétricas */
-@media (min-width: 992px){
-  .branding .container{
-    display: grid;                 /* en móvil seguirá usando tu flex */
-    grid-template-columns: 1fr auto 1fr;  /* izq | centro | der */
+@media (min-width: 992px) {
+  .branding .container {
+    display: grid;
+    /* en móvil seguirá usando tu flex */
+    grid-template-columns: 1fr auto 1fr;
+    /* izq | centro | der */
     align-items: center;
     gap: 1rem;
   }
+
   /* asigna cada bloque a su columna sin tocar el HTML */
-  .branding .container > .brand-left{ grid-column: 1; }
-  .branding .container > #navmenu{ grid-column: 2; justify-self: center; }
-  .branding .container > .login-btn-standalone{ grid-column: 3; justify-self: end; }
+  .branding .container>.brand-left {
+    grid-column: 1;
+  }
+
+  .branding .container>#navmenu {
+    grid-column: 2;
+    justify-self: center;
+  }
+
+  .branding .container>.login-btn-standalone {
+    grid-column: 3;
+    justify-self: end;
+  }
 }
 
 /* 2) El buscador ya se oculta en <lg; mantenlo fluido en desktop */
-.site-search{ flex: 1 1 520px; max-width: 560px; }
-@media (max-width: 991.98px){ .site-search{ display:none !important; } }
+.site-search {
+  flex: 1 1 520px;
+  max-width: 560px;
+}
+
+@media (max-width: 991.98px) {
+  .site-search {
+    display: none !important;
+  }
+}
 
 /* 3) Ajustes finos para que el logo no desborde en móvil */
-@media (max-width: 575.98px){
-  .brand-text{ font-size: 1.375rem; } /* ~22px */
-  .brand-mark{ height: 1.5rem; }
+@media (max-width: 575.98px) {
+  .brand-text {
+    font-size: 1.375rem;
+  }
+
+  /* ~22px */
+  .brand-mark {
+    height: 1.5rem;
+  }
 }
 
 
@@ -303,144 +472,313 @@ body, h1, h2, h3, h4, h5, h6, p, a, button {
 
 /* Login
     /* Fondo de la sección */
-    #login-details{
-      background-image: url("{% static 'img/Gifters/fondo.png' %}");
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      padding: 40px 0;
-      min-height: 80vh;
-      display: flex;
-      align-items: center;
-    }
-    /* Caja del formulario */
-    #login-details .container{
-      background-color:#fff; border-radius:10px; padding:30px;
-      box-shadow:0 0 15px rgba(0,0,0,.1); max-width:500px;
-    }
-    .login-form{ padding:20px 0; }
-    .form-group{ margin-bottom:20px; }
-    .form-control{ padding:12px 15px; border-radius:8px; border:1px solid #ddd; }
-    .btn-login{
-      background-color:#6c63ff; border:none; color:#fff; padding:12px;
-      border-radius:8px; width:100%; font-weight:600; transition:background-color .3s;
-    }
-    .btn-login:hover{ background-color:#5752d3; }
-    .login-header{ text-align:center; margin-bottom:30px; }
-    .login-header h2{ color:#333; font-weight:700; }
-    .login-header p{ color:#666; }
-    .divider{ display:flex; align-items:center; margin:20px 0; }
-    .divider::before, .divider::after{ content:""; flex:1; border-bottom:1px solid #ddd; }
-    .divider span{ padding:0 10px; color:#777; font-size:14px; }
-    .social-login{ display:flex; justify-content:center; gap:15px; margin-bottom:20px; }
-    .social-btn{
-      width:45px; height:45px; border-radius:50%;
-      display:flex; align-items:center; justify-content:center;
-      border:1px solid #ddd; background:#fff; transition:all .3s;
-    }
-    .social-btn:hover{ background:#f5f5f5; }
-    .signup-link{ text-align:center; margin-top:20px; color:#666; }
-    .signup-link a{ color:#6c63ff; text-decoration:none; font-weight:600; }
+#login-details {
+  background-image: url("{% static 'img/Gifters/fondo.png' %}");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  padding: 40px 0;
+  min-height: 80vh;
+  display: flex;
+  align-items: center;
+}
 
-    /* REGISTER
+/* Caja del formulario */
+#login-details .container {
+  background-color: #fff;
+  border-radius: 10px;
+  padding: 30px;
+  box-shadow: 0 0 15px rgba(0, 0, 0, .1);
+  max-width: 500px;
+}
+
+.login-form {
+  padding: 20px 0;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-control {
+  padding: 12px 15px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+
+.btn-login {
+  background-color: #6c63ff;
+  border: none;
+  color: #fff;
+  padding: 12px;
+  border-radius: 8px;
+  width: 100%;
+  font-weight: 600;
+  transition: background-color .3s;
+}
+
+.btn-login:hover {
+  background-color: #5752d3;
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.login-header h2 {
+  color: #333;
+  font-weight: 700;
+}
+
+.login-header p {
+  color: #666;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  margin: 20px 0;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid #ddd;
+}
+
+.divider span {
+  padding: 0 10px;
+  color: #777;
+  font-size: 14px;
+}
+
+.social-login {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.social-btn {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #ddd;
+  background: #fff;
+  transition: all .3s;
+}
+
+.social-btn:hover {
+  background: #f5f5f5;
+}
+
+.signup-link {
+  text-align: center;
+  margin-top: 20px;
+  color: #666;
+}
+
+.signup-link a {
+  color: #6c63ff;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+/* REGISTER
 
       /* Fondo de la sección */
-    #register-details {
-      background-image: url("{% static 'img/Gifters/fondo.png' %}");
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      padding: 40px 0;
-      min-height: 80vh;
-      display: flex;
-      align-items: center;
-    }
-    /* Caja del formulario */
-    #register-details .container {
-      background-color: #fff;
-      border-radius: 10px;
-      padding: 30px;
-      box-shadow: 0 0 15px rgba(0,0,0,.1);
-      max-width: 500px;
-    }
-    .register-form {
-      padding: 20px 0;
-    }
-    .form-group {
-      margin-bottom: 20px;
-    }
-    .form-control {
-      padding: 12px 15px;
-      border-radius: 8px;
-      border: 1px solid #ddd;
-    }
-    .btn-register {
-      background-color: #6c63ff;
-      border: none;
-      color: #fff;
-      padding: 12px;
-      border-radius: 8px;
-      width: 100%;
-      font-weight: 600;
-      transition: background-color .3s;
-    }
-    .btn-register:hover {
-      background-color: #5752d3;
-    }
-    .register-header {
-      text-align: center;
-      margin-bottom: 30px;
-    }
-    .register-header h2 {
-      color: #333;
-      font-weight: 700;
-    }
-    .register-header p {
-      color: #666;
-    }
-    .divider {
-      display: flex;
-      align-items: center;
-      margin: 20px 0;
-    }
-    .divider::before, .divider::after {
-      content: "";
-      flex: 1;
-      border-bottom: 1px solid #ddd;
-    }
-    .divider span {
-      padding: 0 10px;
-      color: #777;
-      font-size: 14px;
-    }
-    .social-register {
-      display: flex;
-      justify-content: center;
-      gap: 15px;
-      margin-bottom: 20px;
-    }
-    .social-btn {
-      width: 45px;
-      height: 45px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 1px solid #ddd;
-      background: #fff;
-      transition: all .3s;
-    }
-    .social-btn:hover {
-      background: #f5f5f5;
-    }
-    .login-link {
-      text-align: center;
-      margin-top: 20px;
-      color: #666;
-    }
-    .login-link a {
-      color: #6c63ff;
-      text-decoration: none;
-      font-weight: 600;
-    }
-    
+#register-details {
+  background-image: url("{% static 'img/Gifters/fondo.png' %}");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  padding: 40px 0;
+  min-height: 80vh;
+  display: flex;
+  align-items: center;
+}
+
+/* Caja del formulario */
+#register-details .container {
+  background-color: #fff;
+  border-radius: 10px;
+  padding: 30px;
+  box-shadow: 0 0 15px rgba(0, 0, 0, .1);
+  max-width: 500px;
+}
+
+.register-form {
+  padding: 20px 0;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-control {
+  padding: 12px 15px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+
+.btn-register {
+  background-color: #6c63ff;
+  border: none;
+  color: #fff;
+  padding: 12px;
+  border-radius: 8px;
+  width: 100%;
+  font-weight: 600;
+  transition: background-color .3s;
+}
+
+.btn-register:hover {
+  background-color: #5752d3;
+}
+
+.register-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.register-header h2 {
+  color: #333;
+  font-weight: 700;
+}
+
+.register-header p {
+  color: #666;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  margin: 20px 0;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid #ddd;
+}
+
+.divider span {
+  padding: 0 10px;
+  color: #777;
+  font-size: 14px;
+}
+
+.social-register {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.social-btn {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #ddd;
+  background: #fff;
+  transition: all .3s;
+}
+
+.social-btn:hover {
+  background: #f5f5f5;
+}
+
+.login-link {
+  text-align: center;
+  margin-top: 20px;
+  color: #666;
+}
+
+.login-link a {
+  color: #6c63ff;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+/* --- Buscador móvil desplegable --- */
+#mobileSearch {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, .06);
+  z-index: 1030;
+  /* sobre el contenido al hacer scroll si el header es sticky */
+}
+
+/* Asegura buenos paddings y tap targets en mobile */
+.site-search-mobile .search-pill {
+  border: 2px solid #6383ff;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.site-search-mobile .search-input {
+  border: 0;
+  padding: .7rem 1rem;
+  box-shadow: none;
+}
+
+.site-search-mobile .search-input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.site-search-mobile .btn-search {
+  background: transparent;
+  border: 0;
+  padding: .6rem .95rem;
+}
+
+.site-search-mobile .btn-search i {
+  font-size: 1.15rem;
+}
+
+/* Ajuste de altura del header en móvil para que no “salte” */
+@media (max-width: 991.98px) {
+  .branding .container {
+    min-height: 64px;
+  }
+}
+
+/* (Opcional) compacta un pelín el botón de login en mobile */
+@media (max-width: 991.98px) {
+  .login-btn-standalone {
+    padding: .4rem .8rem !important;
+    font-size: .875rem !important;
+    border-width: 1px !important;
+  }
+}
+/* === Anti-tiritón 2: bloquea altura de la franja branding también === */
+#header .branding .container,
+#header.header-scrolled .branding .container{
+  min-height: 84px !important;   /* el mismo valor que usas inline */
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* No transiciones de height/padding/margin en el header: solo opacidad/sombra */
+#header, #header *{
+  transition-property: opacity, box-shadow, color, background-color, transform !important;
+}
+
+/* Por si el theme cambia paddings al scrollear */
+#header .branding,
+#header.header-scrolled .branding{
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* Línea inferior opcional sin cambiar el alto */
+#header{ border-bottom: 1px solid transparent; }
+#header.header-scrolled{ border-bottom-color: rgba(0,0,0,.06); }
