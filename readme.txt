@@ -22,7 +22,7 @@ docker compose exec web python manage.py migrate
 Y para ejecutar docker : docker compose up --build
 otros comandos que no recuerdo que hacian referentes a docker: 
 docker compose ps
-docker compose retart web (para reiniciarla)
+docker compose retart web (para reiniciarla MUY UTIL!!! pruebalo cuando no arranque!)
 para runearla creo:
 docker run -p 8000:8000 imagen_django
 y para construirla: docker build --no-cache -t imagen_django .
@@ -43,7 +43,7 @@ http://localhost:8000
 Recordar en caso de que no funcione hay que ponerle enel liveshare que se compartan los terminales en el localhost
 
 El requirements normal es utilizado para iniciar el proyecto y que tenga los requisitos para arrancar, mientras que el requirements2
-es para que el contenedor de docker se pueda construir}
+es para que el contenedor de docker se pueda construir
 
 
 en resumidas cuentas : requirements.txt lo usaremos solo si queremos correr el proyecto fuera de Docker (entorno local).
