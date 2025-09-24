@@ -2,8 +2,6 @@
 """Django's command-line utility for administrative tasks."""
 import os
 import sys
-from fastapi import FastAPI
-
 
 def main():
     """Run administrative tasks."""
@@ -18,16 +16,5 @@ def main():
         ) from exc
     execute_from_command_line(sys.argv)
 
-
 if __name__ == '__main__':
     main()
-
-app = FastAPI()
-
-@app.get("/")
-async def read_root():
-    return {"message": "Hola, Mundo!"}
-
-@app.get("/items/{item_id}")
-async def read_item(item_id: int, q: str = None):
-    return {"item_id": item_id, "q": q}
