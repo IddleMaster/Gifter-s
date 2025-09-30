@@ -32,53 +32,44 @@ class RegisterForm(forms.ModelForm):
     
     class Meta:
         model = User
-        fields = ['first_name', 'last_name', 'username', 'email', 'birthdate']
+        fields = ['nombre', 'apellido', 'nombre_usuario', 'correo']
         widgets = {
-            'first_name': forms.TextInput(attrs={
+            'nombre': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Tu nombre'
             }),
-            'last_name': forms.TextInput(attrs={
+            'apellido': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Tu apellido'
             }),
-            'username': forms.TextInput(attrs={
+            'nombre_usuario': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Elige un nombre de usuario único'
             }),
-            'email': forms.EmailInput(attrs={
+            'correo': forms.EmailInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'tu.email@ejemplo.com'
             }),
-            'birthdate': forms.DateInput(attrs={
-                'class': 'form-control',
-                'type': 'date'
-            }),
         }
         labels = {
-            'first_name': 'Nombre',
-            'last_name': 'Apellido',
-            'username': 'Nombre de usuario',
-            'email': 'Correo electrónico',
-            'birthdate': 'Fecha de nacimiento'
+            'nombre': 'Nombre',
+            'apellido': 'Apellido',
+            'nombre_usuario': 'Nombre de usuario',
+            'correo': 'Correo electrónico'
         }
     
     def clean_password(self):
         password = self.cleaned_data.get('password')
-        
         if not password:
             raise ValidationError("La contraseña es obligatoria")
         
         # Validar fortaleza de la contraseña
         if len(password) < 8:
             raise ValidationError("La contraseña debe tener al menos 8 caracteres")
-        
         if not re.search(r'[A-Z]', password):
             raise ValidationError("La contraseña debe contener al menos una letra mayúscula")
-        
         if not re.search(r'[a-z]', password):
             raise ValidationError("La contraseña debe contener al menos una letra minúscula")
-        
         if not re.search(r'[0-9]', password):
             raise ValidationError("La contraseña debe contener al menos un número")
         
@@ -92,24 +83,16 @@ class RegisterForm(forms.ModelForm):
         if password and confirm_password and password != confirm_password:
             raise ValidationError("Las contraseñas no coinciden")
         
-        # Validar edad mínima (13 años)
-        birthdate = cleaned_data.get('birthdate')
-        if birthdate:
-            today = date.today()
-            age = today.year - birthdate.year - ((today.month, today.day) < (birthdate.month, birthdate.day))
-            if age < 13:
-                raise ValidationError("Debes tener al menos 13 años para registrarte")
-        
         return cleaned_data
     
-    def clean_email(self):
-        email = self.cleaned_data.get('email')
-        if User.objects.filter(email=email).exists():
-            raise ValidationError("Este email ya está registrado")
-        return email
+    def clean_correo(self):
+        correo = self.cleaned_data.get('correo')
+        if User.objects.filter(correo=correo).exists():
+            raise ValidationError("Este correo ya está registrado")
+        return correo
     
-    def clean_username(self):
-        username = self.cleaned_data.get('username')
-        if User.objects.filter(username=username).exists():
+    def clean_nombre_usuario(self):
+        nombre_usuario = self.cleaned_data.get('nombre_usuario')
+        if User.objects.filter(nombre_usuario=nombre_usuario).exists():
             raise ValidationError("Este nombre de usuario ya existe")
-        return username
+        return nombre_usuario

@@ -1,9 +1,10 @@
+from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login
 from django.contrib import messages
 from django.conf import settings
 from .forms import RegisterForm
-from .models import User
+from .models import *
 from .emails import send_verification_email, send_welcome_email
 
 
@@ -59,3 +60,30 @@ def verify_email_view(request, token):
     except User.DoesNotExist:
         messages.error(request, 'El enlace de verificación no es válido.')
         return redirect('register')
+    
+def toggle_like_post(request, post_id):
+    """Vista para alternar like en un post"""
+    if request.method == 'POST':
+        post = Post.objects.get(id_post=post_id)
+        like_agregado = Like.toggle_like_post(request.user, post)
+        
+        # Obtener el nuevo conteo
+        total_likes = Like.contar_likes_post(post)
+        
+        return JsonResponse({
+            'success': True,
+            'like_agregado': like_agregado,
+            'total_likes': total_likes
+        })
+
+def obtener_info_likes_post(request, post_id):
+    """Vista para obtener información de likes de un post"""
+    post = Post.objects.get(id_post=post_id)
+    
+    total_likes = Like.contar_likes_post(post)
+    usuario_dio_like = Like.usuario_dio_like_post(request.user, post) if request.user.is_authenticated else False
+    
+    return JsonResponse({
+        'total_likes': total_likes,
+        'usuario_dio_like': usuario_dio_like
+    })

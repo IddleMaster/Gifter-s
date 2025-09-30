@@ -19,10 +19,12 @@ Luego de crear las tablas ejecutamos :
 docker compose exec web python manage.py makemigrations
 docker compose exec web python manage.py migrate
 
+RECORDAR TENER ABIERTO DOCKER PARA QUE FUNCIONE!
+
 Y para ejecutar docker : docker compose up --build
 otros comandos que no recuerdo que hacian referentes a docker: 
 docker compose ps
-docker compose retart web (para reiniciarla MUY UTIL!!! pruebalo cuando no arranque!)
+docker compose restart web (para reiniciarla MUY UTIL!!! pruebalo cuando no arranque!)
 para runearla creo:
 docker run -p 8000:8000 imagen_django
 y para construirla: docker build --no-cache -t imagen_django .
@@ -30,6 +32,13 @@ y para construirla: docker build --no-cache -t imagen_django .
 hemos tenido que agregarle unas lineas respecto al phpmyadmin
 
 y volvimos a ejecutar docker compose up --build
+PARA HACER LAS MIGRACIONES EN DOCKER:
+
+docker compose exec web python manage.py makemigrations
+docker compose exec web python manage.py migrate
+
+
+
 
 Para entrar a mysql de php: 
 
@@ -49,3 +58,16 @@ es para que el contenedor de docker se pueda construir
 en resumidas cuentas : requirements.txt lo usaremos solo si queremos correr el proyecto fuera de Docker (entorno local).
 
 Y requirements2.txt: para construir el contenedot Docker!
+
+
+MÁS ORDENADO:
+
+# Entrar al contenedor y ejecutar migraciones
+docker compose exec web bash
+python manage.py makemigrations
+python manage.py migrate
+exit
+
+# O hacerlo en un solo comando
+docker compose exec web python manage.py makemigrations
+docker compose exec web python manage.py migrate

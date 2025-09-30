@@ -16,7 +16,7 @@ import os
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
+AUTH_USER_MODEL = "core.User"
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.1/howto/deployment/checklist/
 
@@ -82,7 +82,7 @@ DATABASES = {
         'NAME': os.environ.get('DJANGO_DB_NAME', 'gifters'),
         'USER': os.environ.get('DJANGO_DB_USER', 'gifters_user'),
         'PASSWORD': os.environ.get('DJANGO_DB_PASSWORD', 'gifters_pass'),
-        'HOST': os.environ.get('DJANGO_DB_HOST', 'localhost'),
+        'HOST': os.environ.get('DJANGO_DB_HOST', 'mysql'),
         'PORT': '3306',
     }
 }
@@ -105,7 +105,7 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 #Email Configurations
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
@@ -137,4 +137,4 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/3.1/howto/static-files/
 
 STATIC_URL = '/assets/'
-STATICFILES_DIRS = [os.path.join(BASE_DIR, 'assets')]
+##comentado hasta que se cree assest: STATICFILES_DIRS = [os.path.join(BASE_DIR, 'assets')]
