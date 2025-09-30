@@ -1,0 +1,453 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Todos los Productos - Gifter’s{% endblock %}
+
+{% block extra_css %}
+<style>
+.products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 2rem;
+    margin: 2rem 0;
+}
+
+.product-card {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.product-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.product-image {
+    height: 250px;
+    overflow: hidden;
+    position: relative;
+}
+
+.product-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.product-card:hover .product-image img {
+    transform: scale(1.05);
+}
+
+.product-info {
+    padding: 1.5rem;
+}
+
+.product-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #2d3748;
+}
+
+.product-brand {
+    color: #6c63ff;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+
+.product-price {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #10b981;
+    margin-bottom: 1rem;
+}
+
+.product-description {
+    color: #718096;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    margin-bottom: 1rem;
+}
+
+.product-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: space-between;
+}
+
+.btn-action {
+    flex: 1;
+    padding: 0.5rem;
+    border: none;
+    border-radius: 8px;
+    background: #f7fafc;
+    color: #4a5568;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+}
+
+.btn-action:hover {
+    background: #6c63ff;
+    color: white;
+    transform: translateY(-2px);
+}
+
+/* Filtros */
+.filters-section {
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.filter-group {
+    margin-bottom: 1.5rem;
+}
+
+.filter-group label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #2d3748;
+}
+
+.filter-select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    background: white;
+    transition: border-color 0.3s ease;
+}
+
+.filter-select:focus {
+    outline: none;
+    border-color: #6c63ff;
+}
+
+/* Paginación */
+.pagination {
+    display: flex;
+    justify-content: center;
+    margin: 3rem 0;
+    gap: 0.5rem;
+}
+
+.page-link {
+    padding: 0.75rem 1rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    color: #4a5568;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.page-link:hover {
+    border-color: #6c63ff;
+    color: #6c63ff;
+}
+
+.page-link.active {
+    background: #6c63ff;
+    border-color: #6c63ff;
+    color: white;
+}
+
+/* Estado vacío */
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #718096;
+}
+
+.empty-state i {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    color: #cbd5e0;
+}
+
+/* Header de resultados */
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.results-count {
+    color: #4a5568;
+    font-weight: 500;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .products-grid {
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 1rem;
+    }
+    
+    .filters-section {
+        padding: 1rem;
+    }
+    
+    .results-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+
+    <!-- Header con título y contador -->
+    <div class="results-header">
+        <div>
+            <h1 class="mb-2">Todos los Productos</h1>
+            <p class="results-count">
+                {% if productos.paginator.count > 0 %}
+                    Mostrando {{ productos.start_index }} - {{ productos.end_index }} de {{ productos.paginator.count }} productos
+                {% else %}
+                    No se encontraron productos
+                {% endif %}
+            </p>
+        </div>
+        
+        <!-- Botón para limpiar filtros -->
+        {% if query or selected_categoria or selected_marca %}
+        <a href="{% url 'productos_list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-clockwise"></i> Limpiar Filtros
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- Sección de Filtros -->
+    <div class="filters-section">
+        <form method="get" action="{% url 'productos_list' %}" class="row g-3">
+            <!-- Buscador -->
+            <div class="col-md-4">
+                <div class="filter-group">
+                    <label for="search-input"><i class="bi bi-search"></i> Buscar productos</label>
+                    <input type="text" 
+                           class="form-control filter-select" 
+                           id="search-input"
+                           name="q" 
+                           value="{{ query }}" 
+                           placeholder="Nombre, descripción, marca...">
+                </div>
+            </div>
+
+            <!-- Filtro por Categoría -->
+            <div class="col-md-4">
+                <div class="filter-group">
+                    <label for="categoria-filter"><i class="bi bi-tags"></i> Categoría</label>
+                    <select class="form-select filter-select" id="categoria-filter" name="categoria">
+                        <option value="">Todas las categorías</option>
+                        {% for categoria in categorias %}
+                        <option value="{{ categoria.id_categoria }}" 
+                                {% if selected_categoria == categoria.id_categoria|stringformat:"i" %}selected{% endif %}>
+                            {{ categoria.nombre_categoria }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- Filtro por Marca -->
+            <div class="col-md-4">
+                <div class="filter-group">
+                    <label for="marca-filter"><i class="bi bi-shop"></i> Marca</label>
+                    <select class="form-select filter-select" id="marca-filter" name="marca">
+                        <option value="">Todas las marcas</option>
+                        {% for marca in marcas %}
+                        <option value="{{ marca.id_marca }}" 
+                                {% if selected_marca == marca.id_marca|stringformat:"i" %}selected{% endif %}>
+                            {{ marca.nombre_marca }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- Botones de acción -->
+            <div class="col-12">
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-funnel"></i> Aplicar Filtros
+                    </button>
+                    <a href="{% url 'productos_list' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-clockwise"></i> Limpiar
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Grid de Productos -->
+    {% if productos %}
+        <div class="products-grid">
+            {% for producto in productos %}
+            <div class="product-card">
+                <!-- Imagen del producto -->
+                <div class="product-image">
+                    {% if producto.imagen and producto.imagen.url %}
+                        <img src="{{ producto.imagen.url }}" alt="{{ producto.nombre_producto }}">
+                    {% else %}
+                        <img src="{% static 'img/Gifters/favicongift.png' %}" alt="{{ producto.nombre_producto }}">
+                    {% endif %}
+                </div>
+
+                <!-- Información del producto -->
+                <div class="product-info">
+                    <h3 class="product-title">{{ producto.nombre_producto }}</h3>
+                    <p class="product-brand">{{ producto.id_marca.nombre_marca }}</p>
+                    
+                    {% if producto.precio %}
+                        <p class="product-price">${{ producto.precio }}</p>
+                    {% endif %}
+
+                    <p class="product-description">
+                        {{ producto.descripcion|truncatechars:100 }}
+                    </p>
+
+                    <!-- Acciones -->
+                    <div class="product-actions">
+                        <!-- Ver detalles -->
+                        <a href="{% url 'producto_detalle' producto.id_producto %}" 
+                           class="btn-action" 
+                           title="Ver detalles">
+                            <i class="bi bi-eye"></i>
+                        </a>
+
+                        <!-- Agregar a wishlist -->
+                        <a href="#" 
+                           class="btn-action wishlist-btn" 
+                           title="Agregar a wishlist"
+                           data-product-id="{{ producto.id_producto }}">
+                            <i class="bi bi-heart"></i>
+                        </a>
+
+                        <!-- Link a tienda externa -->
+                        {% with producto.urls_tienda_activas.first as url_tienda %}
+                            {% if url_tienda %}
+                                <a href="{{ url_tienda.url }}" 
+                                   target="_blank" 
+                                   rel="noopener" 
+                                   class="btn-action" 
+                                   title="Ver en tienda">
+                                    <i class="bi bi-link-45deg"></i>
+                                </a>
+                            {% endif %}
+                        {% endwith %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Paginación -->
+        {% if productos.has_other_pages %}
+        <div class="pagination">
+            {% if productos.has_previous %}
+                <a href="?page=1{% if query %}&q={{ query }}{% endif %}{% if selected_categoria %}&categoria={{ selected_categoria }}{% endif %}{% if selected_marca %}&marca={{ selected_marca }}{% endif %}" 
+                   class="page-link">
+                    <i class="bi bi-chevron-double-left"></i>
+                </a>
+                <a href="?page={{ productos.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if selected_categoria %}&categoria={{ selected_categoria }}{% endif %}{% if selected_marca %}&marca={{ selected_marca }}{% endif %}" 
+                   class="page-link">
+                    <i class="bi bi-chevron-left"></i>
+                </a>
+            {% endif %}
+
+            {% for num in productos.paginator.page_range %}
+                {% if productos.number == num %}
+                    <span class="page-link active">{{ num }}</span>
+                {% elif num > productos.number|add:'-3' and num < productos.number|add:'3' %}
+                    <a href="?page={{ num }}{% if query %}&q={{ query }}{% endif %}{% if selected_categoria %}&categoria={{ selected_categoria }}{% endif %}{% if selected_marca %}&marca={{ selected_marca }}{% endif %}" 
+                       class="page-link">{{ num }}</a>
+                {% endif %}
+            {% endfor %}
+
+            {% if productos.has_next %}
+                <a href="?page={{ productos.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if selected_categoria %}&categoria={{ selected_categoria }}{% endif %}{% if selected_marca %}&marca={{ selected_marca }}{% endif %}" 
+                   class="page-link">
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+                <a href="?page={{ productos.paginator.num_pages }}{% if query %}&q={{ query }}{% endif %}{% if selected_categoria %}&categoria={{ selected_categoria }}{% endif %}{% if selected_marca %}&marca={{ selected_marca }}{% endif %}" 
+                   class="page-link">
+                    <i class="bi bi-chevron-double-right"></i>
+                </a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+    {% else %}
+        <!-- Estado vacío -->
+        <div class="empty-state">
+            <i class="bi bi-search"></i>
+            <h3>No se encontraron productos</h3>
+            <p>Intenta ajustar tus filtros de búsqueda o <a href="{% url 'productos_list' %}">ver todos los productos</a>.</p>
+        </div>
+    {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Integración con el buscador del navbar
+    const navbarSearchForms = document.querySelectorAll('form[role="search"]');
+    
+    navbarSearchForms.forEach(form => {
+        form.addEventListener('submit', function(e) {
+            const searchInput = this.querySelector('input[type="search"]');
+            if (searchInput && searchInput.value.trim()) {
+                e.preventDefault();
+                // Redirigir a la página de productos con la búsqueda
+                window.location.href = `{% url 'productos_list' %}?q=${encodeURIComponent(searchInput.value.trim())}`;
+            }
+        });
+    });
+
+    // Wishlist functionality (placeholder)
+    document.querySelectorAll('.wishlist-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const productId = this.getAttribute('data-product-id');
+            
+            // Aquí irá la lógica para agregar a wishlist
+            console.log('Agregar producto', productId, 'a wishlist');
+            
+            // Feedback visual temporal
+            const icon = this.querySelector('i');
+            icon.className = 'bi bi-heart-fill text-danger';
+            this.title = 'En tu wishlist';
+            
+            setTimeout(() => {
+                icon.className = 'bi bi-heart';
+                this.title = 'Agregar a wishlist';
+            }, 2000);
+        });
+    });
+
+    // Auto-submit en cambio de filtros (opcional)
+    const filterSelects = document.querySelectorAll('#categoria-filter, #marca-filter');
+    filterSelects.forEach(select => {
+        select.addEventListener('change', function() {
+            this.form.submit();
+        });
+    });
+});
+</script>
+{% endblock %}

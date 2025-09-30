@@ -1,6 +1,8 @@
 {# templates/login.html #}
 {% extends "base.html" %}
 {% load static %}
+{% load socialaccount %}
+
 
 {% block title %}Iniciar Sesión - Gifter's{% endblock %}
 {% block body_class %}login-page{% endblock %}
@@ -18,37 +20,70 @@
       <p>Ingresa a tu cuenta para descubrir y compartir regalos perfectos</p>
     </div>
 
-    <form class="login-form">
-      <div class="form-group">
-        <label for="email" class="form-label">Correo electrónico</label>
-        <input type="email" class="form-control" id="email" placeholder="nombre@ejemplo.com">
-      </div>
+    <form class="login-form" method="post" action="{% url 'login' %}">
+  {% csrf_token %}
+  {% if request.GET.next %}
+    <input type="hidden" name="next" value="{{ request.GET.next }}">
+  {% endif %}
 
-      <div class="form-group">
-        <label for="password" class="form-label">Contraseña</label>
-        <input type="password" class="form-control" id="password" placeholder="Ingresa tu contraseña">
-      </div>
+  <!-- Errores generales del form (credenciales inválidas, etc.) -->
+  {% if form and form.non_field_errors %}
+    <div class="alert alert-danger">
+      {{ form.non_field_errors }}
+    </div>
+  {% endif %}
 
-      <div class="form-group form-check">
-        <input type="checkbox" class="form-check-input" id="remember">
-        <label class="form-check-label" for="remember">Recordarme</label>
-        <a href="#" style="float:right; color:#6c63ff;">¿Olvidaste tu contraseña?</a>
-      </div>
+  <div class="form-group">
+    <label for="email" class="form-label">Correo electrónico</label>
+    <input
+      type="email"
+      class="form-control"
+      id="email"
+      name="correo"
+      placeholder="nombre@ejemplo.com"
+      value="{{ request.POST.correo|default:'' }}"
+      required
+    >
+  </div>
 
-      <button type="submit" class="btn btn-login">Iniciar Sesión</button>
+  <div class="form-group">
+    <label for="password" class="form-label">Contraseña</label>
+    <input
+      type="password"
+      class="form-control"
+      id="password"
+      name="password"
+      placeholder="Ingresa tu contraseña"
+      required
+    >
+  </div>
 
-      <div class="divider"><span>O continúa con</span></div>
+  <div class="form-group form-check">
+    <input
+      type="checkbox"
+      class="form-check-input"
+      id="remember"
+      name="remember"
+      {% if request.POST.remember %}checked{% endif %}
+    >
+    <label class="form-check-label" for="remember">Recordarme</label>
+    <a href="#" style="float:right; color:#6c63ff;">¿Olvidaste tu contraseña?</a>
+  </div>
 
-      <div class="social-login">
-        <a href="#" class="social-btn"><i class="bi bi-google"></i></a>
-        <a href="#" class="social-btn"><i class="bi bi-facebook"></i></a>
-        <a href="#" class="social-btn"><i class="bi bi-twitter-x"></i></a>
-      </div>
+  <button type="submit" class="btn btn-login">Iniciar Sesión</button>
 
-      <div class="signup-link">
-        ¿No tienes una cuenta? <a href="{% url 'register' %}">Regístrate ahora</a>
-      </div>
-    </form>
+  <div class="divider"><span>O continúa con</span></div>
+
+  <div class="social-login">
+    <a href="{% provider_login_url 'google' process='login' %}" class="social-btn" title="Continuar con Google">
+      <i class="bi bi-google"></i>
+    </a>
+  </div>
+
+  <div class="signup-link">
+    ¿No tienes una cuenta? <a href="{% url 'register' %}">Regístrate ahora</a>
+  </div>
+</form>
   </div>
 </section>
 

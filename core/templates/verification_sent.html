@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Verifica tu correo - Gifter's{% endblock %}
+{% block body_class %}verification-sent-page{% endblock %}
+
+{% block content %}
+<section class="section" style="padding: 60px 0;">
+  <div class="container" data-aos="fade-up" data-aos-delay="100" style="max-width:720px;">
+    <div style="text-align:center;">
+      <i class="bi bi-envelope-check" style="font-size:3rem; color:#6c63ff;"></i>
+      <h2>Revisa tu correo</h2>
+      <p>Te enviamos un enlace para <strong>verificar tu cuenta</strong>. 
+         Abre tu bandeja de entrada y sigue las instrucciones.</p>
+      <p>Si no lo encuentras, revisa también la carpeta de spam.</p>
+
+      <div style="margin-top:24px;">
+        <a href="{% url 'home' %}" class="btn btn-primary">Volver al inicio</a>
+        <a href="{% url 'login' %}" class="btn btn-outline-primary" style="margin-left:8px;">Ir a iniciar sesión</a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

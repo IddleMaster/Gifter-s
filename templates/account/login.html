@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% load static i18n socialaccount %}
+
+{% block title %}Iniciar Sesión - Gifter's{% endblock %}
+{% block body_class %}login-page{% endblock %}
+
+{% block content %}
+<section id="login-details" class="login-details section">
+  <div class="container" data-aos="fade-up" data-aos-delay="100">
+    <div class="login-header">
+      <i class="bi bi-person-circle" style="font-size:3rem; color:#6c63ff;"></i>
+      <h2>Iniciar Sesión</h2>
+      <p>Ingresa a tu cuenta para descubrir y compartir regalos perfectos</p>
+    </div>
+
+    <form class="login-form" method="post" action="{% url 'account_login' %}">
+      {% csrf_token %}
+
+      {% if form and form.errors %}
+        <div class="alert alert-danger mb-3">
+          {% for field, errors in form.errors.items %}
+            {% for error in errors %}{{ error }}<br>{% endfor %}
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="form-group">
+        <label for="id_login" class="form-label">Correo electrónico</label>
+        <input type="email" class="form-control" id="id_login" name="login" placeholder="nombre@ejemplo.com" required>
+      </div>
+
+      <div class="form-group">
+        <label for="id_password" class="form-label">Contraseña</label>
+        <input type="password" class="form-control" id="id_password" name="password" placeholder="Ingresa tu contraseña" required>
+      </div>
+
+      <div class="form-group form-check">
+        <input type="checkbox" class="form-check-input" id="id_remember" name="remember">
+        <label class="form-check-label" for="id_remember">Recordarme</label>
+        <a href="{% url 'account_reset_password' %}" style="float:right; color:#6c63ff;">¿Olvidaste tu contraseña?</a>
+      </div>
+
+      <button type="submit" class="btn btn-login">Iniciar Sesión</button>
+
+      <div class="divider"><span>O continúa con</span></div>
+
+      <div class="social-login">
+        <a href="{% provider_login_url 'google' process='login' %}" class="social-btn" title="Continuar con Google">
+          <i class="bi bi-google"></i>
+        </a>
+      </div>
+
+      <div class="signup-link">
+        ¿No tienes una cuenta? <a href="{% url 'register' %}">Regístrate ahora</a>
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}

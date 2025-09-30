@@ -38,8 +38,23 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
+    'django.contrib.sites',          
+    'allauth',                       
+    'allauth.account',               
+    'allauth.socialaccount',         
+    'allauth.socialaccount.providers.google',  
+
     'core',
     'django_bootstrap5'
+
+]
+
+SITE_ID = 1
+
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',                
+    'allauth.account.auth_backends.AuthenticationBackend',       
 ]
 
 MIDDLEWARE = [
@@ -48,9 +63,13 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+
+    'allauth.account.middleware.AccountMiddleware',  
+
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
 
 ROOT_URLCONF = 'myproject.urls'
 
@@ -106,18 +125,17 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-#Email Configurations
-
+# Email Configurations (usar SMTP real, no consola)
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'  # O tu servidor SMTP
+EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'tu_email@gmail.com'  # Cambia por tu email
-EMAIL_HOST_PASSWORD = 'tu_contraseña_de_app'  # Contraseña de aplicación
-DEFAULT_FROM_EMAIL = 'Gifter\'s <noreply@gifters.com>'
+EMAIL_HOST_USER = 'giftersg4@gmail.com'          # <-- tu Gmail
+EMAIL_HOST_PASSWORD = 'lhix entt ockg lqrl'         # <-- contraseña de aplicación (no la normal)
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER            # usa el mismo remitente real
 
-# Site URL for email verification
-SITE_URL = 'http://localhost:8000'  # Cambia en producción cuando tengamos el dominio
+# URL base para enlaces de verificación
+SITE_URL = os.getenv("SITE_URL", "http://localhost:8000")
 
 # Internationalization
 # https://docs.djangoproject.com/en/3.1/topics/i18n/
@@ -135,6 +153,59 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.1/howto/static-files/
+# Configuración de archivos media
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-STATIC_URL = '/assets/'
+# Configuración de archivos static
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'core/static'),
+]
+##STATIC_URL = '/assets/'
 ##comentado hasta que se cree assest: STATICFILES_DIRS = [os.path.join(BASE_DIR, 'assets')]
+
+
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/'
+
+# Configuración de allauth para tu modelo personalizado
+ACCOUNT_AUTHENTICATION_METHOD = 'email'
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_USER_MODEL_EMAIL_FIELD = 'correo'
+ACCOUNT_EMAIL_VERIFICATION = 'optional'  # cambia a 'mandatory' si quieres forzar verificación
+
+# Adapters (los crearemos después en core/adapters.py)
+ACCOUNT_ADAPTER = 'core.adapters.CustomAccountAdapter'
+SOCIALACCOUNT_ADAPTER = 'core.adapters.CustomSocialAccountAdapter'
+
+SOCIALACCOUNT_QUERY_EMAIL = True
+SOCIALACCOUNT_STORE_TOKENS = True
+
+ACCOUNT_LOGOUT_ON_GET = True
+ACCOUNT_LOGOUT_REDIRECT_URL = '/'
+
+
+# Allauth – salta la pantalla intermedia
+SOCIALACCOUNT_LOGIN_ON_GET = True
+
+# Dónde cae después de login/logout (ya lo tienes, lo dejo junto)
+LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/"
+
+# (Opcional pero recomendado) Ajustes del provider Google
+SOCIALACCOUNT_PROVIDERS = {
+    "google": {
+        "SCOPE": ["email", "profile"],
+        "AUTH_PARAMS": {"prompt": "select_account"}
+    }
+}
+
+# Allauth sin username
+ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None   # <- clave para que no busque 'username'
+ACCOUNT_AUTHENTICATION_METHOD = "email"
+ACCOUNT_USER_MODEL_EMAIL_FIELD = "correo"
+ACCOUNT_EMAIL_REQUIRED = True

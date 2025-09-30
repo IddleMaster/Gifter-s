@@ -5,32 +5,46 @@ import uuid
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.conf import settings
+from datetime import timedelta
+
+
+
+from django.contrib.auth.models import BaseUserManager
 
 class UserManager(BaseUserManager):
-    def create_user(self, correo, nombre, apellido, nombre_usuario, password=None, **extra_fields):
+    def create_user(self, correo, nombre, apellido, nombre_usuario=None, password=None, **extra_fields):
         if not correo:
             raise ValueError("El usuario debe tener un correo electrónico")
-        if not nombre_usuario:
-            raise ValueError("El usuario debe tener un nombre de usuario")
-
         correo = self.normalize_email(correo)
+
         user = self.model(
             correo=correo,
             nombre=nombre,
             apellido=apellido,
-            nombre_usuario=nombre_usuario,
+            nombre_usuario=nombre_usuario or '',  # se autogenera en User.save() si viene vacío
             **extra_fields
         )
-        user.set_password(password)  # Maneja hash de contraseña automáticamente
+        user.set_password(password)  # None => contraseña “no usable”, válido para registros sociales
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, correo, nombre, apellido, nombre_usuario, password=None, **extra_fields):
+    def create_superuser(self, correo, nombre, apellido, password=None, **extra_fields):
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("es_admin", True)
 
-        return self.create_user(correo, nombre, apellido, nombre_usuario, password, **extra_fields)
+        if password is None:
+            raise ValueError("El superusuario debe tener contraseña")
+
+        return self.create_user(
+            correo=correo,
+            nombre=nombre,
+            apellido=apellido,
+            nombre_usuario='',   # lo autogenerará tu modelo en save()
+            password=password,
+            **extra_fields
+        )
+
     
     
 class User(AbstractBaseUser, PermissionsMixin):
@@ -45,8 +59,9 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
+    is_verified = models.BooleanField(default=False)  # <-- NUEVO
 
-    verification_token = models.UUIDField(default=uuid.uuid4, editable=False)
+    verification_token = models.UUIDField(default=uuid.uuid4, editable=False, null=True, blank=True)
     token_created_at = models.DateTimeField(default=timezone.now)
 
     objects = UserManager()
@@ -69,6 +84,11 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f"{self.nombre} {self.apellido} ({self.correo})"
+
+    # --- Método para validación de expiración del token ---
+    def is_verification_token_expired(self):
+        """Devuelve True si el token de verificación ya expiró (ej: 24 horas)."""
+        return timezone.now() - self.token_created_at > timedelta(hours=24)
 
 
 
@@ -907,16 +927,134 @@ class Marca(models.Model):
 
 
 class Producto(models.Model):
-    id_producto = models.AutoField(primary_key=True)   # Identificador único
-    nombre_producto = models.CharField(max_length=255) #Nombre del producto
-    descripcion = models.CharField(max_length=255)     # Breve descripción del producto
-    imagen = models.ImageField(upload_to="productos/", blank=True, null=True)  
-    id_categoria = models.ForeignKey(Categoria, on_delete=models.CASCADE)  # Relación con categoría
-    id_marca = models.ForeignKey(Marca, on_delete=models.CASCADE)          # Relación con marca
-
+    id_producto = models.AutoField(primary_key=True)
+    nombre_producto = models.CharField(max_length=255)
+    descripcion = models.CharField(max_length=255)
+    imagen = models.ImageField(upload_to="productos/", blank=True, null=True)
+    id_categoria = models.ForeignKey(Categoria, on_delete=models.CASCADE)
+    id_marca = models.ForeignKey(Marca, on_delete=models.CASCADE)
+    precio = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    
+    # Campos de control
+    activo = models.BooleanField(default=True, verbose_name='¿Activo?')
+    fecha_creacion = models.DateTimeField(default=timezone.now, editable=False)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'producto'
+        verbose_name = 'Producto'
+        verbose_name_plural = 'Productos'
+        ordering = ['-fecha_creacion']
+        indexes = [
+            models.Index(fields=['id_categoria'], name='idx_producto_categoria'),
+            models.Index(fields=['id_marca'], name='idx_producto_marca'),
+            models.Index(fields=['activo'], name='idx_producto_activo'),
+        ]
+    
+    # Campos calculados para rating
+    @property
+    def rating_promedio(self):
+        """Calcula el rating promedio basado en reseñas"""
+        from django.db.models import Avg
+        promedio = self.resenas.aggregate(Avg('calificacion'))['calificacion__avg']
+        return round(promedio, 1) if promedio else 0
+    
+    @property
+    def total_resenas(self):
+        """Total de reseñas del producto"""
+        return self.resenas.count()
+    
+    @property
+    def fue_comprado(self):
+        """Verifica si el producto fue comprado alguna vez"""
+        return self.en_wishlists.filter(fecha_comprado__isnull=False).exists()
+    
+    @property
+    def urls_tienda_activas(self):
+        """Obtiene todas las URLs de tienda activas"""
+        return self.urls_tienda.filter(activo=True)
+    
+    @property
+    def url_tienda_principal(self):
+        """Obtiene la URL de tienda principal (la primera activa)"""
+        url_principal = self.urls_tienda.filter(activo=True, es_principal=True).first()
+        if url_principal:
+            return url_principal.url
+        return self.urls_tienda.filter(activo=True).first().url if self.urls_tienda_activas.exists() else None
+    
+    def soft_delete(self):
+        """Eliminación suave del producto"""
+        self.activo = False
+        self.save()
+    
+    def restaurar(self):
+        """Restaurar producto eliminado"""
+        self.activo = True
+        self.save()
+    
+    def clean(self):
+        """Validaciones del modelo"""
+        if self.precio and self.precio < 0:
+            raise ValidationError("El precio no puede ser negativo")
+    
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+    
     def __str__(self):
         return self.nombre_producto
 
+
+class UrlTienda(models.Model):
+    """Modelo para manejar múltiples URLs de tienda por producto"""
+    id_url = models.AutoField(primary_key=True)
+    producto = models.ForeignKey(
+        Producto, 
+        on_delete=models.CASCADE, 
+        related_name='urls_tienda'
+    )
+    url = models.URLField(max_length=500, verbose_name='URL de la tienda')
+    nombre_tienda = models.CharField(max_length=100, verbose_name='Nombre de la tienda')
+    es_principal = models.BooleanField(default=False, verbose_name='¿URL principal?')
+    activo = models.BooleanField(default=True, verbose_name='¿Activa?')
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'url_tienda'
+        verbose_name = 'URL de Tienda'
+        verbose_name_plural = 'URLs de Tiendas'
+        ordering = ['-es_principal', 'nombre_tienda']
+        constraints = [
+            # Solo una URL principal por producto
+            models.UniqueConstraint(
+                fields=['producto', 'es_principal'], 
+                condition=models.Q(es_principal=True),
+                name='unique_url_principal_por_producto'
+            )
+        ]
+        indexes = [
+            models.Index(fields=['producto'], name='idx_url_producto'),
+            models.Index(fields=['activo'], name='idx_url_activo'),
+        ]
+    
+    def clean(self):
+        """Validaciones"""
+        if self.es_principal and not self.activo:
+            raise ValidationError("Una URL principal no puede estar inactiva")
+    
+    def save(self, *args, **kwargs):
+        # Si esta URL se marca como principal, quitar principal de otras
+        if self.es_principal:
+            UrlTienda.objects.filter(
+                producto=self.producto, 
+                es_principal=True
+            ).update(es_principal=False)
+        
+        self.clean()
+        super().save(*args, **kwargs)
+    
+    def __str__(self):
+        return f"{self.nombre_tienda} - {self.producto.nombre_producto}"
 
 
 #jav

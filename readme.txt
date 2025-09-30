@@ -37,8 +37,15 @@ PARA HACER LAS MIGRACIONES EN DOCKER:
 docker compose exec web python manage.py makemigrations
 docker compose exec web python manage.py migrate
 
+OTRO COMANDO PARA DOCKER
 
+Con este comando se sube el csv
+ docker compose exec web python manage.py import_products productos.csv
 
+CON ESTE COMANDO AÑADIMOS IMAGENES DEAFULTS
+ docker compose exec web python manage.py assign_default_images
+
+para confirmar, ver en phpmyadmin
 
 Para entrar a mysql de php: 
 
@@ -71,3 +78,8 @@ exit
 # O hacerlo en un solo comando
 docker compose exec web python manage.py makemigrations
 docker compose exec web python manage.py migrate
+
+
+credenciales django
+giftersg4@gmail.com
+gifters123.

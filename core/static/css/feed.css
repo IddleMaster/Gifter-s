@@ -1,0 +1,167 @@
+/* --- Estilos Generales para el Contenedor del Feed --- */
+.feed-container {
+    padding: 20px 15px;
+    background-color: #f0f2f5; /* Un gris claro como fondo */
+    min-height: 100vh;
+}
+
+.feed-main-content {
+    max-width: 680px; /* Ancho estándar para un feed */
+    margin: 0 auto; /* Centrar el contenido */
+}
+
+/* --- Estilos para la Tarjeta de Post (Post Card) --- */
+.post-card {
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    margin-bottom: 20px;
+    padding: 15px;
+}
+
+/* --- Encabezado del Post (Foto de perfil y nombre) --- */
+.post-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.profile-pic {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin-right: 10px;
+    object-fit: cover;
+}
+
+.post-author-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.author-name {
+    font-weight: 600;
+    color: #050505;
+    text-decoration: none;
+}
+
+.author-name:hover {
+    text-decoration: underline;
+}
+
+.post-timestamp {
+    font-size: 0.8rem;
+    color: #65676b;
+}
+
+/* --- Contenido del Post (Texto e Imagen) --- */
+.post-content p {
+    margin-bottom: 10px;
+    color: #050505;
+    line-height: 1.4;
+}
+
+.post-image {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin-top: 10px;
+}
+
+/* --- Acciones del Post (Me gusta, Comentar, Compartir) --- */
+.post-actions {
+    display: flex;
+    justify-content: space-around;
+    padding: 10px 0;
+    border-top: 1px solid #e4e6eb;
+    border-bottom: 1px solid #e4e6eb;
+    margin: 10px 0;
+}
+
+.action-btn {
+    color: #65676b;
+    text-decoration: none;
+    font-weight: 600;
+    padding: 8px 12px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+}
+.action-btn i {
+    margin-right: 6px;
+    font-size: 1.2rem;
+}
+
+.action-btn:hover {
+    background-color: #f0f2f5;
+}
+
+/* --- Sección de Comentarios --- */
+.post-comments {
+    padding-top: 10px;
+}
+
+.comment {
+    display: flex;
+    margin-bottom: 10px;
+}
+
+.comment-pic {
+    width: 32px;
+    height: 32px;
+}
+
+.comment-body {
+    background-color: #f0f2f5;
+    border-radius: 18px;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+}
+
+.comment-body p {
+    margin: 0;
+}
+
+.comment-form {
+    display: flex;
+    align-items: center;
+    margin-top: 10px;
+}
+
+.comment-input {
+    flex-grow: 1;
+    border: none;
+    background-color: #f0f2f5;
+    border-radius: 18px;
+    padding: 8px 12px;
+    outline: none;
+}
+
+/* --- Estilos para la caja de 'Crear Post' --- */
+.create-post-card textarea {
+    flex-grow: 1;
+    border: none;
+    background-color: #f0f2f5;
+    border-radius: 20px;
+    padding: 10px 15px;
+    font-size: 1rem;
+    resize: none;
+    outline: none;
+    min-height: 24px;
+}
+.create-post-actions {
+    text-align: right;
+    margin-top: 10px;
+}
+.btn-create-post {
+    background-color: #2374e1;
+    color: white;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.btn-create-post:hover {
+    background-color: #1a64c4;
+}

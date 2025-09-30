@@ -1,6 +1,7 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="utf-8">
   <meta content="width=device-width, initial-scale=1.0" name="viewport">
@@ -29,149 +30,163 @@
 
   <style>
     /* Poppins global */
-    body, h1,h2,h3,h4,h5,h6,p,a,button{ font-family:'Poppins',sans-serif !important; }
+    body,
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    p,
+    a,
+    button {
+      font-family: 'Poppins', sans-serif !important;
+    }
 
     /* Igual que en tu index */
-    .logo-img{ height:64px; width:auto; display:block; }
-    .login-btn-standalone{
-      display:inline-block; padding:.55rem 1rem; border-radius:999px;
-      background:#1970ea; color:#fff; text-decoration:none; font-weight:700;
+    .logo-img {
+      height: 64px;
+      width: auto;
+      display: block;
     }
-    .login-btn-standalone:hover{ filter:brightness(.92); color:#fff; }
+
+    .login-btn-standalone {
+      display: inline-block;
+      padding: .55rem 1rem;
+      border-radius: 999px;
+      background: #1970ea;
+      color: #fff;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .login-btn-standalone:hover {
+      filter: brightness(.92);
+      color: #fff;
+    }
   </style>
   <link href="{% static 'css/gifters.css' %}" rel="stylesheet">
 
   {% block extra_css %}{% endblock %}
 </head>
+
 <body class="{% block body_class %}{% endblock %}">
 
   <!-- HEADER = el mismo del index -->
-<header id="header" class="header sticky-top">
+  <header id="header" class="header sticky-top">
 
-  <!-- Topbar -->
-  <div class="topbar d-flex align-items-center">
-    <div class="container d-flex justify-content-center justify-content-md-between">
-      <div class="w-100 text-center py-1 bg-primary text-white">
-        <i><span>Gifter's® 2025</span></i>
-      </div>
-      <div class="social-links d-none d-md-flex align-items-center">
-        <a href="#" class="twitter"><i class="bi bi-twitter-x"></i></a>
-        <a href="#" class="facebook"><i class="bi bi-facebook"></i></a>
-        <a href="#" class="instagram"><i class="bi bi-instagram"></i></a>
-        <a href="#" class="linkedin"><i class="bi bi-linkedin"></i></a>
-      </div>
-    </div>
-  </div>
-
-  <!-- Barra principal -->
-  <div class="branding d-flex align-items-center">
-    <div class="container position-relative d-flex align-items-center" style="min-height:84px;">
-
-      <!-- IZQUIERDA: Marca + buscador (desktop) -->
-      <div class="brand-left d-flex align-items-center gap-3 flex-shrink-0">
-        <a href="{% url 'home' %}"
-           class="logo brand d-flex align-items-center"
-           style="z-index:2;">
-          <span class="brand-text">Gifter’s</span>
-          <img src="{% static 'img/Gifters/favicongift.png' %}" alt="Isotipo Gifter’s" class="brand-mark">
-        </a>
-
-        <!-- Buscador solo en ≥ LG -->
-        <form class="site-search d-none d-lg-block" role="search" action="#" method="get">
-          <div class="input-group search-pill">
-            <input type="search" class="form-control search-input"
-                   placeholder="Búsqueda: regalos, categorías, amigos..."
-                   aria-label="Buscar">
-            <button class="btn btn-search" type="submit" aria-label="Buscar">
-              <i class="bi bi-search"></i>
-            </button>
-          </div>
-        </form>
-      </div>
-
-      <!-- CENTRO: Nav (solo desktop) -->
-      <nav id="navmenu" class="navmenu d-none d-lg-block mx-auto">
-        <ul>
-          <li><a href="{% url 'home' %}#hero" class="active">Inicio</a></li>
-          <li><a href="{% url 'home' %}#clients">Categorías</a></li>
-          <li><a href="{% url 'home' %}#services">Amigos</a></li>
-          <li><a href="{% url 'home' %}#portfolio">Regalos</a></li>
-        </ul>
-       <!-- <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>-->
-        <i class="mobile-nav-toggle d-none"></i>
-      </nav>
-
-      <!-- DERECHA: Login + botones móviles -->
-      <div class="d-flex align-items-center ms-auto">
-        <a href="{% url 'login' %}" class="login-btn-standalone">Iniciar Sesión</a>
-
-        <!-- Toggle buscador móvil -->
-        <button class="btn btn-link p-0 ms-2 d-lg-none"
-                type="button"
-                data-bs-toggle="collapse"
-                data-bs-target="#mobileSearch"
-                aria-expanded="false"
-                aria-controls="mobileSearch"
-                aria-label="Buscar">
-          <i class="bi bi-search" style="font-size:1.35rem;"></i>
-        </button>
-
-        <!-- Toggle menú móvil -->
-        <button class="btn btn-link p-0 ms-2 d-lg-none"
-                type="button"
-                data-bs-toggle="collapse"
-                data-bs-target="#mobileNav"
-                aria-expanded="false"
-                aria-controls="mobileNav"
-                aria-label="Menú">
-          <i class="bi bi-list" style="font-size:1.6rem;"></i>
-        </button>
+    <!-- Topbar -->
+    <div class="topbar d-flex align-items-center">
+      <div class="container d-flex justify-content-center justify-content-md-between">
+        <div class="w-100 text-center py-1 bg-primary text-white">
+          <i><span>Gifter's® 2025</span></i>
+        </div>
+        <div class="social-links d-none d-md-flex align-items-center">
+          <a href="#" class="twitter"><i class="bi bi-twitter-x"></i></a>
+          <a href="#" class="facebook"><i class="bi bi-facebook"></i></a>
+          <a href="#" class="instagram"><i class="bi bi-instagram"></i></a>
+          <a href="#" class="linkedin"><i class="bi bi-linkedin"></i></a>
+        </div>
       </div>
     </div>
-  </div>
 
-<!-- Agrupador de colapsables móviles -->
-<div id="mobileCollapses" class="d-lg-none">
+    <!-- Barra principal -->
+    <div class="branding d-flex align-items-center">
+      <div class="container position-relative d-flex align-items-center" style="min-height:84px;">
 
-  <!-- Buscador móvil colapsable -->
-  <div id="mobileSearch"
-       class="collapse border-top bg-white"
-       data-bs-parent="#mobileCollapses">
-    <div class="container py-2">
-      <form class="site-search-mobile" role="search" action="#" method="get">
-        <div class="input-group search-pill">
-          <input type="search" class="form-control search-input"
-                 placeholder="Buscar regalos, categorías, amigos…"
-                 aria-label="Buscar">
-          <button class="btn btn-search" type="submit" aria-label="Buscar">
-            <i class="bi bi-search"></i>
+        <!-- IZQUIERDA: Marca + buscador (desktop) -->
+        <div class="brand-left d-flex align-items-center gap-3 flex-shrink-0">
+          <a href="{% url 'home' %}" class="logo brand d-flex align-items-center" style="z-index:2;">
+            <span class="brand-text">Gifter’s</span>
+            <img src="{% static 'img/Gifters/favicongift.png' %}" alt="Isotipo Gifter’s" class="brand-mark">
+          </a>
+
+          <!-- Buscador solo en ≥ LG -->
+          <form class="site-search d-none d-lg-block" role="search" action="{% url 'productos_list' %}" method="get">
+            <div class="input-group search-pill">
+              <input type="search" class="form-control search-input" name="q"
+                placeholder="Búsqueda: regalos, categorías, amigos..." aria-label="Buscar" value="{{ request.GET.q }}">
+              <button class="btn btn-search" type="submit" aria-label="Buscar">
+                <i class="bi bi-search"></i>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- CENTRO: Nav (solo desktop) -->
+        <nav id="navmenu" class="navmenu d-none d-lg-block mx-auto">
+          <ul>
+            <li><a href="{% url 'home' %}#hero" class="active">Inicio</a></li>
+            <li><a href="{% url 'home' %}#clients">Categorías</a></li>
+            <li><a href="{% url 'home' %}#services">Amigos</a></li>
+            <li><a href="{% url 'home' %}#portfolio">Regalos</a></li>
+          </ul>
+          <!-- <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>-->
+          <i class="mobile-nav-toggle d-none"></i>
+        </nav>
+
+        <!-- DERECHA: Login + botones móviles -->
+        <div class="d-flex align-items-center ms-auto">
+          {% if user.is_authenticated %}
+          <a href="{% url 'account_logout' %}" class="btn btn-primary">Cerrar sesión</a>
+          {% else %}
+          <a href="{% url 'account_login' %}" class="login-btn-standalone">Iniciar Sesión</a>
+          {% endif %}
+
+
+
+          <!-- Toggle buscador móvil -->
+          <button class="btn btn-link p-0 ms-2 d-lg-none" type="button" data-bs-toggle="collapse"
+            data-bs-target="#mobileSearch" aria-expanded="false" aria-controls="mobileSearch" aria-label="Buscar">
+            <i class="bi bi-search" style="font-size:1.35rem;"></i>
+          </button>
+
+          <!-- Toggle menú móvil -->
+          <button class="btn btn-link p-0 ms-2 d-lg-none" type="button" data-bs-toggle="collapse"
+            data-bs-target="#mobileNav" aria-expanded="false" aria-controls="mobileNav" aria-label="Menú">
+            <i class="bi bi-list" style="font-size:1.6rem;"></i>
           </button>
         </div>
-      </form>
+      </div>
     </div>
-  </div>
 
-  <!-- Menú móvil colapsable -->
-  <div id="mobileNav"
-       class="collapse border-top bg-white"
-       data-bs-parent="#mobileCollapses">
-    <div class="container py-2">
-      <nav aria-label="Navegación principal móvil">
-        <ul class="nav flex-column mobile-nav">
-          <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#hero">Inicio</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#clients">Categorías</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#services">Amigos</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#portfolio">Regalos</a></li>
-        </ul>
-      </nav>
+    <!-- Agrupador de colapsables móviles -->
+    <div id="mobileCollapses" class="d-lg-none">
+
+      <!-- Buscador móvil colapsable -->
+      <div id="mobileSearch" class="collapse border-top bg-white" data-bs-parent="#mobileCollapses">
+        <div class="container py-2">
+          <form class="site-search-mobile" role="search" action="{% url 'productos_list' %}" method="get">
+            <div class="input-group search-pill">
+              <input type="search" class="form-control search-input" name="q"
+                placeholder="Buscar regalos, categorías, amigos…" aria-label="Buscar" value="{{ request.GET.q }}">
+              <button class="btn btn-search" type="submit" aria-label="Buscar">
+                <i class="bi bi-search"></i>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Menú móvil colapsable -->
+      <div id="mobileNav" class="collapse border-top bg-white" data-bs-parent="#mobileCollapses">
+        <div class="container py-2">
+          <nav aria-label="Navegación principal móvil">
+            <ul class="nav flex-column mobile-nav">
+              <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#hero">Inicio</a></li>
+              <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#clients">Categorías</a></li>
+              <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#services">Amigos</a></li>
+              <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#portfolio">Regalos</a></li>
+            </ul>
+          </nav>
+        </div>
+      </div>
+
     </div>
-  </div>
 
-</div>
+    <!-- OPCIONAL: no se pisan buscador y menú; cerrar menú al click -->
 
-  <!-- OPCIONAL: no se pisan buscador y menú; cerrar menú al click -->
-  
-</header>
+  </header>
   <!-- /HEADER -->
 
   <main class="main">
@@ -232,49 +247,50 @@
 
   <!-- Main JS -->
   <script src="{% static 'js/main.js' %}"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  // Elementos
-  const msEl = document.getElementById('mobileSearch');
-  const mnEl = document.getElementById('mobileNav');
-  const bSearch = document.getElementById('btnMobileSearch');
-  const bMenu   = document.getElementById('btnMobileNav');
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      // Elementos
+      const msEl = document.getElementById('mobileSearch');
+      const mnEl = document.getElementById('mobileNav');
+      const bSearch = document.getElementById('btnMobileSearch');
+      const bMenu = document.getElementById('btnMobileNav');
 
-  // Si falta algo, salimos
-  if (!window.bootstrap || !msEl || !mnEl || !bSearch || !bMenu) return;
+      // Si falta algo, salimos
+      if (!window.bootstrap || !msEl || !mnEl || !bSearch || !bMenu) return;
 
-  // Instancias de Collapse sin auto-toggle
-  const ms = new bootstrap.Collapse(msEl, { toggle: false });
-  const mn = new bootstrap.Collapse(mnEl, { toggle: false });
+      // Instancias de Collapse sin auto-toggle
+      const ms = new bootstrap.Collapse(msEl, { toggle: false });
+      const mn = new bootstrap.Collapse(mnEl, { toggle: false });
 
-  // Evitar propagación/accidentes con otros listeners
-  function stop(e){ e.preventDefault(); e.stopPropagation(); }
+      // Evitar propagación/accidentes con otros listeners
+      function stop(e) { e.preventDefault(); e.stopPropagation(); }
 
-  // Clicks controlados: al abrir uno, cerramos el otro
-  bSearch.addEventListener('click', function (e) {
-    stop(e);
-    mn.hide();
-    ms.toggle();
-  });
+      // Clicks controlados: al abrir uno, cerramos el otro
+      bSearch.addEventListener('click', function (e) {
+        stop(e);
+        mn.hide();
+        ms.toggle();
+      });
 
-  bMenu.addEventListener('click', function (e) {
-    stop(e);
-    ms.hide();
-    mn.toggle();
-  });
+      bMenu.addEventListener('click', function (e) {
+        stop(e);
+        ms.hide();
+        mn.toggle();
+      });
 
-  // Redundante (pero seguro): si uno se abre por otra causa, cierra el otro
-  msEl.addEventListener('show.bs.collapse', function(){ mn.hide(); });
-  mnEl.addEventListener('show.bs.collapse', function(){ ms.hide(); });
+      // Redundante (pero seguro): si uno se abre por otra causa, cierra el otro
+      msEl.addEventListener('show.bs.collapse', function () { mn.hide(); });
+      mnEl.addEventListener('show.bs.collapse', function () { ms.hide(); });
 
-  // Cierra el menú al elegir una opción
-  document.querySelectorAll('#mobileNav .nav-link').forEach(function(a){
-    a.addEventListener('click', function(){
-      mn.hide();
+      // Cierra el menú al elegir una opción
+      document.querySelectorAll('#mobileNav .nav-link').forEach(function (a) {
+        a.addEventListener('click', function () {
+          mn.hide();
+        });
+      });
     });
-  });
-});
-</script>
+  </script>
   {% block extra_js %}{% endblock %}
 </body>
+
 </html>

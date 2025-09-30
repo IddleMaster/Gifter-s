@@ -5,6 +5,30 @@ from .models import User
 from datetime import date
 import re
 
+class LoginForm(forms.Form):
+    correo = forms.EmailField(
+        label="Correo electrónico",
+        widget=forms.EmailInput(attrs={
+            "class": "form-control",
+            "placeholder": "tu.email@ejemplo.com",
+            "autocomplete": "email",
+        })
+    )
+    password = forms.CharField(
+        label="Contraseña",
+        widget=forms.PasswordInput(attrs={
+            "class": "form-control",
+            "placeholder": "Ingresa tu contraseña",
+            "autocomplete": "current-password",
+        }),
+        min_length=8,
+        help_text="Mínimo 8 caracteres"
+    )
+    remember_me = forms.BooleanField(
+        required=False,
+        label="Recordarme"
+    )
+    
 class RegisterForm(forms.ModelForm):
     password = forms.CharField(
         widget=forms.PasswordInput(attrs={
