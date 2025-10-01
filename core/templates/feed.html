@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Gifter’s{% endblock %}
+{% block title %}Feed | Gifter’s{% endblock %}
 {% block body_class %}index-page{% endblock %}
 
 {% block extra_css %}
@@ -9,64 +9,66 @@
 {% endblock %}
 
 {% block content %}
-
 <main class="feed-container">
     <div class="feed-main-content">
         <div class="feed-posts-column">
             
             <div class="post-card create-post-card">
-                <div class="post-header">
-                    {# Aquí iría la foto del usuario que ha iniciado sesión #}
-                    <img src="{% static 'img/team/team-1.jpg' %}" alt="Tu foto de perfil" class="profile-pic">
-                    <textarea placeholder="¿Qué estás pensando, {{ user.nombre_usuario }}?"></textarea>
-                </div>
-                <div class="create-post-actions">
-                    <button class="btn-create-post">Publicar</button>
-                </div>
+                <form method="POST" action="{% url 'feed' %}">
+                    {% csrf_token %}
+                    <div class="post-header">
+                        <img src="{% static 'img/team/team-1.jpg' %}" alt="Tu foto de perfil" class="profile-pic">
+                        {{ form.contenido }}
+                    </div>
+                    <div class="create-post-actions">
+                        <button type="submit" class="btn-create-post">Publicar</button>
+                    </div>
+                </form>
             </div>
 
+            {% for post in posts %}
             <div class="post-card">
                 <div class="post-header">
                     <img src="{% static 'img/team/team-2.jpg' %}" alt="Foto de perfil" class="profile-pic">
                     <div class="post-author-info">
-                        <a href="#" class="author-name">Elías C.</a>
-                        <span class="post-timestamp">hace 5 minutos</span>
+                        <a href="#" class="author-name">{{ post.id_usuario.nombre_usuario }}</a>
+                        <span class="post-timestamp">{{ post.fecha_publicacion|date:"d M, Y H:i" }}</span>
                     </div>
                 </div>
 
                 <div class="post-content">
-                    <p>¡Miren este increíble set de LEGO que me regalaron! Es el Nissan Skyline de Brian O'Conner en 2 Fast 2 Furious. ¡Un sueño hecho realidad para cualquier fan de la saga! 🚗💨</p>
-                    <img src="{% static 'img/Gifters/nissan-lego.png' %}" alt="Imagen del post" class="post-image">
+                    <p>{{ post.contenido }}</p>
+                    {% if post.url_media %}
+                    <img src="{{ post.url_media }}" alt="Imagen del post" class="post-image">
+                    {% endif %}
                 </div>
 
                 <div class="post-actions">
-                    <a href="#" class="action-btn"><i class="bi bi-heart"></i> 15 Me gusta</a>
-                    <a href="#" class="action-btn"><i class="bi bi-chat-dots"></i> 3 Comentarios</a>
+                    <a href="#" class="action-btn like-btn {% if post.user_has_liked %}liked{% endif %}" data-post-id="{{ post.id_post }}">
+                        <i class="bi bi-heart-fill"></i>
+                        <i class="bi bi-heart"></i>
+                        <span class="like-count">{{ post.likes.count }}</span> Me gusta
+                    </a>
+                    <a href="#" class="action-btn"><i class="bi bi-chat-dots"></i> Comentar</a>
                     <a href="#" class="action-btn"><i class="bi bi-share"></i> Compartir</a>
                 </div>
 
                 <div class="post-comments">
-                    <div class="comment">
-                        <img src="{% static 'img/team/team-3.jpg' %}" alt="Foto de perfil" class="profile-pic comment-pic">
-                        <div class="comment-body">
-                            <a href="#" class="author-name">Javiera A.</a>
-                            <p>¡Qué genial! Se ve increíble. ¿Fue difícil de armar?</p>
-                        </div>
-                    </div>
-                    <div class="comment">
-                        <img src="{% static 'img/team/team-4.jpg' %}" alt="Foto de perfil" class="profile-pic comment-pic">
-                        <div class="comment-body">
-                            <a href="#" class="author-name">Matias Q.</a>
-                            <p>Uff, ¡tremendo regalo! 🔥</p>
-                        </div>
-                    </div>
                     <div class="comment-form">
                          <img src="{% static 'img/team/team-1.jpg' %}" alt="Tu foto de perfil" class="profile-pic comment-pic">
                          <input type="text" class="comment-input" placeholder="Escribe un comentario...">
                     </div>
                 </div>
             </div>
-            </div>
+            {% empty %}
+                <div class="post-card">
+                    <p>Aún no hay publicaciones. ¡Sé el primero en compartir algo!</p>
+                </div>
+            {% endfor %}
+        </div>
     </div>
 </main>
 {% endblock %}
+
+
+

@@ -26,7 +26,6 @@
   <!-- Main CSS -->
   <link href="{% static 'css/main.css' %}" rel="stylesheet">
   <link href="{% static 'css/gifters.css' %}" rel="stylesheet">
-  <link href="{% static 'css/perfil.css' %}" rel="stylesheet">
 
   <style>
     /* Poppins global */
@@ -75,6 +74,8 @@
   <!-- HEADER = el mismo del index -->
   <header id="header" class="header sticky-top">
 
+
+
     <!-- Topbar -->
     <div class="topbar d-flex align-items-center">
       <div class="container d-flex justify-content-center justify-content-md-between">
@@ -103,12 +104,15 @@
 
           <!-- Buscador solo en ≥ LG -->
           <form class="site-search d-none d-lg-block" role="search" action="{% url 'productos_list' %}" method="get">
-            <div class="input-group search-pill">
-              <input type="search" class="form-control search-input" name="q"
-                placeholder="Búsqueda: regalos, categorías, amigos..." aria-label="Buscar" value="{{ request.GET.q }}">
+            <div class="input-group search-pill position-relative">
+              <input type="search" class="form-control search-input" name="q" id="searchInputDesktop"
+                placeholder="Búsqueda: regalos, categorías, amigos..." aria-label="Buscar" value="{{ request.GET.q }}"
+                autocomplete="off">
               <button class="btn btn-search" type="submit" aria-label="Buscar">
                 <i class="bi bi-search"></i>
               </button>
+              <!-- Contenedor de sugerencias DEBE estar dentro del input-group -->
+              <div id="sugerenciasDesktop" class="sugerencias-container"></div>
             </div>
           </form>
         </div>
@@ -117,54 +121,73 @@
         <nav id="navmenu" class="navmenu d-none d-lg-block mx-auto">
           <ul>
             <li><a href="{% url 'home' %}#hero" class="active">Inicio</a></li>
-            <li><a href="{% url 'home' %}#clients">Categorías</a></li>
+            <li><a href="{% url 'home' %}#clients">Categorías</a></li> <!-- Ahora apunta a las categorías reales -->
             <li><a href="{% url 'home' %}#services">Amigos</a></li>
             <li><a href="{% url 'home' %}#portfolio">Regalos</a></li>
+            <!-- Ahora apunta a Tendencias/Productos Destacados -->
           </ul>
-          <!-- <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>-->
           <i class="mobile-nav-toggle d-none"></i>
         </nav>
 
-        <!-- DERECHA: Login + botones móviles -->
-        <div class="d-flex align-items-center ms-auto">
-          {% if user.is_authenticated %}
-          <a href="{% url 'account_logout' %}" class="btn btn-primary">Cerrar sesión</a>
-          {% else %}
-          <a href="{% url 'account_login' %}" class="login-btn-standalone">Iniciar Sesión</a>
-          {% endif %}
+        {% if user.is_authenticated %}
+        <div class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" role="button"
+            data-bs-toggle="dropdown" aria-expanded="false">
+            <span>Hola, {{ user.nombre }}</span>
+          </a>
 
+          <ul class="dropdown-menu dropdown-menu-end shadow">
+            <li><a class="dropdown-item" href="{% url 'perfil' %}">Mi perfil</a></li>
 
-
-          <!-- Toggle buscador móvil -->
-          <button class="btn btn-link p-0 ms-2 d-lg-none" type="button" data-bs-toggle="collapse"
-            data-bs-target="#mobileSearch" aria-expanded="false" aria-controls="mobileSearch" aria-label="Buscar">
-            <i class="bi bi-search" style="font-size:1.35rem;"></i>
-          </button>
-
-          <!-- Toggle menú móvil -->
-          <button class="btn btn-link p-0 ms-2 d-lg-none" type="button" data-bs-toggle="collapse"
-            data-bs-target="#mobileNav" aria-expanded="false" aria-controls="mobileNav" aria-label="Menú">
-            <i class="bi bi-list" style="font-size:1.6rem;"></i>
-          </button>
+            <li>
+              <hr class="dropdown-divider">
+            </li>
+            <li>
+              <form method="post" action="{% url 'account_logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="dropdown-item logout-item">Cerrar sesión</button>
+              </form>
+            </li>
+          </ul>
         </div>
+        {% else %}
+        <a href="{% url 'account_login' %}" class="btn btn-primary">Iniciar Sesión</a>
+        {% endif %}
+
+
+
+
+
+
+        <!-- Toggle buscador móvil -->
+        <button class="btn btn-link p-0 ms-2 d-lg-none" type="button" data-bs-toggle="collapse"
+          data-bs-target="#mobileSearch" aria-expanded="false" aria-controls="mobileSearch" aria-label="Buscar">
+          <i class="bi bi-search" style="font-size:1.35rem;"></i>
+        </button>
+
+        <!-- Toggle menú móvil -->
+        <button class="btn btn-link p-0 ms-2 d-lg-none" type="button" data-bs-toggle="collapse"
+          data-bs-target="#mobileNav" aria-expanded="false" aria-controls="mobileNav" aria-label="Menú">
+          <i class="bi bi-list" style="font-size:1.6rem;"></i>
+        </button>
       </div>
+    </div>
     </div>
 
     <!-- Agrupador de colapsables móviles -->
     <div id="mobileCollapses" class="d-lg-none">
 
-      <!-- Buscador móvil colapsable -->
-      <div id="mobileSearch" class="collapse border-top bg-white" data-bs-parent="#mobileCollapses">
+      <!-- Menú móvil colapsable -->
+      <div id="mobileNav" class="collapse border-top bg-white" data-bs-parent="#mobileCollapses">
         <div class="container py-2">
-          <form class="site-search-mobile" role="search" action="{% url 'productos_list' %}" method="get">
-            <div class="input-group search-pill">
-              <input type="search" class="form-control search-input" name="q"
-                placeholder="Buscar regalos, categorías, amigos…" aria-label="Buscar" value="{{ request.GET.q }}">
-              <button class="btn btn-search" type="submit" aria-label="Buscar">
-                <i class="bi bi-search"></i>
-              </button>
-            </div>
-          </form>
+          <nav aria-label="Navegación principal móvil">
+            <ul class="nav flex-column mobile-nav">
+              <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#hero">Inicio</a></li>
+              <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#clients">Categorías</a></li>
+              <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#services">Amigos</a></li>
+              <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#portfolio">Regalos</a></li>
+            </ul>
+          </nav>
         </div>
       </div>
 
@@ -187,9 +210,20 @@
     <!-- OPCIONAL: no se pisan buscador y menú; cerrar menú al click -->
 
   </header>
-  <!-- /HEADER -->
+  {% if messages %}
+  <div class="container my-2">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-2" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
 
   <main class="main">
+    <!-- /HEADER -->
+
     {% block content %}{% endblock %}
   </main>
 
@@ -246,6 +280,17 @@
   <script src="{% static 'vendor/isotope-layout/isotope.pkgd.min.js' %}"></script>
 
   <!-- Main JS -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        document.querySelectorAll('.alert').forEach(a => {
+          const bsAlert = bootstrap.Alert.getOrCreateInstance(a);
+          bsAlert.close();
+        });
+      }, 4000);
+    });
+  </script>
+
   <script src="{% static 'js/main.js' %}"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {

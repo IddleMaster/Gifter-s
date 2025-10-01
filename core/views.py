@@ -1,9 +1,10 @@
-from django.http import JsonResponse
+from itertools import count
+from django.http import JsonResponse, HttpResponseForbidden
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login
 from django.contrib import messages
 from django.conf import settings
-from .forms import RegisterForm
+from .forms import PostForm, RegisterForm, PerfilForm, PreferenciasUsuarioForm
 from .models import *
 from .emails import send_verification_email, send_welcome_email
 from django.core.paginator import Paginator
@@ -11,33 +12,52 @@ from django.db.models import Q, Avg
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth import authenticate, login
-
 from django.core.mail import send_mail
 from django.urls import reverse
-
 from django.db import IntegrityError, transaction
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 import uuid
-
-
 from .models import User, Post, Like  # ajusta si necesitas más
 
 
+from rest_framework import generics, permissions, status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from core.models import User, SolicitudAmistad, Seguidor
+from .serializers import SolicitudAmistadSerializer, UsuarioLiteSerializer
+from .models import Conversacion, Mensaje, ParticipanteConversacion, EntregaMensaje
+from .serializers import ConversacionSerializer, MensajeSerializer
+
+
+from rest_framework.pagination import PageNumberPagination
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+
+from core.models import Conversacion, Mensaje, ParticipanteConversacion
+from .serializers import ConversacionLiteSerializer, MensajeSerializer
+
+
+
 def home(request):
-    """Página principal con productos destacados"""
+    """Página principal con productos destacados y categorías"""
     try:
         # Obtener productos activos (máximo 9 para la página principal)
         productos_destacados = Producto.objects.filter(activo=True).order_by('-fecha_creacion')[:9]
         
+        # Obtener todas las categorías activas (que tengan productos)
+        categorias = Categoria.objects.filter(
+            producto__activo=True
+        ).distinct().order_by('nombre_categoria')[:12]  # Máximo 12 categorías
+        
         # Debug en consola
         print("🎯 VISTA HOME EJECUTADA")
         print(f"📦 Productos encontrados: {productos_destacados.count()}")
-        for p in productos_destacados:
-            print(f"   - {p.nombre_producto} (Imagen: {'Sí' if p.imagen else 'No'})")
+        print(f"📂 Categorías encontradas: {categorias.count()}")
         
         context = {
             'productos_destacados': productos_destacados,
+            'categorias': categorias,
         }
         return render(request, 'index.html', context)
         
@@ -49,9 +69,9 @@ def home(request):
         # En caso de error, mostrar lista vacía
         context = {
             'productos_destacados': [],
+            'categorias': [],
         }
         return render(request, 'index.html', context)
-
 
 def register_view(request):
     if request.method == 'POST':
@@ -168,6 +188,8 @@ def obtener_info_likes_post(request, post_id):
         'usuario_dio_like': usuario_dio_like
     })
     
+
+    
 ###PRODUCTOS
     
 def productos_list(request):
@@ -224,15 +246,71 @@ def producto_detalle(request, producto_id):
     return render(request, 'productos/detalle.html', context)
 
 # Protege la página para que solo usuarios logueados puedan verla
-
+##TODo LO QUE TENGA QUE VER CON EL FEED AQUI
+@login_required
 def feed_view(request):
     """
-    Esta vista se encarga de mostrar el feed principal a los usuarios.
+    Versión original y optimizada para mostrar el feed y el estado de los 'likes'.
     """
-    # Por ahora, solo renderizamos la plantilla.
-    # Más adelante, aquí obtendremos los posts de la base de datos.
-    context = {} # Un diccionario vacío por ahora
+    form = PostForm()
+
+    if request.method == 'POST':
+        form = PostForm(request.POST)
+        if form.is_valid():
+            nuevo_post = form.save(commit=False)
+            nuevo_post.id_usuario = request.user
+            nuevo_post.save()
+            return redirect('feed')
+    
+    # 1. Obtenemos todos los posts, optimizando con prefetch_related para los likes
+    all_posts = Post.objects.all().select_related('id_usuario').prefetch_related('likes').order_by('-fecha_publicacion')
+
+    # 2. Obtenemos los IDs de los posts a los que el usuario actual ha dado like
+    liked_post_ids = Like.objects.filter(
+        id_usuario=request.user, 
+        id_post__in=all_posts
+    ).values_list('id_post_id', flat=True)
+    
+    # 3. Añadimos el atributo 'user_has_liked' a cada post
+    for post in all_posts:
+        post.user_has_liked = post.id_post in liked_post_ids
+
+    context = {
+        'posts': all_posts,
+        'form': form
+    }
     return render(request, 'feed.html', context)
+
+
+@login_required
+def toggle_like_post_view(request, post_id):
+    """
+    Vista para dar o quitar 'like' a un post.
+    Responde con JSON para ser usada con JavaScript.
+    """
+    # Solo aceptamos peticiones POST para esta acción
+    if request.method == 'POST':
+        # Obtenemos el post, si no existe, devuelve un error 404
+        post = get_object_or_404(Post, id_post=post_id)
+        
+        # Usamos el método que ya tienes en tu modelo Like. ¡Perfecto!
+        like, created = Like.objects.get_or_create(id_usuario=request.user, id_post=post)
+
+        # Si el like no fue creado, significa que ya existía, entonces lo borramos.
+        if not created:
+            like.delete()
+            liked = False
+        else:
+            liked = True
+            
+        # Contamos el total de likes actual para el post
+        total_likes = post.likes.count()
+        
+        # Devolvemos una respuesta en formato JSON
+        return JsonResponse({'liked': liked, 'total_likes': total_likes})
+    
+    # Si no es una petición POST, devolvemos un error
+    return JsonResponse({'error': 'Método no permitido'}, status=405)
 
 # FUNCIONES DE ADMINISTRACIÓN DE PRODUCTOS
 
@@ -529,6 +607,66 @@ def buscar_productos(request):
     }
     return render(request, 'productos/buscar.html', context)
 
+def buscar_sugerencias(request):
+    """Vista para obtener sugerencias de búsqueda en tiempo real"""
+    query = request.GET.get('q', '').strip()
+    print(f"🔍 Búsqueda recibida: '{query}'")  # Para debug
+    
+    if len(query) < 2:
+        return JsonResponse({'sugerencias': []})
+    
+    sugerencias = []
+    
+    try:
+        # Buscar productos por nombre, descripción o marca
+        productos = Producto.objects.filter(
+            Q(nombre_producto__icontains=query) |
+            Q(descripcion__icontains=query) |
+            Q(id_marca__nombre_marca__icontains=query),
+            activo=True
+        ).select_related('id_categoria', 'id_marca')[:6]
+        
+        print(f"📦 Productos encontrados: {productos.count()}")  # Para debug
+        
+        for producto in productos:
+            sugerencias.append({
+                'tipo': 'producto',
+                'texto': producto.nombre_producto,
+                'marca': producto.id_marca.nombre_marca if producto.id_marca else '',
+                'categoria': producto.id_categoria.nombre_categoria if producto.id_categoria else '',
+                'url': f"/producto/{producto.id_producto}/"
+            })
+        
+        # Buscar categorías
+        categorias = Categoria.objects.filter(
+            nombre_categoria__icontains=query
+        )[:3]
+        
+        for categoria in categorias:
+            sugerencias.append({
+                'tipo': 'categoría',
+                'texto': categoria.nombre_categoria,
+                'descripcion': categoria.descripcion,
+                'url': f"/productos/?categoria={categoria.id_categoria}"
+            })
+        
+        # Buscar marcas
+        marcas = Marca.objects.filter(
+            nombre_marca__icontains=query
+        )[:2]
+        
+        for marca in marcas:
+            sugerencias.append({
+                'tipo': 'marca', 
+                'texto': marca.nombre_marca,
+                'url': f"/productos/?marca={marca.id_marca}"
+            })
+            
+    except Exception as e:
+        print(f"❌ Error en búsqueda de sugerencias: {e}")
+    
+    print(f"🎯 Total sugerencias a enviar: {len(sugerencias)}")  # Para debug
+    return JsonResponse({'sugerencias': sugerencias})
 
 def login_view(request):
     """
@@ -618,3 +756,258 @@ def productos_list(request):
         'selected_marca': marca_id,
     }
     return render(request, 'productos_list.html', context)  # ← CORREGIDO
+
+@login_required
+def profile_view(request):
+    """
+    Muestra el perfil del usuario actual.
+    Crea Perfil y Preferencias si no existen (sin señales).
+    """
+    perfil, _ = Perfil.objects.get_or_create(user=request.user)
+    prefs, _ = PreferenciasUsuario.objects.get_or_create(user=request.user)
+
+    context = {
+        'perfil': perfil,
+        'prefs': prefs,
+    }
+    return render(request, 'perfil.html', context)
+
+
+@login_required
+def profile_edit(request):
+    """
+    Edita perfil (bio, foto, fecha) y preferencias.
+    """
+    perfil, _ = Perfil.objects.get_or_create(user=request.user)
+    prefs, _ = PreferenciasUsuario.objects.get_or_create(user=request.user)
+
+    if request.method == 'POST':
+        p_form = PerfilForm(request.POST, request.FILES, instance=perfil)
+        pref_form = PreferenciasUsuarioForm(request.POST, instance=prefs)
+
+        if p_form.is_valid() and pref_form.is_valid():
+            p_form.save()
+            pref_form.save()
+            messages.success(request, 'Perfil actualizado correctamente.')
+            return redirect('perfil')
+        else:
+            messages.error(request, 'Revisa los campos marcados.')
+    else:
+        p_form = PerfilForm(instance=perfil)
+        pref_form = PreferenciasUsuarioForm(instance=prefs)
+
+    return render(request, 'perfil_editar.html', {
+        'p_form': p_form,
+        'pref_form': pref_form,
+    })
+
+def chat_room(request, conversacion_id):
+    conv = get_object_or_404(Conversacion, pk=conversacion_id)
+    if not ParticipanteConversacion.objects.filter(conversacion=conv, usuario=request.user).exists():
+        return HttpResponseForbidden("No eres participante de esta conversación.")
+    return render(request, "chat/room.html", {"conversacion_id": conv.conversacion_id})
+
+
+    ##########   ##########   ##########   ##########   ##########   
+  ##########   ##########     ##########   ##########   ##########   
+  ########## SECCION DE LOS AMIGOS (solicitudes y demas) ###############   
+  ##########   ##########   ##########   ##########   ##########   ## 
+class IsAuthenticated(permissions.IsAuthenticated):
+    pass
+
+# POST /amistad/solicitudes/  (enviar)
+class EnviarSolicitudAmistad(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        receptor_id = request.data.get("receptor_id")
+        mensaje = request.data.get("mensaje", "")
+        if not receptor_id:
+            return Response({"detail": "receptor_id es requerido"}, status=400)
+        if int(receptor_id) == request.user.id:
+            return Response({"detail": "No puedes enviarte una solicitud a ti mismo."}, status=400)
+
+        try:
+            receptor = User.objects.get(pk=receptor_id)
+        except User.DoesNotExist:
+            return Response({"detail": "Usuario receptor no existe"}, status=404)
+
+        try:
+            with transaction.atomic():
+                sol = SolicitudAmistad.objects.create(emisor=request.user, receptor=receptor, mensaje=mensaje)
+        except IntegrityError:
+            # UniqueConstraint emisor+receptor
+            sol = SolicitudAmistad.objects.filter(emisor=request.user, receptor=receptor).first()
+
+        return Response(SolicitudAmistadSerializer(sol).data, status=201)
+
+# GET /amistad/solicitudes/recibidas/?estado=pendiente
+class SolicitudesRecibidasList(generics.ListAPIView):
+    serializer_class = SolicitudAmistadSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        estado = self.request.query_params.get("estado")
+        qs = SolicitudAmistad.objects.filter(receptor=self.request.user)
+        if estado:
+            qs = qs.filter(estado=estado)
+        return qs.order_by("-creada_en")
+
+# GET /amistad/solicitudes/enviadas/?estado=pendiente
+class SolicitudesEnviadasList(generics.ListAPIView):
+    serializer_class = SolicitudAmistadSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        estado = self.request.query_params.get("estado")
+        qs = SolicitudAmistad.objects.filter(emisor=self.request.user)
+        if estado:
+            qs = qs.filter(estado=estado)
+        return qs.order_by("-creada_en")
+
+# POST /amistad/solicitudes/{id}/aceptar
+class AceptarSolicitud(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            sol = SolicitudAmistad.objects.get(pk=pk, receptor=request.user)
+        except SolicitudAmistad.DoesNotExist:
+            return Response({"detail": "Solicitud no encontrada"}, status=404)
+        conv = sol.aceptar()
+        data = SolicitudAmistadSerializer(sol).data
+        data["conversacion_id"] = getattr(conv, "conversacion_id", None)
+        return Response(data)
+
+# POST /amistad/solicitudes/{id}/rechazar
+class RechazarSolicitud(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            sol = SolicitudAmistad.objects.get(pk=pk, receptor=request.user)
+        except SolicitudAmistad.DoesNotExist:
+            return Response({"detail": "Solicitud no encontrada"}, status=404)
+        sol.rechazar()
+        return Response(SolicitudAmistadSerializer(sol).data)
+
+# POST /amistad/solicitudes/{id}/cancelar
+class CancelarSolicitud(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            sol = SolicitudAmistad.objects.get(pk=pk, emisor=request.user)
+        except SolicitudAmistad.DoesNotExist:
+            return Response({"detail": "Solicitud no encontrada"}, status=404)
+        sol.cancelar()
+        return Response(SolicitudAmistadSerializer(sol).data)
+
+# GET /amistad/amigos/
+class AmigosList(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        amigos = request.user.amigos_qs
+        return Response(UsuarioLiteSerializer(amigos, many=True).data)
+
+# DELETE /amistad/amigos/{id}/  (dejar de ser amigos = remover follow mutuo)
+class EliminarAmigo(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        try:
+            amigo = User.objects.get(pk=pk)
+        except User.DoesNotExist:
+            return Response({"detail": "Usuario no encontrado"}, status=404)
+
+        Seguidor.objects.filter(seguidor=request.user, seguido=amigo).delete()
+        Seguidor.objects.filter(seguidor=amigo, seguido=request.user).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+        ##############################
+def _user_in_conversation(user, conversacion):
+    return ParticipanteConversacion.objects.filter(conversacion=conversacion, usuario=user).exists()
+
+
+
+class SmallPagination(PageNumberPagination):
+    page_size = 30
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+class ConversacionesList(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        qs = (Conversacion.objects
+              .filter(participantes__usuario=request.user)
+              .select_related("ultimo_mensaje")
+              .prefetch_related("participantes__usuario")
+              .order_by("-actualizada_en")
+              .distinct())
+        data = ConversacionLiteSerializer(qs, many=True).data
+        return Response(data)
+
+
+class MensajesListCreate(APIView):
+    permission_classes = [IsAuthenticated]
+    pagination_class = SmallPagination
+
+    def get_conv(self, request, conv_id):
+        # Asegura que el usuario pertenezca a la conversación
+        try:
+            conv = (Conversacion.objects
+                    .prefetch_related("participantes__usuario")
+                    .get(conversacion_id=conv_id, participantes__usuario=request.user))
+        except Conversacion.DoesNotExist:
+            return None
+        return conv
+
+    def get(self, request, conv_id):
+        conv = self.get_conv(request, conv_id)
+        if not conv:
+            return Response({"detail": "Conversación no encontrada"}, status=404)
+
+        qs = (Mensaje.objects
+              .filter(conversacion=conv)
+              .select_related("remitente")
+              .order_by("-creado_en"))
+
+        paginator = SmallPagination()
+        page = paginator.paginate_queryset(qs, request)
+        ser = MensajeSerializer(page, many=True)
+        return paginator.get_paginated_response(ser.data)
+
+    def post(self, request, conv_id):
+        conv = self.get_conv(request, conv_id)
+        if not conv:
+            return Response({"detail": "Conversación no encontrada"}, status=404)
+
+        contenido = (request.data.get("contenido") or "").strip()
+        if not contenido:
+            return Response({"detail": "contenido es requerido"}, status=400)
+
+        msg = Mensaje.objects.create(
+            conversacion=conv,
+            remitente=request.user,
+            contenido=contenido,
+            tipo=Mensaje.Tipo.TEXTO,
+        )
+        # actualiza puntero y timestamp de conversación
+        conv.ultimo_mensaje = msg
+        conv.save(update_fields=["ultimo_mensaje", "actualizada_en"])
+
+        # (Opcional) emitir por WebSocket al grupo de la sala
+        try:
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                f"chat_{conv.conversacion_id}",
+                {"type": "chat.message", "message": contenido,
+                 "user": getattr(request.user, "nombre_usuario", "usuario")}
+            )
+        except Exception:
+            pass
+
+        return Response(MensajeSerializer(msg).data, status=201)                

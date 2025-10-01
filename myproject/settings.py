@@ -44,6 +44,8 @@ INSTALLED_APPS = [
     'allauth.account',               
     'allauth.socialaccount',         
     'allauth.socialaccount.providers.google',  
+    'channels',
+    'rest_framework', 
 
     'core',
     'django_bootstrap5'
@@ -91,6 +93,18 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'myproject.wsgi.application'
 
+# <-- NUEVO: ASGI + CHANNEL LAYERS
+ASGI_APPLICATION = 'myproject.asgi.application'
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            # Host/puerto del servicio 'redis' en docker-compose
+            "hosts": [("redis", 6379)],
+        },
+    },
+}
 
 # Database
 # https://docs.djangoproject.com/en/3.1/ref/settings/#databases

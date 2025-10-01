@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Editar perfil – Gifter’s{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+  <h2 class="mb-3">Editar perfil</h2>
+
+  <form method="post" enctype="multipart/form-data" class="row g-4">
+    {% csrf_token %}
+
+    <div class="col-12 col-lg-6">
+      <div class="card p-3 h-100">
+        <h4 class="mb-3">Datos de perfil</h4>
+
+        <div class="mb-3">
+          <label class="form-label">Nombre</label>
+          <input class="form-control" value="{{ request.user.nombre }}" disabled>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Apellido</label>
+          <input class="form-control" value="{{ request.user.apellido }}" disabled>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Usuario</label>
+          <input class="form-control" value="@{{ request.user.nombre_usuario }}" disabled>
+        </div>
+
+        {{ p_form.non_field_errors }}
+        <div class="mb-3">
+          <label class="form-label">{{ p_form.bio.label }}</label>
+          {{ p_form.bio }}
+          {{ p_form.bio.errors }}
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">{{ p_form.profile_picture.label }}</label><br>
+          {% if request.user.perfil.profile_picture %}
+            <img src="{{ request.user.perfil.profile_picture.url }}" alt="Foto actual" style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin-bottom:8px;">
+          {% endif %}
+          {{ p_form.profile_picture }}
+          {{ p_form.profile_picture.errors }}
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">{{ p_form.birth_date.label }}</label>
+          {{ p_form.birth_date }}
+          {{ p_form.birth_date.errors }}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+
+    </div>
+
+    <div class="col-12 d-flex gap-2">
+      <a href="{% url 'perfil' %}" class="btn btn-outline-secondary">Cancelar</a>
+      <button type="submit" class="btn btn-primary">Guardar cambios</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

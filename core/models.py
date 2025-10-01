@@ -48,6 +48,11 @@ class UserManager(BaseUserManager):
     
     
 class User(AbstractBaseUser, PermissionsMixin):
+
+    @property
+    def amigos_qs(self):
+        # QuerySet de usuarios que tienen follow mutuo conmigo
+        return Seguidor.objects.amigos_de(self)
     # PK llamada 'id' para Django, columna en BD = id_usuario
     id = models.AutoField(primary_key=True, db_column='id_usuario')
 
@@ -341,6 +346,14 @@ class Wishlist(models.Model):
     
     def __str__(self):
         return f"{self.nombre_wishlist} - {self.usuario.nombre_usuario}"
+    
+
+class SeguidorQuerySet(models.QuerySet):
+    def amigos_de(self, user):
+        # Usuarios que sigue 'user' y que a la vez lo siguen
+        return (User.objects
+                .filter(seguidores__seguidor=user, siguiendo__seguido=user)
+                .distinct())  
 
 class Seguidor(models.Model):
     relacion_id = models.AutoField(primary_key=True, verbose_name='ID Relación')
@@ -387,6 +400,8 @@ class Seguidor(models.Model):
         # Evitar que un usuario se siga a sí mismo
         if self.seguidor == self.seguido:
             raise ValidationError("Un usuario no puede seguirse a sí mismo")
+        
+      
 
 class Post(models.Model):
     # PK
@@ -1329,58 +1344,6 @@ class Resena(models.Model):
         return f"{self.id_usuario.nombre_usuario} → {self.id_producto.nombre_producto} [{self.calificacion}/5]"
         # --- Conversación ---
 
-class Conversacion(models.Model):
-    conversacion_id = models.AutoField(primary_key=True, db_column='conversacion_id')
-
-    class Tipo(models.TextChoices):
-        DIRECTA = 'directa', 'directa'
-        GRUPO   = 'grupo',   'grupo'
-        EVENTO  = 'evento',  'evento'
-
-    tipo = models.CharField(max_length=10, choices=Tipo.choices)
-
-    nombre = models.CharField(max_length=120, null=True, blank=True)     # para grupos/eventos
-    foto_url = models.CharField(max_length=255, null=True, blank=True)
-
-    # FK al creador (columna física id_usuario)
-    creador = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        db_column='id_usuario',
-        related_name='conversaciones_creadas'
-    )
-
-    # FK opcional a Evento para “chat de evento”
-    evento = models.ForeignKey(
-        'core.Evento',
-        on_delete=models.CASCADE,
-        db_column='evento_id',
-        related_name='conversaciones',
-        null=True, blank=True
-    )
-
-    creada_en = models.DateTimeField(auto_now_add=True)
-    actualizada_en = models.DateTimeField(auto_now=True)
-
-    class Estado(models.TextChoices):
-        ACTIVA     = 'activa',     'activa'
-        ARCHIVADA  = 'archivada',  'archivada'
-
-    estado = models.CharField(max_length=10, choices=Estado.choices, default=Estado.ACTIVA)
-
-    class Meta:
-        db_table = 'conversacion'
-        verbose_name = 'Conversación'
-        verbose_name_plural = 'Conversaciones'
-        ordering = ['-actualizada_en']
-        indexes = [
-            models.Index(fields=['tipo'], name='idx_conv_tipo'),
-            models.Index(fields=['evento'], name='idx_conv_evento'),
-            models.Index(fields=['id_usuario'], name='idx_conv_creador'),
-        ]
-
-    def __str__(self):
-        return self.nombre or f"Conversación {self.conversacion_id} ({self.tipo})"
 
     
     
@@ -1593,6 +1556,87 @@ class BloqueoDeUsuario(models.Model):
     def __str__(self):
         return f"{self.blocker.nombre_usuario} bloqueó a {self.blocked.nombre_usuario}"
 
+class SolicitudAmistad(models.Model):
+    id_solicitud = models.AutoField(primary_key=True)
+
+    emisor = models.ForeignKey(
+        User, on_delete=models.CASCADE,
+        related_name='solicitudes_enviadas',
+        db_column='emisor_id'
+    )
+    receptor = models.ForeignKey(
+        User, on_delete=models.CASCADE,
+        related_name='solicitudes_recibidas',
+        db_column='receptor_id'
+    )
+
+    class Estado(models.TextChoices):
+        PENDIENTE = 'pendiente', 'pendiente'
+        ACEPTADA  = 'aceptada',  'aceptada'
+        RECHAZADA = 'rechazada', 'rechazada'
+        CANCELADA = 'cancelada', 'cancelada'
+
+    estado = models.CharField(max_length=10, choices=Estado.choices, default=Estado.PENDIENTE)
+    mensaje = models.CharField(max_length=255, blank=True, null=True)
+    creada_en = models.DateTimeField(auto_now_add=True)
+    respondida_en = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'solicitud_amistad'
+        ordering = ['-creada_en']
+        constraints = [
+            models.UniqueConstraint(fields=['emisor', 'receptor'], name='uq_solicitud_emisor_receptor'),
+        ]
+        indexes = [
+            models.Index(fields=['receptor', 'estado'], name='idx_sol_receptor_estado'),
+            models.Index(fields=['emisor', 'estado'], name='idx_sol_emisor_estado'),
+        ]
+
+    def clean(self):
+        if self.emisor_id == self.receptor_id:
+            raise ValidationError("No puedes enviarte una solicitud a ti mismo.")
+
+    def aceptar(self):
+        if self.estado != self.Estado.PENDIENTE:
+            return
+        from core.models import Seguidor, Conversacion, ParticipanteConversacion
+        # follow mutuo (idempotente)
+        Seguidor.objects.get_or_create(seguidor=self.emisor, seguido=self.receptor)
+        Seguidor.objects.get_or_create(seguidor=self.receptor, seguido=self.emisor)
+        self.estado = self.Estado.ACEPTADA
+        self.respondida_en = timezone.now()
+        self.save(update_fields=['estado', 'respondida_en'])
+
+        # buscar o crear conversación directa
+        conv = (Conversacion.objects
+                .filter(tipo=Conversacion.Tipo.DIRECTA, participantes__usuario=self.emisor)
+                .filter(participantes__usuario=self.receptor)
+                .distinct()
+                .first())
+        if not conv:
+            conv = Conversacion.objects.create(
+                tipo=Conversacion.Tipo.DIRECTA,
+                creador=self.emisor,
+                nombre=None
+            )
+            ParticipanteConversacion.objects.bulk_create([
+                ParticipanteConversacion(conversacion=conv, usuario=self.emisor),
+                ParticipanteConversacion(conversacion=conv, usuario=self.receptor),
+            ])
+        return conv
+
+    def rechazar(self):
+        if self.estado == self.Estado.PENDIENTE:
+            self.estado = self.Estado.RECHAZADA
+            self.respondida_en = timezone.now()
+            self.save(update_fields=['estado', 'respondida_en'])
+
+    def cancelar(self):
+        if self.estado == self.Estado.PENDIENTE:
+            self.estado = self.Estado.CANCELADA
+            self.respondida_en = timezone.now()
+            self.save(update_fields=['estado', 'respondida_en'])        
+
 
         ########## CHAT ###########
 
@@ -1693,18 +1737,18 @@ class Mensaje(models.Model):
     editado_en = models.DateTimeField(null=True, blank=True)
     eliminado  = models.BooleanField(default=False)
 
-class Meta:
-    db_table = 'mensaje'
-    verbose_name = 'Mensaje'
-    verbose_name_plural = 'Mensajes'
-    ordering = ['-creado_en']
-    indexes = [
-        models.Index(fields=['conversacion', 'creado_en'], name='idx_msg_conv_fecha'),
-        models.Index(fields=['remitente'], name='idx_msg_remitente'),  # <-- campo, no db_column
-    ]
+    class Meta:
+        db_table = 'mensaje'
+        verbose_name = 'Mensaje'
+        verbose_name_plural = 'Mensajes'
+        ordering = ['-creado_en']
+        indexes = [
+            models.Index(fields=['conversacion', 'creado_en'], name='idx_msg_conv_fecha'),
+            models.Index(fields=['remitente'], name='idx_msg_remitente'),  # <-- campo, no db_column
+        ]
 
-    def __str__(self):
-        return f"Msg {self.mensaje_id} en conv {self.conversacion_id} por {self.remitente_id}"
+        def __str__(self):
+            return f"Msg {self.mensaje_id} en conv {self.conversacion_id} por {self.remitente_id}"
     # --- ParticipanteConversacion ---
 
 class ParticipanteConversacion(models.Model):

@@ -1,7 +1,8 @@
 from django import forms
 from django.core.exceptions import ValidationError
 from django.core.validators import MinLengthValidator
-from .models import User
+from .models import User, Perfil, PreferenciasUsuario
+from .models import Post
 from datetime import date
 import re
 
@@ -120,3 +121,61 @@ class RegisterForm(forms.ModelForm):
         if User.objects.filter(nombre_usuario=nombre_usuario).exists():
             raise ValidationError("Este nombre de usuario ya existe")
         return nombre_usuario
+    
+    #formulario de feed
+class PostForm(forms.ModelForm):
+    contenido = forms.CharField(
+        widget=forms.Textarea(attrs={
+            'placeholder': '¿Qué estás pensando?',
+            'class': 'form-control', # Puedes añadir clases para el estilo
+            'rows': 3
+        }),
+        label="" # Ocultamos la etiqueta por defecto
+    )
+
+    class Meta:
+        model = Post
+        fields = ['contenido'] # Por ahora, solo permitimos posts de texto
+
+class PerfilForm(forms.ModelForm):
+    class Meta:
+        model = Perfil
+        fields = ['bio', 'profile_picture', 'birth_date']
+        widgets = {
+            'bio': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Cuéntanos algo sobre ti...'
+            }),
+            'birth_date': forms.DateInput(attrs={
+                'type': 'date',
+                'class': 'form-control'
+            }),
+        }
+        labels = {
+            'bio': 'Biografía',
+            'profile_picture': 'Foto de perfil',
+            'birth_date': 'Fecha de nacimiento',
+        }
+
+class PreferenciasUsuarioForm(forms.ModelForm):
+    class Meta:
+        model = PreferenciasUsuario
+        fields = [
+            'email_on_new_follower',
+            'email_on_event_invite',
+            'email_on_birthday_reminder',
+            'accepts_marketing_emails',
+        ]
+        labels = {
+            'email_on_new_follower': 'Email por nuevo seguidor',
+            'email_on_event_invite': 'Email por invitación a evento',
+            'email_on_birthday_reminder': 'Recordatorio de cumpleaños',
+            'accepts_marketing_emails': 'Acepta correos de marketing',
+        }
+        widgets = {
+            'email_on_new_follower': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'email_on_event_invite': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'email_on_birthday_reminder': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'accepts_marketing_emails': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }

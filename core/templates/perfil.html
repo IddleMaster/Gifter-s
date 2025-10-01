@@ -11,16 +11,25 @@
 {% block content %}
 <div class="profile-header">
   <div class="profile-info">
-    <div class="avatar">
-      <img src="{% static 'img/favicongift.jpg' %}" alt="Usuario">
-    </div>
+
+    <!-- AVATAR (versión simple y robusta con <img>) -->
+<!-- AVATAR (namespaced, a prueba de estilos globales) -->
+<div
+  class="g-avatar g-avatar--banner"
+  style="background-image:url('{% if perfil.profile_picture %}{{ perfil.profile_picture.url }}{% else %}{% static "img/avatar-placeholder.png" %}{% endif %}');">
+</div>
+
+
     <div class="user-details">
-      <h2>Usuario</h2>
-      <p class="description">"Descripción"</p>
+      <h2>{{ request.user.nombre }} {{ request.user.apellido }}</h2>
+      <p class="text-muted">@{{ request.user.nombre_usuario }}</p>
+      <p class="description">{{ request.user.perfil.bio|default:"Sin biografía aún." }}</p>
     </div>
+
     <div class="edit-profile">
-      <button class="btn-edit">Editar perfil ✎</button>
+      <a href="{% url 'perfil_editar' %}" class="btn-edit">Editar perfil ✎</a>
     </div>
+
   </div>
 
   <nav class="profile-nav">
@@ -65,52 +74,49 @@
           <p>Chocolate de leche</p>
         </div>
         <div class="gift-actions">
-          <button title="Ver">🔍</button>
-          <button title="Copiar enlace">🔗</button>
+          <button title="Ver" alt="emoji lupa">🔍</button>
+          <button title="Copiar enlace" alt="emoji link">🔗</button>
         </div>
       </div>
     </div>
   </section>
 
   <!-- Eventos importantes -->
-<section id="eventos" class="tab-content">
-  <h3>Eventos importantes de “usuario”</h3>
-
-  <div class="events-list">
-    <div class="event-item">
-      <div class="event-bar">
-        <span class="event-name">Mi Cumpleaños</span>
+  <section id="eventos" class="tab-content">
+    <h3>Eventos importantes de “usuario”</h3>
+    <div class="events-list">
+      <div class="event-item">
+        <div class="event-bar">
+          <span class="event-name">Mi Cumpleaños</span>
+        </div>
+        <span class="event-date">12 de noviembre</span>
+        <button class="event-edit" title="Editar">✎</button>
       </div>
-      <span class="event-date">12 de noviembre</span>
-      <button class="event-edit" title="Editar">✎</button>
-    </div>
-
-    <div class="event-item">
-      <div class="event-bar">
-        <span class="event-name">Otro evento</span>
+      <div class="event-item">
+        <div class="event-bar">
+          <span class="event-name">Otro evento</span>
+        </div>
+        <span class="event-date">“fecha”</span>
+        <button class="event-edit" title="Editar">✎</button>
       </div>
-      <span class="event-date">“fecha”</span>
-      <button class="event-edit" title="Editar">✎</button>
-    </div>
-
-    <div class="event-item">
-      <div class="event-bar">
-        <span class="event-name">Otro evento</span>
+      <div class="event-item">
+        <div class="event-bar">
+          <span class="event-name">Otro evento</span>
+        </div>
+        <span class="event-date">“fecha”</span>
+        <button class="event-edit" title="Editar">✎</button>
       </div>
-      <span class="event-date">“fecha”</span>
-      <button class="event-edit" title="Editar">✎</button>
     </div>
-  </div>
-</section>
-
-
+  </section>
 
   <!-- Amigos -->
   <section id="amigos" class="tab-content">
     <h3>Amigos</h3>
     <div class="friends-grid">
       <div class="friend-card">
-        <div class="avatar"><img src="{% static 'img/avatar-placeholder.png' %}" alt=""></div>
+        <div class="avatar">
+          <img src="{% static 'img/avatar-placeholder.png' %}" alt="Avatar amigo">
+        </div>
         <h4>Carla Soto</h4>
         <p>@carli</p>
         <button class="btn-primary">👁 Ver perfil</button>
@@ -120,7 +126,9 @@
   </section>
 
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <script>
 document.addEventListener("DOMContentLoaded", function(){
   const tabs = document.querySelectorAll(".profile-nav a");
@@ -129,14 +137,11 @@ document.addEventListener("DOMContentLoaded", function(){
   tabs.forEach(tab => {
     tab.addEventListener("click", e => {
       e.preventDefault();
-      // desactivar todo
       tabs.forEach(t => t.classList.remove("active"));
       sections.forEach(s => s.classList.remove("active"));
-
-      // activar seleccionado
       tab.classList.add("active");
-      const target = tab.getAttribute("data-tab");
-      document.getElementById(target).classList.add("active");
+      const target = document.getElementById(tab.getAttribute("data-tab"));
+      if (target) target.classList.add("active");
     });
   });
 });

@@ -9,45 +9,179 @@
 .profile-header,.profile-content{max-width:1040px;margin:0 auto;padding:0 18px}
 
 /* Banner */
-.profile-header{margin-top:18px;border-radius:var(--radius-lg);overflow:hidden;
-  background:linear-gradient(180deg,var(--brand) 0%,#5f7aff 100%);color:#fff;box-shadow:var(--shadow)}
-.profile-header::after{content:\"\";display:block;height:2px;width:75%;margin:22px auto 0;
-  background:rgba(255,255,255,.35);border-radius:2px}
+.profile-header{
+  margin-top:18px;
+  border-radius:var(--radius-lg);
+  overflow:hidden;
+  background:linear-gradient(180deg,var(--brand) 0%,#5f7aff 100%);
+  color:#fff;
+  box-shadow:var(--shadow)
+}
+.profile-header::after{
+  content:"";
+  display:block;
+  height:2px;
+  width:75%;
+  margin:22px auto 0;
+  background:rgba(255,255,255,.35);
+  border-radius:2px
+}
 
-.profile-info{display:grid;grid-template-columns:96px 1fr auto;gap:18px;align-items:center;padding:22px}
-.avatar{width:96px;height:96px;border-radius:50%;background:rgba(255,255,255,.2);display:grid;place-items:center;overflow:hidden}
-.avatar img{width:60%;height:60%;object-fit:cover;filter:brightness(0) invert(1)}
-.user-details h2{margin:0 0 4px;font-weight:700;font-size:36px;line-height:1.1}
-.user-details .description{margin:0;font-weight:300;font-size:14px;opacity:.95}
-.edit-profile .btn-edit{border:none;background:#fff;color:var(--brand-dark);font-weight:600;
-  padding:10px 18px;border-radius:999px;box-shadow:0 4px 10px rgba(0,0,0,.08);cursor:pointer;
-  transition:transform .06s ease,box-shadow .2s ease}
+.profile-info{
+  display:grid;
+  grid-template-columns:96px 1fr auto;
+  gap:18px;
+  align-items:center;
+  padding:22px
+}
+
+/* Avatar limpio */
+.avatar{
+  width:96px;
+  height:96px;
+  border-radius:50%;
+  background:transparent;       /* antes tenía blanco */
+  display:inline-block;
+  overflow:hidden;
+}
+.avatar img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+
+.user-details h2{
+  margin:0 0 4px;
+  font-weight:700;
+  font-size:36px;
+  line-height:1.1
+}
+.user-details .description{
+  margin:0;
+  font-weight:300;
+  font-size:14px;
+  opacity:.95
+}
+
+.edit-profile .btn-edit{
+  border:none;
+  background:#fff;
+  color:var(--brand-dark);
+  font-weight:600;
+  padding:10px 18px;
+  border-radius:999px;
+  box-shadow:0 4px 10px rgba(0,0,0,.08);
+  cursor:pointer;
+  transition:transform .06s ease,box-shadow .2s ease
+}
 .edit-profile .btn-edit:hover{transform:translateY(-1px)}
 .edit-profile .btn-edit:active{transform:translateY(0)}
 
 /* Tabs */
 .profile-nav{padding:0 22px 10px}
-.profile-nav ul{list-style:none;margin:0;padding:0;display:flex;gap:26px;align-items:center;overflow:auto}
-.profile-nav a{display:inline-block;padding:12px 0 14px;color:#e8edff;text-decoration:none;font-weight:500;position:relative;white-space:nowrap}
+.profile-nav ul{
+  list-style:none;
+  margin:0;
+  padding:0;
+  display:flex;
+  gap:26px;
+  align-items:center;
+  overflow:auto
+}
+.profile-nav a{
+  display:inline-block;
+  padding:12px 0 14px;
+  color:#e8edff;
+  text-decoration:none;
+  font-weight:500;
+  position:relative;
+  white-space:nowrap
+}
 .profile-nav a.active,.profile-nav a:hover{color:#fff}
-.profile-nav a.active::after,.profile-nav a:hover::after{content:\"\";position:absolute;left:0;right:0;bottom:0;height:3px;background:#fff;border-radius:3px}
+.profile-nav a.active::after,.profile-nav a:hover::after{
+  content:"";
+  position:absolute;
+  left:0;right:0;bottom:0;
+  height:3px;
+  background:#fff;
+  border-radius:3px
+}
 
 /* Contenido */
 .profile-content{margin-top:22px;margin-bottom:60px}
-.profile-content h3{text-align:center;font-size:22px;color:var(--ink);font-weight:700;margin:22px 0 28px;position:relative}
-.profile-content h3::before,.profile-content h3::after{content:\"\";position:absolute;top:50%;width:160px;height:2px;background:var(--line)}
+.profile-content h3{
+  text-align:center;
+  font-size:22px;
+  color:var(--ink);
+  font-weight:700;
+  margin:22px 0 28px;
+  position:relative
+}
+.profile-content h3::before,.profile-content h3::after{
+  content:"";
+  position:absolute;
+  top:50%;
+  width:160px;
+  height:2px;
+  background:var(--line)
+}
 .profile-content h3::before{left:calc(50% - 160px - 12ch)}
 .profile-content h3::after{right:calc(50% - 160px - 12ch)}
 
 /* Grid y cards */
 .gift-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:26px}
-.gift-card{background:var(--card);border-radius:var(--radius-md);box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
-.gift-card>img{width:100%;height:140px;object-fit:cover;display:block;filter:saturate(.98)}
-.gift-info{padding:12px 16px;border-bottom:1px solid var(--line)}
-.gift-info h4{margin:0 0 4px;font-size:16px;color:#2b3247;font-weight:600}
-.gift-info p{margin:0;font-size:13px;color:var(--muted);font-weight:500}
-.gift-actions{display:flex;justify-content:flex-end;gap:10px;padding:10px 12px 12px}
-.gift-actions button{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:#fff;color:#5a6483;font-size:16px;line-height:1;display:grid;place-items:center;cursor:pointer;transition:background .2s ease,transform .06s ease,border-color .2s ease}
+.gift-card{
+  background:var(--card);
+  border-radius:var(--radius-md);
+  box-shadow:var(--shadow);
+  overflow:hidden;
+  display:flex;
+  flex-direction:column
+}
+.gift-card>img{
+  width:100%;
+  height:140px;
+  object-fit:cover;
+  display:block;
+  filter:saturate(.98)
+}
+.gift-info{
+  padding:12px 16px;
+  border-bottom:1px solid var(--line)
+}
+.gift-info h4{
+  margin:0 0 4px;
+  font-size:16px;
+  color:#2b3247;
+  font-weight:600
+}
+.gift-info p{
+  margin:0;
+  font-size:13px;
+  color:var(--muted);
+  font-weight:500
+}
+.gift-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  padding:10px 12px 12px
+}
+.gift-actions button{
+  width:34px;
+  height:34px;
+  border-radius:50%;
+  border:1px solid var(--line);
+  background:#fff;
+  color:#5a6483;
+  font-size:16px;
+  line-height:1;
+  display:grid;
+  place-items:center;
+  cursor:pointer;
+  transition:background .2s ease,transform .06s ease,border-color .2s ease
+}
 .gift-actions button:hover{background:var(--brand-100);border-color:#c9d6ff}
 .gift-actions button:active{transform:translateY(1px)}
 
@@ -63,69 +197,57 @@
   .gift-grid{grid-template-columns:1fr}
   .profile-content h3::before,.profile-content h3::after{display:none}
 }
+
 /* Forzar el nombre a blanco dentro del banner */
 .profile-header .user-details h2,
 .profile-header .user-details .description {
   color: #fff;
 }
 
+/* Tabs */
 .tab-content { display: none; }
 .tab-content.active { display: block; }
-/* Reducir espacio entre tabs y el título del contenido */
-.tab-content h3 {
-  margin-top: 0px;   /* antes era 22px */
-}
 
-/* Si quieres aún más compacto: */
-.profile-content {
-  margin-top: 0px;   /* antes era 22px */
-}
+/* Reducir espacio entre tabs y el título del contenido */
+.tab-content h3 { margin-top: 0px; }
+.profile-content { margin-top: 0px; }
 
 /* ===== Eventos importantes ===== */
-/* ===== Eventos importantes (versión mockup exacta) ===== */
 .events-list{
   display:flex;
   flex-direction:column;
   gap:16px;
   margin-top:16px;
 }
-
-/* Contenedor de cada fila */
 .event-item{
   position:relative;
-  padding:10px 12px;                 /* margen interno para sombra suave */
+  padding:10px 12px;
   border-radius:20px;
   box-shadow: 0 12px 28px rgba(0,0,0,.08);
 }
-
-/* Barra azul continua del evento */
 .event-bar{
   height:46px;
   width:100%;
-  background: #4D6BFF;               /* var(--brand) */
+  background: #4D6BFF;
   border-radius:999px;
   position:relative;
   overflow:hidden;
 }
-
-/* Texto del nombre dentro de la barra */
 .event-name{
   position:absolute;
-  left:190px;                         /* deja espacio para la pill de fecha */
+  left:190px;
   top:50%;
   transform:translateY(-50%);
   color:#fff;
   font-weight:600;
   letter-spacing:.2px;
 }
-
-/* Pill de fecha (sobre la barra, a la izquierda) */
 .event-date{
   position:absolute;
   left:16px;
   top:50%;
   transform:translateY(-50%);
-  background:#3f59db;                 /* var(--brand-dark) */
+  background:#3f59db;
   color:#fff;
   font-weight:700;
   padding:10px 16px;
@@ -134,8 +256,6 @@
   text-align:center;
   z-index:1;
 }
-
-/* Botón editar (círculo a la derecha) */
 .event-edit{
   position:absolute;
   right:16px;
@@ -144,7 +264,7 @@
   width:36px; height:36px;
   border-radius:999px;
   border:none;
-  background:#3f59db;                 /* var(--brand-dark) */
+  background:#3f59db;
   color:#fff;
   display:grid; place-items:center;
   cursor:pointer;
@@ -153,13 +273,192 @@
 }
 .event-edit:hover{ background:#2f49c9; }
 .event-edit:active{ transform:translateY(-50%) scale(.98); }
-
-/* Responsivo: si el ancho es menor, reducimos offsets */
 @media (max-width:720px){
   .event-bar{ height:44px; }
   .event-date{ min-width:124px; padding:8px 12px; left:12px; }
   .event-name{ left:152px; font-weight:600; }
   .event-edit{ right:12px; width:34px; height:34px; }
 }
+.events-list .event-item:nth-child(even) .event-bar{ background:#819cfd; }
 
-.events-list .event-item:nth-child(even) .event-bar{ background:#819cfd; } /* tono más claro */
+/* ===== OVERRIDES DUROS PARA EL AVATAR EN EL BANNER ===== */
+.profile-header .avatar{
+  width: 96px !important;
+  height: 96px !important;
+  border-radius: 50% !important;
+  overflow: hidden !important;
+  background: transparent !important;   /* sin fondo blanco */
+  display: inline-block !important;
+  border: 0 !important;
+}
+
+.profile-header .avatar img{
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+
+  /* anula cualquier efecto raro de otros css */
+  filter: none !important;
+  mix-blend-mode: normal !important;
+  background: transparent !important;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+}
+/* por si algún CSS global daba fondo semiblanco a .avatar */
+.avatar { background: transparent !important; }
+
+
+/* Avatar con background-image */
+.avatar-img{
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  display: block; /* asegura que pinte el área */
+}
+
+/* --- Avatar en el banner, por encima de cualquier overlay --- */
+.profile-header { position: relative; }
+.profile-header .profile-info { position: relative; z-index: 2; }
+
+/* El <img> del avatar con z-index explícito */
+.profile-header .avatar { position: relative; z-index: 3; }
+.profile-header .avatar img{
+  width:96px;height:96px;border-radius:50%;
+  object-fit:cover;display:block;
+  opacity:1 !important; filter:none !important;
+  mix-blend-mode:normal !important; background:transparent !important;
+}
+
+/* Avatar del banner: gana a todo y evita overlays */
+.profile-header { position: relative; }
+.profile-header .profile-info { position: relative; z-index: 2; }
+
+.avatar--banner{
+  width:96px; height:96px;
+  border-radius:50%;
+  background-size:cover;
+  background-position:center;
+  background-repeat:no-repeat;
+  display:inline-block;
+  position:relative;
+  z-index:3;                 /* por encima de cualquier pseudo/overlay */
+  opacity:1 !important;
+  filter:none !important;
+  mix-blend-mode:normal !important;
+  -webkit-mask-image:none !important;
+  mask-image:none !important;
+  visibility:visible !important;
+}
+
+/* Evitar overlays del banner */
+.profile-header { position: relative; }
+.profile-header .profile-info { position: relative; z-index: 2; }
+
+/* Avatar del banner “a prueba de todo” */
+.avatar--banner{
+  width:96px; height:96px;
+  border-radius:50%;
+  background-size:cover;
+  background-position:center;
+  background-repeat:no-repeat;
+  display:inline-block;
+  position:relative;
+  z-index:3;                 /* por encima de cualquier pseudo/overlay */
+  opacity:1 !important;
+  filter:none !important;
+  mix-blend-mode:normal !important;
+  -webkit-mask-image:none !important;
+  mask-image:none !important;
+  visibility:visible !important;
+}
+
+/* (seguridad extra) por si algún pseudo del banner intercepta clics */
+.profile-header::after{ pointer-events:none; }
+
+
+/* Banner: asegura orden de apilado y evita overlays */
+.profile-header { position: relative; }
+.profile-header .profile-info { position: relative; z-index: 2; }
+
+/* Avatar del banner, una sola versión */
+.avatar--banner{
+  width:96px; height:96px;
+  border-radius:50%;
+  background-size:cover;
+  background-position:center;
+  background-repeat:no-repeat;
+  display:inline-block;
+  position:relative;
+  z-index:3;
+  opacity:1 !important;
+  filter:none !important;
+  mix-blend-mode:normal !important;
+  -webkit-mask-image:none !important;
+  mask-image:none !important;
+  visibility:visible !important;
+}
+
+/* Evita que un pseudo del banner capture eventos encima */
+.profile-header::after{ pointer-events:none; }
+
+/* --- PRIORIDAD Y APILADO DEL BANNER --- */
+.profile-header { position: relative; }
+.profile-header .profile-info { position: relative; z-index: 2; }
+.profile-header::after { pointer-events: none; }
+
+/* --- AVATAR (funciona con <img>) --- */
+.profile-header .avatar{
+  width:96px;
+  height:96px;
+  border-radius:50%;
+  overflow:hidden;
+  background:transparent;
+  display:inline-block;
+  position:relative;
+  z-index:3;
+}
+.profile-header .avatar img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+  opacity:1 !important;
+  filter:none !important;
+  mix-blend-mode:normal !important;
+  -webkit-mask-image:none !important;
+  mask-image:none !important;
+  visibility:visible !important;
+}
+
+/* ===== Fix definitivo banner + avatar ===== */
+.profile-header { position: relative; }
+.profile-header .profile-info { position: relative; z-index: 2; }
+.profile-header::after { pointer-events: none; }
+
+/* Avatar namespaced: evita conflictos con .avatar de otros CSS */
+.g-avatar{
+  width:96px; height:96px;
+  border-radius:50%;
+  display:inline-block;
+  overflow:hidden;
+  background:transparent;
+  position:relative;
+  z-index:3;
+}
+
+/* Pintado por background, no depende de <img> */
+.g-avatar--banner{
+  background-size:cover;
+  background-position:center;
+  background-repeat:no-repeat;
+  opacity:1 !important;
+  filter:none !important;
+  mix-blend-mode:normal !important;
+  -webkit-mask-image:none !important;
+  mask-image:none !important;
+  visibility:visible !important;
+}

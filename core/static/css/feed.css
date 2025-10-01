@@ -165,3 +165,20 @@
 .btn-create-post:hover {
     background-color: #1a64c4;
 }
+/* --- Estilos para el botón de Like Interactivo --- */
+.like-btn .bi-heart-fill {
+    display: none; /* Oculta el corazón relleno por defecto */
+    color: #e0245e; /* Color rojo para el like */
+}
+.like-btn.liked .bi-heart-fill {
+    display: inline-block; /* Muestra el corazón relleno cuando el botón tiene la clase 'liked' */
+}
+.like-btn.liked .bi-heart {
+    display: none; /* Oculta el contorno cuando está 'liked' */
+}
+.like-btn.liked {
+    color: #e0245e; /* Cambia el color del texto a rojo */
+}
+.like-count {
+    margin-right: 4px; /* Pequeño espacio entre el número y el texto */
+}

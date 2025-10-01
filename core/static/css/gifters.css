@@ -759,26 +759,326 @@ button {
     border-width: 1px !important;
   }
 }
+
 /* === Anti-tiritón 2: bloquea altura de la franja branding también === */
 #header .branding .container,
-#header.header-scrolled .branding .container{
-  min-height: 84px !important;   /* el mismo valor que usas inline */
+#header.header-scrolled .branding .container {
+  min-height: 84px !important;
+  /* el mismo valor que usas inline */
   padding-top: 0 !important;
   padding-bottom: 0 !important;
 }
 
 /* No transiciones de height/padding/margin en el header: solo opacidad/sombra */
-#header, #header *{
+#header,
+#header * {
   transition-property: opacity, box-shadow, color, background-color, transform !important;
 }
 
 /* Por si el theme cambia paddings al scrollear */
 #header .branding,
-#header.header-scrolled .branding{
+#header.header-scrolled .branding {
   padding-top: 0 !important;
   padding-bottom: 0 !important;
 }
 
 /* Línea inferior opcional sin cambiar el alto */
-#header{ border-bottom: 1px solid transparent; }
-#header.header-scrolled{ border-bottom-color: rgba(0,0,0,.06); }
+#header {
+  border-bottom: 1px solid transparent;
+}
+
+#header.header-scrolled {
+  border-bottom-color: rgba(0, 0, 0, .06);
+}
+
+/* ===== ESTILOS PARA SISTEMA DE SUGERENCIAS DE BÚSQUEDA ===== */
+
+.sugerencias-container {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-top: none;
+  border-radius: 0 0 0.375rem 0.375rem;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  z-index: 9999;
+  /* Aumentamos el z-index */
+  max-height: 350px;
+  overflow-y: auto;
+  display: none;
+}
+
+.sugerencia-item {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #f8f9fa;
+  cursor: pointer;
+  display: block;
+  text-decoration: none;
+  color: #212529;
+  transition: background-color 0.15s ease-in-out;
+  background: white;
+  width: 100%;
+  /* Aseguramos que ocupe todo el ancho */
+}
+
+.sugerencia-item:hover {
+  background-color: #f8f9fa;
+  text-decoration: none;
+  color: #212529;
+}
+
+.sugerencia-item:last-child {
+  border-bottom: none;
+}
+
+.sugerencia-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.sugerencia-tipo {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.25rem;
+  background: #e9ecef;
+  color: #6c757d;
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+  /* Evita que se rompa el texto */
+}
+
+.sugerencia-tipo.producto {
+  background: #d1e7dd;
+  color: #0f5132;
+}
+
+.sugerencia-tipo.categoria {
+  background: #cfe2ff;
+  color: #052c65;
+}
+
+.sugerencia-tipo.marca {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.sugerencia-texto {
+  flex: 1;
+  font-weight: 600;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  /* Evita que se rompa el texto */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Añade "..." si el texto es muy largo */
+}
+
+.sugerencia-meta {
+  font-size: 0.8rem;
+  color: #6c757d;
+  margin-left: 1.5rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sugerencia-meta .marca {
+  color: #0d6efd;
+  font-weight: 500;
+}
+
+.sugerencia-meta .categoria {
+  color: #198754;
+}
+
+.sugerencia-descripcion {
+  font-size: 0.75rem;
+  color: #6c757d;
+  font-style: italic;
+  margin-left: 1.5rem;
+  margin-top: 0.1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-pill {
+  position: relative;
+}
+
+/* Mejorar el input cuando hay sugerencias */
+.search-input:focus {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  z-index: 10000;
+  /* Aseguramos que esté por encima */
+}
+
+/* Asegurar que el contenedor del input tenga posición relativa */
+.input-group.search-pill {
+  position: relative;
+}
+
+/* ===== MEJORAS PARA CARRUSEL DE CATEGORÍAS ===== */
+
+.categorias-carousel {
+  position: relative;
+  padding: 20px 0 40px 0;
+  /* Más espacio arriba y abajo */
+}
+
+.categorias-carousel .swiper {
+  padding: 20px 50px 40px 50px;
+  /* Más espacio a los lados para las flechas */
+}
+
+.categorias-carousel .swiper-slide {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 80px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+  text-align: center;
+  padding: 0 15px;
+  cursor: pointer;
+  margin: 0 5px;
+  /* Espacio entre slides */
+}
+
+.categorias-carousel .swiper-slide:hover {
+  background: #e9ecef;
+  border-color: #0d6efd;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.categorias-carousel .swiper-slide a {
+  color: #333;
+  font-weight: 500;
+  text-decoration: none;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.3s ease;
+}
+
+.categorias-carousel .swiper-slide:hover a {
+  color: #0d6efd;
+}
+
+/* Flechas de navegación personalizadas - POSICIÓN CORREGIDA */
+.categorias-carousel .swiper-button-next,
+.categorias-carousel .swiper-button-prev {
+  width: 40px;
+  height: 40px;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  border: 1px solid #dee2e6;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-top: 0;
+  transition: all 0.3s ease;
+}
+
+.categorias-carousel .swiper-button-next:hover,
+.categorias-carousel .swiper-button-prev:hover {
+  background: #0d6efd;
+  border-color: #0d6efd;
+}
+
+.categorias-carousel .swiper-button-next:after,
+.categorias-carousel .swiper-button-prev:after {
+  font-size: 16px;
+  color: #333;
+  font-weight: bold;
+}
+
+.categorias-carousel .swiper-button-next:hover:after,
+.categorias-carousel .swiper-button-prev:hover:after {
+  color: white;
+}
+
+/* POSICIÓN CORREGIDA - Flechas más hacia los lados */
+.categorias-carousel .swiper-button-prev {
+  left: 0px !important;
+  /* Pegada al borde izquierdo del contenedor */
+}
+
+.categorias-carousel .swiper-button-next {
+  right: 0px !important;
+  /* Pegada al borde derecho del contenedor */
+}
+
+/* Puntos de paginación con mejor espaciado */
+.categorias-carousel .swiper-pagination {
+  bottom: 10px !important;
+  /* Más espacio arriba de los puntos */
+}
+
+.categorias-carousel .swiper-pagination-bullet {
+  width: 8px;
+  height: 8px;
+  background: #6c757d;
+  opacity: 0.5;
+  transition: all 0.3s ease;
+}
+
+.categorias-carousel .swiper-pagination-bullet-active {
+  background: #0d6efd;
+  opacity: 1;
+  transform: scale(1.2);
+}
+
+/* Responsive para móviles */
+@media (max-width: 768px) {
+
+  .categorias-carousel .swiper-button-next,
+  .categorias-carousel .swiper-button-prev {
+    display: none;
+    /* Ocultar flechas en móvil */
+  }
+
+  .categorias-carousel .swiper {
+    padding: 15px 20px 30px 20px;
+    /* Menos padding lateral en móvil */
+  }
+
+  .categorias-carousel .swiper-slide {
+    height: 70px;
+    font-size: 0.9rem;
+  }
+}
+
+/* Para pantallas muy grandes */
+@media (min-width: 1400px) {
+  .categorias-carousel .swiper-button-prev {
+    left: -10px !important;
+    /* Un poco más afuera en pantallas grandes */
+  }
+
+  .categorias-carousel .swiper-button-next {
+    right: -10px !important;
+    /* Un poco más afuera en pantallas grandes */
+  }
+}
+
+
+
+
+
+
+/* aaaaaaaaaaaaaa */
+
+
+

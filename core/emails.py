@@ -3,6 +3,9 @@ from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.core.mail import EmailMultiAlternatives
 
+from django.urls import reverse
+
+
 def send_verification_email(user, request):
     verification_url = f"{settings.SITE_URL}/verify-email/{user.verification_token}/"
 

@@ -13,12 +13,14 @@ services:
 
   web:
     build: .
-    command: python manage.py runserver 0.0.0.0:8000
+    command: daphne -b 0.0.0.0 -p 8000 myproject.asgi:application
     ports:
       - "8000:8000"
     volumes:
       - .:/app
+      - media_volume:/app/media
     depends_on:
+      - redis 
       - db
     environment:
       DJANGO_DB_HOST: db
@@ -35,5 +37,12 @@ services:
     depends_on:
       - db
 
+  redis:                  # <-- NUEVO SERVICIO
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"     
+
 volumes:
   mysql_data:
+  media_volume:

@@ -37,7 +37,7 @@ PARA HACER LAS MIGRACIONES EN DOCKER:
 docker compose exec web python manage.py makemigrations
 docker compose exec web python manage.py migrate
 
-OTRO COMANDO PARA DOCKER
+COMANDOS PERSONALIZADOS CREADOS PARA DOCKER!
 
 Con este comando se sube el csv
  docker compose exec web python manage.py import_products productos.csv
@@ -46,6 +46,12 @@ CON ESTE COMANDO AÑADIMOS IMAGENES DEAFULTS
  docker compose exec web python manage.py assign_default_images
 
 para confirmar, ver en phpmyadmin
+
+HE AQUÍ UN COMANDO PARA AGREGAR O EDITAR CATEGORÍAS:
+
+docker-compose exec web python manage.py update_categories
+
+
 
 Para entrar a mysql de php: 
 

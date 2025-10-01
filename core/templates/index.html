@@ -67,43 +67,85 @@
 
 
 
-
 <!-- Categorías recomendadas -->
 <div class="container section-title" data-aos="fade-up">
   <h2>Categorías</h2>
+  <p><span>&nbsp;</span> <span class="description-title">Explora nuestras categorías</span></p>
 </div>
 
-<!-- Clients Section -->
-<section id="clients" class="clients section light-background">
+<!-- Clients Section - CATEGORÍAS DINÁMICAS CON FLECHAS -->
+<section id="clients" class="clients section light-background categorias-carousel">
   <div class="container">
+    {% if categorias %}
     <div class="swiper init-swiper">
       <script type="application/json" class="swiper-config">
-          {
-            "loop": true,
-            "speed": 600,
-            "autoplay": { "delay": 5000 },
-            "slidesPerView": "auto",
-            "pagination": { "el": ".swiper-pagination", "type": "bullets", "clickable": true },
-            "breakpoints": {
-              "320": { "slidesPerView": 2, "spaceBetween": 40 },
-              "480": { "slidesPerView": 3, "spaceBetween": 60 },
-              "640": { "slidesPerView": 4, "spaceBetween": 80 },
-              "992": { "slidesPerView": 6, "spaceBetween": 120 }
+        {
+          "loop": true,
+          "speed": 600,
+          "autoplay": { "delay": 5000 },
+          "slidesPerView": "auto",
+          "pagination": { 
+            "el": ".swiper-pagination", 
+            "type": "bullets", 
+            "clickable": true 
+          },
+          "navigation": {
+            "nextEl": ".swiper-button-next",
+            "prevEl": ".swiper-button-prev"
+          },
+          "breakpoints": {
+            "320": { 
+              "slidesPerView": 2, 
+              "spaceBetween": 15 
+            },
+            "480": { 
+              "slidesPerView": 3, 
+              "spaceBetween": 20 
+            },
+            "640": { 
+              "slidesPerView": 4, 
+              "spaceBetween": 25 
+            },
+            "768": { 
+              "slidesPerView": 5, 
+              "spaceBetween": 30 
+            },
+            "992": { 
+              "slidesPerView": 6, 
+              "spaceBetween": 35 
+            },
+            "1200": { 
+              "slidesPerView": 7, 
+              "spaceBetween": 40 
             }
           }
-        </script>
+        }
+      </script>
+      
+      <!-- Contenedor del carrusel -->
       <div class="swiper-wrapper align-items-center">
-        <div class="swiper-slide">Tecnología</div>
-        <div class="swiper-slide">Moda</div>
-        <div class="swiper-slide">Alimentos y Bebidas</div>
-        <div class="swiper-slide">Mascotas</div>
-        <div class="swiper-slide">Deportes</div>
-        <div class="swiper-slide">Juguetes y juegos</div>
-        <div class="swiper-slide">Instrumentos Musicales</div>
-        <div class="swiper-slide">Decohogar</div>
-
+        {% for categoria in categorias %}
+        <div class="swiper-slide">
+          <a href="{% url 'productos_list' %}?categoria={{ categoria.id_categoria }}" 
+             class="text-decoration-none text-dark d-block w-100 h-100">
+            {{ categoria.nombre_categoria }}
+          </a>
+        </div>
+        {% endfor %}
       </div>
+      
+      <!-- Flechas de navegación -->
+      <div class="swiper-button-next"></div>
+      <div class="swiper-button-prev"></div>
+      
+      <!-- Puntos de paginación -->
+      <div class="swiper-pagination"></div>
     </div>
+    {% else %}
+    <div class="text-center py-4">
+      <p class="text-muted">No hay categorías disponibles en este momento.</p>
+    </div>
+    {% endif %}
   </div>
 </section>
 
@@ -118,7 +160,6 @@
     <div class="row gy-4">
       <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="100">
         <div class="service-item position-relative">
-
           <div class="">
             <img src="{% static 'img/Gifters/favicongift.png' %}" alt="user image" height="100px" width="100px">
           </div>
@@ -152,466 +193,80 @@
   </div>
 </section>
 
-
-<!-- Portfolio -->
+<!-- Tendencias - AHORA CON PRODUCTOS DESTACADOS -->
 <section id="portfolio" class="portfolio section">
   <div class="container section-title" data-aos="fade-up">
     <h2>Tendencias</h2>
-    <p><span>&nbsp;</span> <span class="description-title">A muchas personas les interesa:</span></p>
+    <p><span>&nbsp;</span> <span class="description-title">Productos más populares</span></p>
   </div>
 
   <div class="container">
     <div class="isotope-layout" data-default-filter="*" data-layout="masonry" data-sort="original-order">
-
       <div class="row gy-4 isotope-container" data-aos="fade-up" data-aos-delay="200">
+        {% for producto in productos_destacados %}
         <div class="col-lg-4 col-md-6 portfolio-item isotope-item filter-app">
 
-          <img src="{% static 'img/Gifters/trencito1.png' %}" class="img-fluid" alt="">
-
-          <div class="portfolio-info">
-            <h4>Chocolate Trencito aireado 100 g</h4>
-            <p>Nestlé</p>
-
-            <!-- 1) Lupa: abre la imagen (slide 1) del grupo "gal-trencito" -->
-            <a href="{% static 'img/Gifters/trencito1.png' %}" class="glightbox preview-link"
-              data-gallery="gal-trencito">
-              <i class="bi bi-zoom-in"></i>
-            </a>
-
-            <!-- 2) Link directo (opcional, lo dejas igual o lo apuntas a la tienda) -->
-            <a href="https://www.unimarc.cl/product/chocolate-trencito-barra-105-air-leche?srsltid=AfmBOoqJXntgmIgP_83hs8JKSstWvZjaRjXNkTZrvSzdUY9Fs_Q68iFp"
-              target="_blank" rel="noopener" title="Ver en tienda" class="details-link">
-              <i class="bi bi-link-45deg"></i>
-            </a>
-          </div>
-
-          <!-- 3) Slide 2 del mismo grupo: contenido inline con el botón -->
-          <a href="#cta-trencito" class="glightbox d-none" data-gallery="gal-trencito"></a>
-
-          <!-- 4) Contenido inline oculto (la “segunda foto” del lightbox) -->
-          <div id="cta-trencito" class="glightbox-inline" style="display:none;">
-            <div class="p-4 text-center">
-              <h3 class="mb-2">Chocolate Trencito aireado 100 g</h3>
-              <p class="text-muted mb-3">Nestlé</p>
-              <a href="https://www.unimarc.cl/product/chocolate-trencito-barra-105-air-leche?srsltid=AfmBOoqJXntgmIgP_83hs8JKSstWvZjaRjXNkTZrvSzdUY9Fs_Q68iFp"
-                target="_blank" rel="noopener" class="btn btn-primary btn-lg px-4">
-                Ver en tienda
-              </a>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- masterdogs-->
-        <div class="col-lg-4 col-md-6 portfolio-item isotope-item filter-app">
-
-          <img src="{% static 'img/Gifters/masterdogs.png' %}" class="img-fluid" alt="">
-
-          <div class="portfolio-info">
-            <h4>Masterdog Adulto Carne 9KG</h4>
-            <p>Masterdog</p>
-
-
-            <a href="{% static 'img/Gifters/masterdogs.png' %}" class="glightbox preview-link"
-              data-gallery="gal-masterdogs">
-              <i class="bi bi-zoom-in"></i>
-            </a>
-
-
-            <a href="https://www.befoods.cl/products/masterdog-adulto-carne-9kg?variant=51190332981479&country=CL&currency=CLP&utm_medium=product_sync&utm_source=google&utm_content=sag_organic&utm_campaign=sag_organic&srsltid=AfmBOorJnOZz5setQaVpsY93TleANY7QRatP77AmNvX_JxlYiF6rCWzIn04"
-              target="_blank" rel="noopener" title="Ver en tienda" class="details-link">
-              <i class="bi bi-link-45deg"></i>
-            </a>
-          </div>
-
-
-          <a href="#cta-masterdogs" class="glightbox d-none" data-gallery="gal-masterdogs"></a>
-
-
-          <div id="cta-masterdogs" class="glightbox-inline" style="display:none;">
-            <div class="p-4 text-center">
-              <h3 class="mb-2">Masterdog Adulto Carne 9KG</h3>
-              <p class="text-muted mb-3">Masterdog</p>
-              <a href="https://www.befoods.cl/products/masterdog-adulto-carne-9kg?variant=51190332981479&country=CL&currency=CLP&utm_medium=product_sync&utm_source=google&utm_content=sag_organic&utm_campaign=sag_organic&srsltid=AfmBOorJnOZz5setQaVpsY93TleANY7QRatP77AmNvX_JxlYiF6rCWzIn04"
-                target="_blank" rel="noopener" class="btn btn-primary btn-lg px-4">
-                Ver en tienda
-              </a>
-            </div>
-          </div>
-
-        </div>
-        <!-- nissan lego-->
-
-        <div class="col-lg-4 col-md-6 portfolio-item isotope-item filter-app">
-
-          <img src="{% static 'img/Gifters/nissan-lego.png' %}" class="img-fluid" alt="">
-
-          <div class="portfolio-info">
-            <h4>Nissan Skyline GT-R</h4>
-            <p>Lego</p>
-
-
-            <a href="{% static 'img/Gifters/nissan-lego.png' %}" class="glightbox preview-link"
-              data-gallery="gal-nissan-lego">
-              <i class="bi bi-zoom-in"></i>
-            </a>
-
-
-            <a href="https://www.tiendalego.cl/products/nissan-skyline-gt-r-r34-de-2-fast-2-furious-lego-speed-champions-76917?variant=40525582565494&country=CL&currency=CLP&utm_medium=product_sync&utm_source=google&utm_content=sag_organic&utm_campaign=sag_organic&srsltid=AfmBOoo-Ouy2OQCnNPFDTjmeascjoIcHEU6fnBMnlUTQjP1yuw4PowUX304"
-              target="_blank" rel="noopener" title="Ver en tienda" class="details-link">
-              <i class="bi bi-link-45deg"></i>
-            </a>
-          </div>
-
-
-          <a href="#cta-nissan-lego" class="glightbox d-none" data-gallery="gal-nissan-lego"></a>
-
-
-          <div id="cta-nissan-lego" class="glightbox-inline" style="display:none;">
-            <div class="p-4 text-center">
-              <h3 class="mb-2">Nissan Skyline GT-R</h3>
-              <p class="text-muted mb-3">Lego</p>
-              <a href="https://www.tiendalego.cl/products/nissan-skyline-gt-r-r34-de-2-fast-2-furious-lego-speed-champions-76917?variant=40525582565494&country=CL&currency=CLP&utm_medium=product_sync&utm_source=google&utm_content=sag_organic&utm_campaign=sag_organic&srsltid=AfmBOoo-Ouy2OQCnNPFDTjmeascjoIcHEU6fnBMnlUTQjP1yuw4PowUX304"
-                target="_blank" rel="noopener" class="btn btn-primary btn-lg px-4">
-                Ver en tienda
-              </a>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- lentes rayban-->
-
-        <div class="col-lg-4 col-md-6 portfolio-item isotope-item filter-app">
-
-          <img src="{% static 'img/Gifters/rayban.png' %}" class="img-fluid" alt="">
-
-          <div class="portfolio-info">
-            <h4>Lentes de Sol Justin</h4>
-            <p>Rayban</p>
-
-
-            <a href="{% static 'img/Gifters/rayban.png' %}" class="glightbox preview-link" data-gallery="gal-rayban">
-              <i class="bi bi-zoom-in"></i>
-            </a>
-
-
-            <a href="https://www.paris.cl/MKGODWXJ91.html?utm_source=google&utm_medium=organic&utm_campaign=organicshopping"
-              target="_blank" rel="noopener" title="Ver en tienda" class="details-link">
-              <i class="bi bi-link-45deg"></i>
-            </a>
-          </div>
-
-
-          <a href="#cta-rayban" class="glightbox d-none" data-gallery="gal-rayban"></a>
-
-
-          <div id="cta-rayban" class="glightbox-inline" style="display:none;">
-            <div class="p-4 text-center">
-              <h3 class="mb-2">Lentes de Sol Justin</h3>
-              <p class="text-muted mb-3">Rayban</p>
-              <a href="https://www.paris.cl/MKGODWXJ91.html?utm_source=google&utm_medium=organic&utm_campaign=organicshopping"
-                target="_blank" rel="noopener" class="btn btn-primary btn-lg px-4">
-                Ver en tienda
-              </a>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- polera lisa simpsons-->
-
-        <div class="col-lg-4 col-md-6 portfolio-item isotope-item filter-app">
-
-          <img src="{% static 'img/Gifters/polera-lisa.png' %}" class="img-fluid" alt="">
-
-          <div class="portfolio-info">
-            <h4>Polera Lisa Simpsons</h4>
-            <p>Los Simpsons</p>
-
-
-            <a href="{% static 'img/Gifters/polera-lisa.png' %}" class="glightbox preview-link"
-              data-gallery="gal-polera-lisa">
-              <i class="bi bi-zoom-in"></i>
-            </a>
-
-
-            <a href="https://www.lamia.cl/polera-lisa-simpson-con-polera-de-daria-los-simpson-linea-premium-1?srsltid=AfmBOopKWTKKfmC5BUEqMAJwdmxY5-lZGxif6Uj4_GbIAqGCMyk8cFBTNac"
-              target="_blank" rel="noopener" title="Ver en tienda" class="details-link">
-              <i class="bi bi-link-45deg"></i>
-            </a>
-          </div>
-
-
-          <a href="#cta-polera-lisa" class="glightbox d-none" data-gallery="gal-polera-lisa"></a>
-
-
-          <div id="cta-polera-lisa" class="glightbox-inline" style="display:none;">
-            <div class="p-4 text-center">
-              <h3 class="mb-2">Polera Lisa Simpsons</h3>
-              <p class="text-muted mb-3">Los Simpsons</p>
-              <a href="https://www.lamia.cl/polera-lisa-simpson-con-polera-de-daria-los-simpson-linea-premium-1?srsltid=AfmBOopKWTKKfmC5BUEqMAJwdmxY5-lZGxif6Uj4_GbIAqGCMyk8cFBTNac"
-                target="_blank" rel="noopener" class="btn btn-primary btn-lg px-4">
-                Ver en tienda
-              </a>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- dron sonic -->
-
-        <div class="col-lg-4 col-md-6 portfolio-item isotope-item filter-app">
-
-          <img src="{% static 'img/Gifters/dron-sonic.png' %}" class="img-fluid" alt="">
-
-          <div class="portfolio-info">
-            <h4>HELI DRON SONIC</h4>
-            <p>SONIC</p>
-
-
-            <a href="{% static 'img/Gifters/dron-sonic.png' %}" class="glightbox preview-link"
-              data-gallery="gal-dron-sonic">
-              <i class="bi bi-zoom-in"></i>
-            </a>
-
-
-            <a href="https://simple.ripley.cl/heli-dron-sonic-2000401578625p?gad_campaignid=17335898532&gad_source=1&gclid=EAIaIQobChMI6-HnjbnUjwMV3mdIAB29dxo9EAQYBCABEgKEefD_BwE&color_80=azul&s=mdco"
-              target="_blank" rel="noopener" title="Ver en tienda" class="details-link">
-              <i class="bi bi-link-45deg"></i>
-            </a>
-          </div>
-
-
-          <a href="#cta-dron-sonic" class="glightbox d-none" data-gallery="gal-dron-sonic"></a>
-
-
-          <div id="cta-dron-sonic" class="glightbox-inline" style="display:none;">
-            <div class="p-4 text-center">
-              <h3 class="mb-2">HELI DRON SONIC</h3>
-              <p class="text-muted mb-3">SONIC</p>
-              <a href="https://simple.ripley.cl/heli-dron-sonic-2000401578625p?gad_campaignid=17335898532&gad_source=1&gclid=EAIaIQobChMI6-HnjbnUjwMV3mdIAB29dxo9EAQYBCABEgKEefD_BwE&color_80=azul&s=mdco"
-                target="_blank" rel="noopener" class="btn btn-primary btn-lg px-4">
-                Ver en tienda
-              </a>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- maquillaje lumi -->
-
-        <div class="col-lg-4 col-md-6 portfolio-item isotope-item filter-app">
-
-          <img src="{% static 'img/Gifters/maquillaje-lumi.png' %}" class="img-fluid" alt="">
-
-          <div class="portfolio-info">
-            <h4>Base de Maquillaje Lumi</h4>
-            <p>LOREAL</p>
-
-
-            <a href="{% static 'img/Gifters/maquillaje-lumi.png' %}" class="glightbox preview-link"
-              data-gallery="gal-maquillaje-lumi">
-              <i class="bi bi-zoom-in"></i>
-            </a>
-
-
-            <a href="https://www.cruzverde.cl/base-de-maquillaje-lumi-glotion-all-in-1-902-light-glow-40ml/570659.html"
-              target="_blank" rel="noopener" title="Ver en tienda" class="details-link">
-              <i class="bi bi-link-45deg"></i>
-            </a>
-          </div>
-
-
-          <a href="#cta-maquillaje-lumi" class="glightbox d-none" data-gallery="gal-maquillaje-lumi"></a>
-
-
-          <div id="cta-maquillaje-lumi" class="glightbox-inline" style="display:none;">
-            <div class="p-4 text-center">
-              <h3 class="mb-2">Base de Maquillaje Lumi</h3>
-              <p class="text-muted mb-3">LOREAL</p>
-              <a href="https://www.cruzverde.cl/base-de-maquillaje-lumi-glotion-all-in-1-902-light-glow-40ml/570659.html"
-                target="_blank" rel="noopener" class="btn btn-primary btn-lg px-4">
-                Ver en tienda
-              </a>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- pelota fubol  -->
-
-        <div class="col-lg-4 col-md-6 portfolio-item isotope-item filter-app">
-
-          <img src="{% static 'img/Gifters/pelota-futbol.png' %}" class="img-fluid" alt="">
-
-          <div class="portfolio-info">
-            <h4>Pelota de fútbol Big Cat</h4>
-            <p>PUMA</p>
-
-
-            <a href="{% static 'img/Gifters/pelota-futbol.png' %}" class="glightbox preview-link"
-              data-gallery="gal-pelota-futbol">
-              <i class="bi bi-zoom-in"></i>
-            </a>
-
-
-            <a href="https://www.cruzverde.cl/base-de-maquillaje-lumi-glotion-all-in-1-902-light-glow-40ml/570659.html"
-              target="_blank" rel="noopener" title="Ver en tienda" class="details-link">
-              <i class="bi bi-link-45deg"></i>
-            </a>
-          </div>
-
-
-          <a href="#cta-pelota-futbol" class="glightbox d-none" data-gallery="gal-pelota-futbol"></a>
-
-
-          <div id="cta-pelota-futbol" class="glightbox-inline" style="display:none;">
-            <div class="p-4 text-center">
-              <h3 class="mb-2">Pelota de fútbol Big Cat</h3>
-              <p class="text-muted mb-3">PUMA</p>
-              <a href="https://www.cruzverde.cl/base-de-maquillaje-lumi-glotion-all-in-1-902-light-glow-40ml/570659.html"
-                target="_blank" rel="noopener" class="btn btn-primary btn-lg px-4">
-                Ver en tienda
-              </a>
-            </div>
-          </div>
-
-        </div>
-
-        <!--reloj festina  -->
-        <div class="col-lg-4 col-md-6 portfolio-item isotope-item filter-app">
-
-          <img src="{% static 'img/Gifters/reloj-festina.png' %}" class="img-fluid" alt="">
-
-          <div class="portfolio-info">
-            <h4>Reloj Hombre Acero Clásico</h4>
-            <p>Festina</p>
-
-
-            <a href="{% static 'img/Gifters/reloj-festina.png' %}" class="glightbox preview-link"
-              data-gallery="gal-reloj-festina">
-              <i class="bi bi-zoom-in"></i>
-            </a>
-
-
-            <a href="https://www.cruzverde.cl/base-de-maquillaje-lumi-glotion-all-in-1-902-light-glow-40ml/570659.html"
-              target="_blank" rel="noopener" title="Ver en tienda" class="details-link">
-              <i class="bi bi-link-45deg"></i>
-            </a>
-          </div>
-
-
-          <a href="#cta-reloj-festina" class="glightbox d-none" data-gallery="reloj-festina"></a>
-
-
-          <div id="cta-reloj-festina" class="glightbox-inline" style="display:none;">
-            <div class="p-4 text-center">
-              <h3 class="mb-2">Reloj Hombre Acero Clásico</h3>
-              <p class="text-muted mb-3">Festina</p>
-              <a href="https://www.cruzverde.cl/base-de-maquillaje-lumi-glotion-all-in-1-902-light-glow-40ml/570659.html"
-                target="_blank" rel="noopener" class="btn btn-primary btn-lg px-4">
-                Ver en tienda
-              </a>
-            </div>
-          </div>
-
-        </div>
-
-</section>
-
-<!-- NUEVA SECCIÓN: Productos Importados -->
-<section id="productos-importados" class="portfolio section light-background">
-  <div class="container section-title" data-aos="fade-up">
-    <h2>Productos Destacados</h2>
-    <p><span>&nbsp;</span> <span class="description-title">Descubre nuestra selección especial</span></p>
-  </div>
-
-  <div class="container">
-    <!-- DEBUG INFO - TEMPORAL -->
-    <div class="alert alert-info text-center mb-4">
-      <h4>🔍 Información de Debug</h4>
-      <p>Productos cargados: <strong>{{ productos_destacados|length }}</strong></p>
-      <p>Variable existe: <strong>{% if productos_destacados %}SÍ{% else %}NO{% endif %}</strong></p>
-    </div>
-
-    <div class="row gy-4 isotope-container" data-aos="fade-up" data-aos-delay="200">
-      {% for producto in productos_destacados %}
-      <div class="col-lg-4 col-md-6 portfolio-item isotope-item filter-app">
-
-        <!-- DEBUG: Información del producto -->
-        <div class="debug-info"
-          style="background: #f8f9fa; padding: 8px; margin-bottom: 10px; border-radius: 5px; font-size: 11px;">
-          <strong>ID:</strong> {{ producto.id_producto }} |
-          <strong>Imagen:</strong> {% if producto.imagen %}SÍ{% else %}NO{% endif %}
-        </div>
-
-        <!-- Imagen del producto -->
-        <div class="product-image-container"
-          style="height: 250px; overflow: hidden; border-radius: 8px; margin-bottom: 15px;">
-          {% if producto.imagen and producto.imagen.url %}
-          <img src="{{ producto.imagen.url }}" class="img-fluid" alt="{{ producto.nombre_producto }}"
-            style="width: 100%; height: 100%; object-fit: cover;">
-          {% else %}
-          <img src="{% static 'img/Gifters/favicongift.png' %}" class="img-fluid" alt="{{ producto.nombre_producto }}"
-            style="width: 100%; height: 100%; object-fit: cover;">
-          {% endif %}
-        </div>
-
-        <div class="portfolio-info">
-          <h4>{{ producto.nombre_producto }}</h4>
-          <p class="text-primary">{{ producto.id_marca.nombre_marca }}</p>
-
-          {% if producto.precio %}
-          <p class="h5 text-success">${{ producto.precio }}</p>
-          {% endif %}
-
-          <p class="text-muted small">{{ producto.descripcion|truncatechars:80 }}</p>
-
-          <!-- Botones -->
-          <div class="product-actions">
-            <!-- Lupa para ampliar -->
+          <!-- Imagen del producto -->
+          <div class="product-image-container" style="height: 250px; overflow: hidden; border-radius: 8px;">
             {% if producto.imagen and producto.imagen.url %}
-            <a href="{{ producto.imagen.url }}" class="glightbox preview-link"
-              data-gallery="gal-producto-{{ producto.id_producto }}">
-              <i class="bi bi-zoom-in"></i>
-            </a>
+            <img src="{{ producto.imagen.url }}" class="img-fluid" alt="{{ producto.nombre_producto }}"
+              style="width: 100%; height: 100%; object-fit: cover;">
             {% else %}
-            <a href="{% static 'img/Gifters/favicongift.png' %}" class="glightbox preview-link"
-              data-gallery="gal-producto-{{ producto.id_producto }}">
-              <i class="bi bi-zoom-in"></i>
-            </a>
+            <img src="{% static 'img/Gifters/favicongift.png' %}" class="img-fluid" alt="{{ producto.nombre_producto }}"
+              style="width: 100%; height: 100%; object-fit: cover;">
+            {% endif %}
+          </div>
+
+          <div class="portfolio-info">
+            <h4>{{ producto.nombre_producto }}</h4>
+            <p class="text-primary">{{ producto.id_marca.nombre_marca }}</p>
+
+            {% if producto.precio %}
+            <p class="h5 text-success">${{ producto.precio }}</p>
             {% endif %}
 
-            <!-- Link a la tienda -->
-            {% with producto.urls_tienda_activas.first as url_tienda %}
-            {% if url_tienda %}
-            <a href="{{ url_tienda.url }}" target="_blank" rel="noopener" class="details-link">
-              <i class="bi bi-link-45deg"></i>
-            </a>
-            {% endif %}
-            {% endwith %}
+            <!-- Botones -->
+            <div class="product-actions">
+              <!-- Lupa para ampliar -->
+              {% if producto.imagen and producto.imagen.url %}
+              <a href="{{ producto.imagen.url }}" class="glightbox preview-link"
+                data-gallery="gal-producto-{{ producto.id_producto }}">
+                <i class="bi bi-zoom-in"></i>
+              </a>
+              {% else %}
+              <a href="{% static 'img/Gifters/favicongift.png' %}" class="glightbox preview-link"
+                data-gallery="gal-producto-{{ producto.id_producto }}">
+                <i class="bi bi-zoom-in"></i>
+              </a>
+              {% endif %}
+
+              <!-- Link a la tienda -->
+              {% with producto.urls_tienda_activas.first as url_tienda %}
+              {% if url_tienda %}
+              <a href="{{ url_tienda.url }}" target="_blank" rel="noopener" class="details-link">
+                <i class="bi bi-link-45deg"></i>
+              </a>
+              {% else %}
+              <!-- Si no hay URL de tienda, link al detalle del producto -->
+              <a href="{% url 'producto_detalle' producto.id_producto %}" class="details-link">
+                <i class="bi bi-eye"></i>
+              </a>
+              {% endif %}
+              {% endwith %}
+            </div>
+          </div>
+
+        </div>
+        {% empty %}
+        <div class="col-12 text-center">
+          <div class="alert alert-info">
+            <h4>📦 No hay productos destacados</h4>
+            <p>Pronto agregaremos nuevos productos interesantes.</p>
+            <a href="{% url 'productos_list' %}" class="btn btn-primary mt-2">Explorar todos los productos</a>
           </div>
         </div>
-
+        {% endfor %}
       </div>
-      {% empty %}
-      <div class="col-12 text-center">
-        <div class="alert alert-warning">
-          <h4>📦 No hay productos para mostrar</h4>
-          <p>Esto puede significar que:</p>
-          <ul class="text-start">
-            <li>No hay productos en la base de datos</li>
-            <li>Los productos no están marcados como activos</li>
-            <li>Hay un error en la vista home</li>
-            <li>La variable 'productos_destacados' no se está pasando al template</li>
-          </ul>
-          <p class="mt-3">
-            <a href="{% url 'productos_list' %}" class="btn btn-primary">Ver lista completa de productos</a>
-          </p>
-        </div>
-      </div>
-      {% endfor %}
     </div>
 
     <!-- Botón para ver más productos -->
@@ -622,6 +277,8 @@
     {% endif %}
   </div>
 </section>
+
+
 
 <div class="container section-title" data-aos="fade-up">
   <h2>Reseñas de nuestros usuarios</h2>
