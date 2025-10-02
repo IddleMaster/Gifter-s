@@ -12,15 +12,6 @@
   /**
    * Apply .scrolled class to the body as the page is scrolled down
    */
-  function toggleScrolled() {
-    const selectBody = document.querySelector('body');
-    const selectHeader = document.querySelector('#header');
-    if (!selectHeader.classList.contains('scroll-up-sticky') && !selectHeader.classList.contains('sticky-top') && !selectHeader.classList.contains('fixed-top')) return;
-    window.scrollY > 100 ? selectBody.classList.add('scrolled') : selectBody.classList.remove('scrolled');
-  }
-
-  document.addEventListener('scroll', toggleScrolled);
-  window.addEventListener('load', toggleScrolled);
 
   /**
    * Mobile nav toggle
@@ -238,153 +229,153 @@
 // ===== SISTEMA DE SUGERENCIAS DE BÚSQUEDA =====
 
 function inicializarSugerenciasBusqueda() {
-    console.log('🔍 Inicializando sistema de sugerencias...');
-    
-    const searchConfigs = [
-        { input: 'searchInputDesktop', container: 'sugerenciasDesktop' },
-        { input: 'searchInputMobile', container: 'sugerenciasMobile' }
-    ];
+  console.log('🔍 Inicializando sistema de sugerencias...');
 
-    let timeoutId;
-    const DEBOUNCE_DELAY = 300;
+  const searchConfigs = [
+    { input: 'searchInputDesktop', container: 'sugerenciasDesktop' },
+    { input: 'searchInputMobile', container: 'sugerenciasMobile' }
+  ];
 
-    searchConfigs.forEach(config => {
-        const searchInput = document.getElementById(config.input);
-        const sugerenciasContainer = document.getElementById(config.container);
+  let timeoutId;
+  const DEBOUNCE_DELAY = 300;
 
-        console.log(`Buscando elementos: ${config.input} y ${config.container}`);
-        console.log('Input encontrado:', searchInput);
-        console.log('Container encontrado:', sugerenciasContainer);
+  searchConfigs.forEach(config => {
+    const searchInput = document.getElementById(config.input);
+    const sugerenciasContainer = document.getElementById(config.container);
 
-        if (!searchInput || !sugerenciasContainer) {
-            console.error(`❌ No se encontraron los elementos: ${config.input} o ${config.container}`);
-            return;
-        }
+    console.log(`Buscando elementos: ${config.input} y ${config.container}`);
+    console.log('Input encontrado:', searchInput);
+    console.log('Container encontrado:', sugerenciasContainer);
 
-        // Añadir estilos de debug temporalmente
-        sugerenciasContainer.style.border = '2px solid red';
-        sugerenciasContainer.style.background = '#fff0f0';
-
-        // Evento de input con debounce
-        searchInput.addEventListener('input', function (e) {
-            const query = e.target.value.trim();
-            console.log(`📝 Input cambiado: "${query}"`);
-            
-            clearTimeout(timeoutId);
-
-            if (query.length < 2) {
-                console.log('❌ Query muy corta, ocultando sugerencias');
-                sugerenciasContainer.style.display = 'none';
-                return;
-            }
-
-            timeoutId = setTimeout(() => {
-                console.log(`🔍 Buscando sugerencias para: "${query}"`);
-                buscarSugerencias(query, sugerenciasContainer);
-            }, DEBOUNCE_DELAY);
-        });
-
-        // Ocultar sugerencias al hacer clic fuera
-        document.addEventListener('click', function (e) {
-            if (!searchInput.contains(e.target) && !sugerenciasContainer.contains(e.target)) {
-                sugerenciasContainer.style.display = 'none';
-            }
-        });
-
-        // Navegación con teclado
-        searchInput.addEventListener('keydown', function (e) {
-            const items = sugerenciasContainer.querySelectorAll('.sugerencia-item');
-
-            if (e.key === 'ArrowDown' && items.length > 0) {
-                e.preventDefault();
-                items[0].focus();
-            } else if (e.key === 'Escape') {
-                sugerenciasContainer.style.display = 'none';
-                searchInput.focus();
-            }
-        });
-
-        // Cerrar sugerencias al enviar el formulario
-        const form = searchInput.closest('form');
-        if (form) {
-            form.addEventListener('submit', function () {
-                sugerenciasContainer.style.display = 'none';
-            });
-        }
-    });
-
-    function buscarSugerencias(query, container) {
-        const url = `/buscar-sugerencias/?q=${encodeURIComponent(query)}`;
-        console.log(`🌐 Haciendo petición a: ${url}`);
-        
-        fetch(url)
-            .then(response => {
-                console.log('📨 Respuesta recibida:', response.status);
-                if (!response.ok) throw new Error('Error en la respuesta');
-                return response.json();
-            })
-            .then(data => {
-                console.log('✅ Datos recibidos:', data);
-                mostrarSugerencias(data.sugerencias, container);
-            })
-            .catch(error => {
-                console.error('❌ Error fetching suggestions:', error);
-                container.style.display = 'none';
-            });
+    if (!searchInput || !sugerenciasContainer) {
+      console.error(`❌ No se encontraron los elementos: ${config.input} o ${config.container}`);
+      return;
     }
 
-    function mostrarSugerencias(sugerencias, container) {
-        console.log(`🎯 Mostrando ${sugerencias.length} sugerencias`);
-        
-        if (sugerencias.length === 0) {
-            console.log('📭 No hay sugerencias, ocultando container');
-            container.style.display = 'none';
-            return;
+    // Añadir estilos de debug temporalmente
+    sugerenciasContainer.style.border = '2px solid red';
+    sugerenciasContainer.style.background = '#fff0f0';
+
+    // Evento de input con debounce
+    searchInput.addEventListener('input', function (e) {
+      const query = e.target.value.trim();
+      console.log(`📝 Input cambiado: "${query}"`);
+
+      clearTimeout(timeoutId);
+
+      if (query.length < 2) {
+        console.log('❌ Query muy corta, ocultando sugerencias');
+        sugerenciasContainer.style.display = 'none';
+        return;
+      }
+
+      timeoutId = setTimeout(() => {
+        console.log(`🔍 Buscando sugerencias para: "${query}"`);
+        buscarSugerencias(query, sugerenciasContainer);
+      }, DEBOUNCE_DELAY);
+    });
+
+    // Ocultar sugerencias al hacer clic fuera
+    document.addEventListener('click', function (e) {
+      if (!searchInput.contains(e.target) && !sugerenciasContainer.contains(e.target)) {
+        sugerenciasContainer.style.display = 'none';
+      }
+    });
+
+    // Navegación con teclado
+    searchInput.addEventListener('keydown', function (e) {
+      const items = sugerenciasContainer.querySelectorAll('.sugerencia-item');
+
+      if (e.key === 'ArrowDown' && items.length > 0) {
+        e.preventDefault();
+        items[0].focus();
+      } else if (e.key === 'Escape') {
+        sugerenciasContainer.style.display = 'none';
+        searchInput.focus();
+      }
+    });
+
+    // Cerrar sugerencias al enviar el formulario
+    const form = searchInput.closest('form');
+    if (form) {
+      form.addEventListener('submit', function () {
+        sugerenciasContainer.style.display = 'none';
+      });
+    }
+  });
+
+  function buscarSugerencias(query, container) {
+    const url = `/buscar-sugerencias/?q=${encodeURIComponent(query)}`;
+    console.log(`🌐 Haciendo petición a: ${url}`);
+
+    fetch(url)
+      .then(response => {
+        console.log('📨 Respuesta recibida:', response.status);
+        if (!response.ok) throw new Error('Error en la respuesta');
+        return response.json();
+      })
+      .then(data => {
+        console.log('✅ Datos recibidos:', data);
+        mostrarSugerencias(data.sugerencias, container);
+      })
+      .catch(error => {
+        console.error('❌ Error fetching suggestions:', error);
+        container.style.display = 'none';
+      });
+  }
+
+  function mostrarSugerencias(sugerencias, container) {
+    console.log(`🎯 Mostrando ${sugerencias.length} sugerencias`);
+
+    if (sugerencias.length === 0) {
+      console.log('📭 No hay sugerencias, ocultando container');
+      container.style.display = 'none';
+      return;
+    }
+
+    container.innerHTML = '';
+
+    // Añadir un título de debug temporal
+    const debugHeader = document.createElement('div');
+    debugHeader.style.padding = '0.5rem 1rem';
+    debugHeader.style.background = '#ffeb3b';
+    debugHeader.style.fontSize = '0.8rem';
+    debugHeader.style.borderBottom = '1px solid #ccc';
+    debugHeader.textContent = `🔍 ${sugerencias.length} sugerencias encontradas`;
+    container.appendChild(debugHeader);
+
+    sugerencias.forEach((sugerencia, index) => {
+      console.log(`📦 Sugerencia ${index + 1}:`, sugerencia);
+
+      const item = document.createElement('a');
+      item.href = sugerencia.url;
+      item.className = 'sugerencia-item';
+      item.tabIndex = 0;
+      item.style.border = '1px solid blue'; // Debug visual
+
+      // Construir contenido según el tipo
+      let metaHTML = '';
+      let descripcionHTML = '';
+
+      if (sugerencia.tipo === 'producto') {
+        if (sugerencia.marca || sugerencia.categoria) {
+          metaHTML = `<div class="sugerencia-meta">`;
+          if (sugerencia.marca) {
+            metaHTML += `<span class="marca">${sugerencia.marca}</span>`;
+          }
+          if (sugerencia.marca && sugerencia.categoria) {
+            metaHTML += ` • `;
+          }
+          if (sugerencia.categoria) {
+            metaHTML += `<span class="categoria">${sugerencia.categoria}</span>`;
+          }
+          metaHTML += `</div>`;
         }
+      } else if (sugerencia.tipo === 'categoría' && sugerencia.descripcion) {
+        descripcionHTML = `<div class="sugerencia-descripcion">${sugerencia.descripcion}</div>`;
+      }
 
-        container.innerHTML = '';
-
-        // Añadir un título de debug temporal
-        const debugHeader = document.createElement('div');
-        debugHeader.style.padding = '0.5rem 1rem';
-        debugHeader.style.background = '#ffeb3b';
-        debugHeader.style.fontSize = '0.8rem';
-        debugHeader.style.borderBottom = '1px solid #ccc';
-        debugHeader.textContent = `🔍 ${sugerencias.length} sugerencias encontradas`;
-        container.appendChild(debugHeader);
-
-        sugerencias.forEach((sugerencia, index) => {
-            console.log(`📦 Sugerencia ${index + 1}:`, sugerencia);
-            
-            const item = document.createElement('a');
-            item.href = sugerencia.url;
-            item.className = 'sugerencia-item';
-            item.tabIndex = 0;
-            item.style.border = '1px solid blue'; // Debug visual
-
-            // Construir contenido según el tipo
-            let metaHTML = '';
-            let descripcionHTML = '';
-
-            if (sugerencia.tipo === 'producto') {
-                if (sugerencia.marca || sugerencia.categoria) {
-                    metaHTML = `<div class="sugerencia-meta">`;
-                    if (sugerencia.marca) {
-                        metaHTML += `<span class="marca">${sugerencia.marca}</span>`;
-                    }
-                    if (sugerencia.marca && sugerencia.categoria) {
-                        metaHTML += ` • `;
-                    }
-                    if (sugerencia.categoria) {
-                        metaHTML += `<span class="categoria">${sugerencia.categoria}</span>`;
-                    }
-                    metaHTML += `</div>`;
-                }
-            } else if (sugerencia.tipo === 'categoría' && sugerencia.descripcion) {
-                descripcionHTML = `<div class="sugerencia-descripcion">${sugerencia.descripcion}</div>`;
-            }
-
-            item.innerHTML = `
+      item.innerHTML = `
                 <div class="sugerencia-header">
                     <span class="sugerencia-tipo ${sugerencia.tipo}">${sugerencia.tipo}</span>
                     <span class="sugerencia-texto">${sugerencia.texto}</span>
@@ -393,67 +384,69 @@ function inicializarSugerenciasBusqueda() {
                 ${descripcionHTML}
             `;
 
-            // Al hacer clic, redirigir
-            item.addEventListener('click', function (e) {
-                e.preventDefault();
-                console.log(`🖱️ Clic en sugerencia: ${sugerencia.url}`);
-                window.location.href = this.href;
-            });
+      // Al hacer clic, redirigir
+      item.addEventListener('click', function (e) {
+        e.preventDefault();
+        console.log(`🖱️ Clic en sugerencia: ${sugerencia.url}`);
+        window.location.href = this.href;
+      });
 
-            container.appendChild(item);
-        });
+      container.appendChild(item);
+    });
 
-        console.log('👁️ Mostrando container de sugerencias');
-        container.style.display = 'block';
-        
-        // Debug: mostrar posición y tamaño
-        console.log('📍 Posición del container:', container.getBoundingClientRect());
-    }
+    console.log('👁️ Mostrando container de sugerencias');
+    container.style.display = 'block';
+
+    // Debug: mostrar posición y tamaño
+    console.log('📍 Posición del container:', container.getBoundingClientRect());
+  }
 }
 
 // Inicializar cuando el DOM esté listo
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 DOM cargado, inicializando sugerencias...');
-    inicializarSugerenciasBusqueda();
+document.addEventListener('DOMContentLoaded', function () {
+  console.log('🚀 DOM cargado, inicializando sugerencias...');
+  inicializarSugerenciasBusqueda();
 });
 
 
 //feed
-document.addEventListener('DOMContentLoaded', function() {
-    // --- LÍNEA DE PRUEBA 1 ---
-    console.log("El script del feed se está ejecutando.");
+document.addEventListener('DOMContentLoaded', function () {
+  // --- LÍNEA DE PRUEBA 1 ---
+  console.log("El script del feed se está ejecutando.");
 
-    const likeButtons = document.querySelectorAll('.like-btn');
+  const likeButtons = document.querySelectorAll('.like-btn');
 
-    // --- LÍNEA DE PRUEBA 2 ---
-    console.log("Botones de 'like' encontrados:", likeButtons);
+  // --- LÍNEA DE PRUEBA 2 ---
+  console.log("Botones de 'like' encontrados:", likeButtons);
 
-    likeButtons.forEach(button => {
-        button.addEventListener('click', function(event) {
-            event.preventDefault(); 
+  likeButtons.forEach(button => {
+    button.addEventListener('click', function (event) {
+      event.preventDefault();
 
-            const postId = this.dataset.postId;
-            const url = `/post/${postId}/like/`;
-            const csrfToken = document.querySelector('form [name=csrfmiddlewaretoken]').value;
+      const postId = this.dataset.postId;
+      const url = `/post/${postId}/like/`;
+      const csrfToken = document.querySelector('form [name=csrfmiddlewaretoken]').value;
 
-            fetch(url, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': csrfToken,
-                    'Content-Type': 'application/json'
-                },
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    console.error("Error desde el servidor:", data.error);
-                    return;
-                }
-                const likeCountSpan = this.querySelector('.like-count');
-                likeCountSpan.textContent = data.total_likes;
-                this.classList.toggle('liked', data.liked);
-            })
-            .catch(error => console.error('Error en fetch:', error));
-        });
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': csrfToken,
+          'Content-Type': 'application/json'
+        },
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.error) {
+            console.error("Error desde el servidor:", data.error);
+            return;
+          }
+          const likeCountSpan = this.querySelector('.like-count');
+          likeCountSpan.textContent = data.total_likes;
+          this.classList.toggle('liked', data.liked);
+        })
+        .catch(error => console.error('Error en fetch:', error));
     });
+  });
 });
+
+

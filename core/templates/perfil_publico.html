@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Perfil de {{ usuario_publico.nombre }}{% endblock %}
+{% block body_class %}index-page{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/perfil.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="profile-header">
+  <div class="profile-info">
+
+    <div class="g-avatar g-avatar--banner"
+      style="background-image:url('{% if perfil_publico and perfil_publico.profile_picture %}{{ perfil_publico.profile_picture.url }}{% else %}{% static "
+      img/avatar-placeholder.png" %}{% endif %}');">
+    </div>
+
+    <div class="user-details">
+      <h2>{{ usuario_publico.nombre }} {{ usuario_publico.apellido }}</h2>
+      <p class="text-muted">@{{ usuario_publico.nombre_usuario }}</p>
+      <p class="description">{{ perfil_publico.bio|default:"Sin biografía aún." }}</p>
+    </div>
+
+    <div class="edit-profile">
+      {# --- Acciones de relación / chat --- #}
+      {% if request.user.is_authenticated %}
+      {% if es_amigo %}
+      <a href="#" id="btnChatPerfilPublico" class="btn-edit" data-username="{{ usuario_publico.nombre_usuario }}">💬
+        Chatear</a>
+
+      {% elif pendiente_enviada %}
+      <form method="post" action="{% url 'amistad_cancelar' usuario_publico.nombre_usuario %}">
+        {% csrf_token %}
+        <button class="btn-edit" style="background:#f44336;">Cancelar solicitud</button>
+      </form>
+
+      {% elif pendiente_recibida %}
+      <div style="display:flex; gap:.5rem;">
+        <form method="post" action="{% url 'amistad_aceptar' usuario_publico.nombre_usuario %}">
+          {% csrf_token %}
+          <button class="btn-edit" style="background:#4caf50;">Aceptar</button>
+        </form>
+        <form method="post" action="{% url 'amistad_cancelar' usuario_publico.nombre_usuario %}">
+          {% csrf_token %}
+          <button class="btn-edit" style="background:#9e9e9e;">Rechazar</button>
+        </form>
+      </div>
+
+      {% else %}
+      <form method="post" action="{% url 'amistad_enviar' usuario_publico.nombre_usuario %}">
+        {% csrf_token %}
+        <button class="btn-edit">➕ Agregar amigo</button>
+      </form>
+      {% endif %}
+      {% else %}
+      <a href="{% url 'login' %}?next={{ request.path }}" class="btn-edit">Inicia sesión</a>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <nav class="profile-nav">
+    <ul>
+      <li>
+        <a href="#" data-tab="actividad" class="{% if ultimos_posts %}active{% endif %}">Actividad pública</a>
+      </li>
+      <li>
+        <a href="#" data-tab="eventos" class="{% if not ultimos_posts and eventos_publicos %}active{% endif %}">
+          Eventos importantes
+        </a>
+      </li>
+    </ul>
+  </nav>
+
+</div>
+
+<div class="profile-content">
+
+  <!-- Actividad pública -->
+  <section id="actividad" class="tab-content active">
+    <h3>Actividad pública de “{{ usuario_publico.nombre_usuario }}”</h3>
+
+    {% if ultimos_posts %}
+    <div class="gift-grid">
+      {% for p in ultimos_posts %}
+      <div class="gift-card">
+        <div class="gift-info">
+          <h4>
+            {% if p.tipo_post == 'texto' %}Publicación{% else %}{{ p.tipo_post|title }}{% endif %}
+            · {{ p.fecha_publicacion|date:"d/m/Y H:i" }}
+          </h4>
+          {% if p.tipo_post == 'texto' %}
+          <p>{{ p.contenido|default:"(sin contenido)"|truncatechars:160 }}</p>
+          {% else %}
+          <p>Contenido multimedia</p>
+          {% if p.url_media %}
+          <a href="{{ p.url_media }}" target="_blank" rel="noopener">Ver</a>
+          {% endif %}
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted">Aún no hay actividad pública.</p>
+    {% endif %}
+  </section>
+
+  {% load i18n %}
+  <section id="eventos" class="tab-content {% if not ultimos_posts and eventos_publicos %}active{% endif %}">
+    <div class="events-header">
+      <h3>Eventos importantes de “{{ usuario_publico.nombre_usuario }}”</h3>
+    </div>
+
+    <div class="events-list">
+      {% if eventos_publicos %}
+      {% for ev in eventos_publicos %}
+      <div class="event-item" data-event-id="{{ ev.pk }}">
+        <div class="left event-toggle" role="button" tabindex="0" aria-expanded="false"
+          aria-controls="desc-{{ ev.pk }}">
+          <span class="badge">
+            {% language 'es' %}
+            {{ ev.fecha_evento|date:"j" }} de {{ ev.fecha_evento|date:"F" }}
+            {% endlanguage %}
+          </span>
+          <div class="name">{{ ev.titulo }}</div>
+        </div>
+        {% if ev.descripcion %}
+        <div id="desc-{{ ev.pk }}" class="event-desc" hidden>
+          <p>{{ ev.descripcion|linebreaksbr }}</p>
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+      {% else %}
+      <p class="text-muted">Este usuario aún no comparte eventos públicos.</p>
+      {% endif %}
+    </div>
+  </section>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const tabs = document.querySelectorAll(".profile-nav a");
+    const sections = document.querySelectorAll(".tab-content");
+
+    tabs.forEach(tab => {
+      tab.addEventListener("click", e => {
+        e.preventDefault();
+        tabs.forEach(t => t.classList.remove("active"));
+        sections.forEach(s => s.classList.remove("active"));
+        tab.classList.add("active");
+        const target = document.getElementById(tab.getAttribute("data-tab"));
+        if (target) target.classList.add("active");
+      });
+    });
+  });
+</script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    /* Tabs */
+    const tabs = document.querySelectorAll(".profile-nav a");
+    const sections = document.querySelectorAll(".tab-content");
+    tabs.forEach(tab => {
+      tab.addEventListener("click", e => {
+        e.preventDefault();
+        tabs.forEach(t => t.classList.remove("active"));
+        sections.forEach(s => s.classList.remove("active"));
+        tab.classList.add("active");
+        const target = document.getElementById(tab.getAttribute("data-tab"));
+        if (target) target.classList.add("active");
+      });
+    });
+
+    /* Acordeón de eventos */
+    const items = document.querySelectorAll(".events-list .event-item");
+    const setMax = (el) => el.style.maxHeight = el.scrollHeight + "px";
+    function openDesc(panel, toggle) { panel.hidden = false; panel.classList.add("open"); setMax(panel); toggle.setAttribute("aria-expanded", "true"); }
+    function closeDesc(panel, toggle) {
+      if (!panel.style.maxHeight || panel.style.maxHeight === "0px") panel.style.maxHeight = panel.scrollHeight + "px";
+      requestAnimationFrame(() => { panel.classList.remove("open"); panel.style.maxHeight = "0px"; });
+      toggle.setAttribute("aria-expanded", "false");
+    }
+    function closeAllExcept(current) {
+      items.forEach(it => {
+        const tg = it.querySelector(".event-toggle"); const pn = it.querySelector(".event-desc");
+        if (pn && pn !== current && tg.getAttribute("aria-expanded") === "true") { closeDesc(pn, tg); }
+      });
+    }
+
+    items.forEach(item => {
+      const toggle = item.querySelector(".event-toggle");
+      const panel = item.querySelector(".event-desc");
+      if (!toggle || !panel) return;
+
+      toggle.setAttribute("aria-expanded", "false");
+      toggle.setAttribute("aria-controls", panel.id);
+
+      toggle.addEventListener("click", () => {
+        const isOpen = toggle.getAttribute("aria-expanded") === "true";
+        if (isOpen) closeDesc(panel, toggle); else { closeAllExcept(panel); openDesc(panel, toggle); }
+      });
+      toggle.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle.click(); } });
+      panel.addEventListener("transitionend", (ev) => {
+        if (ev.propertyName !== "max-height") return;
+        toggle.getAttribute("aria-expanded") === "true" ? setMax(panel) : panel.hidden = true;
+      });
+    });
+
+    window.addEventListener("resize", () => document.querySelectorAll(".event-desc.open").forEach(p => setMax(p)));
+  });
+</script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const btn = document.getElementById('btnChatPerfilPublico');
+    btn?.addEventListener('click', function (e) {
+      e.preventDefault();
+      const u = this.dataset.username;
+      if (window.openChatWith) {
+        window.openChatWith(u);
+      } else {
+        // fallback: abre el cajón sin seleccionar
+        document.getElementById('chatFab')?.click();
+      }
+    });
+  });
+</script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('btnChatPerfilPublico');
+    btn?.addEventListener('click', (e) => {
+      e.preventDefault();
+      const username = btn.dataset.username;
+      if (window.openChatWith) {
+        window.openChatWith(username);
+      } else {
+        // fallback: solo abre el cajón por si aún no cargó el script
+        document.getElementById('chatFab')?.click();
+      }
+    });
+  });
+</script>
+
+{% endblock %}

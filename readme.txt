@@ -89,3 +89,10 @@ docker compose exec web python manage.py migrate
 credenciales django
 giftersg4@gmail.com
 gifters123.
+
+
+PAGINAS...
+
+http://localhost:8000/feed/
+                                /id/
+http://localhost:8000/chat/room/1/

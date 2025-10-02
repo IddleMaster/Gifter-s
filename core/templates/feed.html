@@ -5,21 +5,29 @@
 {% block body_class %}index-page{% endblock %}
 
 {% block extra_css %}
-  <link rel="stylesheet" href="{% static 'css/feed.css' %}">
+<link rel="stylesheet" href="{% static 'css/feed.css' %}">
 {% endblock %}
 
 {% block content %}
 <main class="feed-container">
     <div class="feed-main-content">
         <div class="feed-posts-column">
-            
+
             <div class="post-card create-post-card">
-                <form method="POST" action="{% url 'feed' %}">
+                <form method="POST" action="{% url 'post_crear' %}">
                     {% csrf_token %}
                     <div class="post-header">
-                        <img src="{% static 'img/team/team-1.jpg' %}" alt="Tu foto de perfil" class="profile-pic">
-                        {{ form.contenido }}
+                        {% if user.perfil.profile_picture %}
+                        <img src="{{ user.perfil.profile_picture.url }}" alt="{{ user.username }}" class="profile-pic">
+                        {% else %}
+                        <img src="{% static 'img/Gifters/favicongift.png' %}" alt="Sin foto" class="profile-pic">
+                        {% endif %}
+
+                        <textarea name="contenido" class="create-post-input" rows="2"
+                            placeholder="¿Qué quieres compartir?" required></textarea>
+                        {# si aún usas form.contenido, elimínalo o asegúrate de pasarlo en el contexto #}
                     </div>
+
                     <div class="create-post-actions">
                         <button type="submit" class="btn-create-post">Publicar</button>
                     </div>
@@ -27,11 +35,23 @@
             </div>
 
             {% for post in posts %}
-            <div class="post-card">
+            <div class="post-card" id="post-{{ post.id_post }}">
                 <div class="post-header">
-                    <img src="{% static 'img/team/team-2.jpg' %}" alt="Foto de perfil" class="profile-pic">
+                    {% if post.id_usuario.perfil.profile_picture %}
+                    <a href="{% url 'perfil_detalle' post.id_usuario.nombre_usuario %}">
+                        <img src="{{ post.id_usuario.perfil.profile_picture.url }}"
+                            alt="{{ post.id_usuario.nombre_usuario }}" class="profile-pic">
+                    </a>
+                    {% else %}
+                    <a href="{% url 'perfil_detalle' post.id_usuario.nombre_usuario %}">
+                        <img src="{% static 'img/Gifters/favicongift.png' %}" alt="Sin foto" class="profile-pic">
+                    </a>
+                    {% endif %}
+
                     <div class="post-author-info">
-                        <a href="#" class="author-name">{{ post.id_usuario.nombre_usuario }}</a>
+                        <a href="{% url 'perfil_detalle' post.id_usuario.nombre_usuario %}" class="author-name">
+                            {{ post.id_usuario.nombre_usuario }}
+                        </a>
                         <span class="post-timestamp">{{ post.fecha_publicacion|date:"d M, Y H:i" }}</span>
                     </div>
                 </div>
@@ -44,7 +64,8 @@
                 </div>
 
                 <div class="post-actions">
-                    <a href="#" class="action-btn like-btn {% if post.user_has_liked %}liked{% endif %}" data-post-id="{{ post.id_post }}">
+                    <a href="#" class="action-btn like-btn {% if post.user_has_liked %}liked{% endif %}"
+                        data-post-id="{{ post.id_post }}">
                         <i class="bi bi-heart-fill"></i>
                         <i class="bi bi-heart"></i>
                         <span class="like-count">{{ post.likes.count }}</span> Me gusta
@@ -53,22 +74,62 @@
                     <a href="#" class="action-btn"><i class="bi bi-share"></i> Compartir</a>
                 </div>
 
-                <div class="post-comments">
-                    <div class="comment-form">
-                         <img src="{% static 'img/team/team-1.jpg' %}" alt="Tu foto de perfil" class="profile-pic comment-pic">
-                         <input type="text" class="comment-input" placeholder="Escribe un comentario...">
+                <div class="post-comments" id="comments-{{ post.id_post }}">
+                    {% if post.comentarios.all %}
+                    <div class="comments-list">
+                        {% for c in post.comentarios.all %}
+                        <div class="comment-item" id="comment-{{ c.id_comentario }}">
+                            <a href="{% url 'perfil_detalle' c.usuario.nombre_usuario %}">
+                                {% if c.usuario.perfil.profile_picture %}
+                                <img src="{{ c.usuario.perfil.profile_picture.url }}"
+                                    alt="{{ c.usuario.nombre_usuario }}" class="comment-avatar">
+                                {% else %}
+                                <img src="{% static 'img/Gifters/favicongift.png' %}" alt="Sin foto"
+                                    class="comment-avatar">
+                                {% endif %}
+                            </a>
+
+                            <div class="comment-body">
+                                <div class="comment-header">
+                                    <a href="{% url 'perfil_detalle' c.usuario.nombre_usuario %}"
+                                        class="comment-author">{{ c.usuario.nombre_usuario }}</a>
+                                    <span class="comment-date">{{ c.fecha_comentario|date:"d M, Y H:i" }}</span>
+                                </div>
+                                <p class="comment-text">{{ c.contenido }}</p>
+                            </div>
+
+                            {% if user.id == c.usuario.id %}
+                            <form method="post" action="{% url 'comentario_eliminar' c.id_comentario %}"
+                                class="delete-action">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="/feed/#post-{{ post.id_post }}">
+                                <button class="btn-icon" aria-label="Eliminar"><i class="bi bi-trash-fill"></i></button>
+                            </form>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
                     </div>
+                    {% endif %}
+
+                    <form method="post" class="comment-form" action="{% url 'comentario_crear' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="post_id" value="{{ post.id_post }}">
+                        <input type="hidden" name="next" value="/feed/#post-{{ post.id_post }}">
+                        <input type="text" name="contenido" class="comment-input" placeholder="Escribe un comentario..."
+                            required>
+                        <button type="submit" class="btn btn-icon"><i class="bi bi-send-fill"></i></button>
+                    </form>
                 </div>
             </div>
             {% empty %}
-                <div class="post-card">
-                    <p>Aún no hay publicaciones. ¡Sé el primero en compartir algo!</p>
-                </div>
+            <div class="post-card" id="post-{{ post.id_post }}">
+                <p>Aún no hay publicaciones. ¡Sé el primero en compartir algo!</p>
+            </div>
             {% endfor %}
         </div>
     </div>
+
+
+
 </main>
 {% endblock %}
-
-
-

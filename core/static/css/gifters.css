@@ -1073,12 +1073,61 @@ button {
   }
 }
 
+/* ===== Header compacto estable controlado por body.nav-compact ===== */
+.header{
+  --topbar-h: 40px;           /* alto real de tu topbar */
+  position: sticky;
+  top: 0;
+  z-index: 997;
+  padding-top: var(--topbar-h);    /* siempre reservamos ese alto -> sin saltos */
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
 
+/* Transiciones que NO rompen el layout */
+.header, .header *{
+  transition-property: opacity, box-shadow, color, background-color, transform !important;
+}
 
+/* La TOPBAR va fuera del flujo y se “sube” con transform */
+.header .topbar{
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: var(--topbar-h);
+  line-height: var(--topbar-h);
+  transform: translateY(0);
+  transition: transform .28s ease, opacity .28s ease;
+  opacity: 1;
+  pointer-events: auto;
+}
 
+/* El branding NO cambia de altura; solo lo movemos con transform */
+.header .branding{
+  min-height: 84px;
+  padding-top: 0;
+  padding-bottom: 0;
+  transform: translateY(0);
+  transition: transform .28s ease;
+}
 
+/* Estado compacto: ocultamos topbar (sube) y subimos branding exactamente lo reservado */
+body.nav-compact .header .topbar{
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+body.nav-compact .header .branding{
+  transform: translateY(calc(-1 * var(--topbar-h)));
+}
+body.nav-compact .header{
+  box-shadow: 0 0 18px rgba(0,0,0,.10);
+  border-bottom: 1px solid rgba(0,0,0,.06);
+}
 
-/* aaaaaaaaaaaaaa */
-
-
+/* ===== Neutralizar el comportamiento del theme en .scrolled (solo visual, sin alturas) ===== */
+body.scrolled .header .topbar{
+  height: var(--topbar-h) !important;
+  visibility: visible !important;
+  overflow: visible !important;
+}
 

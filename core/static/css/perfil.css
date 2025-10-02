@@ -462,3 +462,239 @@
   mask-image:none !important;
   visibility:visible !important;
 }
+
+/* Botón redondeado pequeño */
+.btn-rounded-sm {
+  border-radius: 999px;
+  width: 36px; height: 36px; line-height: 20px;
+  padding: 0; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 22px;
+}
+
+
+/* Items de evento (si no lo tenías) */
+.event-item {
+  background: #3f66ff11; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px;
+}
+/* Header */
+.events-header{
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:8px;
+}
+.btn-rounded-sm{
+  border-radius:999px; width:36px; height:36px; padding:0;
+  display:inline-flex; align-items:center; justify-content:center; font-size:22px;
+}
+
+/* Panel colapsable robusto (sin height:auto) */
+.collapse-panel{
+  overflow:hidden;
+  max-height:0; opacity:0; transform:translateY(-6px);
+  transition:max-height 220ms ease, opacity 180ms ease, transform 180ms ease;
+  will-change:max-height, opacity, transform;
+  margin-bottom:0; /* se expande limpio */
+}
+.collapse-panel.open{
+  opacity:1; transform:translateY(0);
+  margin-bottom:12px;
+}
+
+/* Form grid */
+.events-form{
+  background:#fff; border:1px solid #e6e9f2; border-radius:12px;
+  padding:12px; display:grid; gap:10px;
+  grid-template-columns: 180px 1fr 1.2fr 120px;
+  align-items:stretch;
+}
+.events-form .field .form-control,
+.events-form .field input[type="date"],
+.events-form .field textarea{
+  width:100%;
+}
+@media (max-width: 920px){
+  .events-form{ grid-template-columns: 1fr 1fr; }
+  .events-form .field.action{ grid-column: 1 / -1; }
+}
+
+/* Lista de eventos */
+.events-list .event-item{
+  display:flex; align-items:center; justify-content:space-between;
+  background:#3f66ff11; border-radius:12px; padding:12px 14px; margin-bottom:10px;
+}
+.event-item .left{ display:flex; align-items:center; gap:12px; }
+.event-item .badge{ background:#3f66ff; color:#fff; padding:6px 10px; border-radius:999px; font-weight:600; }
+.event-item .name{ font-weight:600; }
+
+.icon-btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  border:1px solid #cfd6ff; padding:6px 10px; border-radius:10px; text-decoration:none;
+}
+.icon-btn.danger{ border-color:#ffcccc; }
+.inline-form{ display:inline; margin:0; }
+
+/* Apariencia azul del bloque de eventos */
+.events-list .event-item{
+  display:flex; align-items:center;
+  background: var(--brand-100);      /* azul claro */
+  border-radius: 14px; padding: 12px 14px; margin-bottom: 12px;
+  box-shadow: 0 10px 24px rgba(17,24,39,.06);
+}
+
+/* Contenido */
+.event-item .left{
+  display:flex; align-items:center; gap:12px; min-width:0;
+}
+.event-item .badge{
+  background: var(--brand-dark); color:#fff;
+  padding:6px 10px; border-radius:999px; font-weight:600;
+}
+.event-item .name{
+  font-weight:700; color: var(--brand); /* texto azul */
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+/* Acciones totalmente a la derecha */
+.event-item .right{
+  margin-left:auto; display:flex; align-items:center; gap:10px;
+}
+
+/* Enlace de editar (puro a la derecha) */
+.edit-link{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:36px; height:36px; border-radius:10px;
+  border:1px solid #cfd6ff; color: var(--brand-dark);
+  text-decoration:none; font-size:18px;
+}
+
+/* Botón de texto "Eliminar" con letras azules */
+.delete-link{
+  background:transparent; border:none;
+  color: var(--brand-dark); font-weight:700; cursor:pointer;
+  padding:8px 10px; border-radius:8px;
+}
+.delete-link:hover{ text-decoration:underline; }
+
+/* (por si alguna regla anterior lo sobrescribe) */
+.icon-btn{ display:none; } /* ocultamos estilos viejos de icono */
+
+/* === Eventos: título centrado y botón a la derecha === */
+.events-header{
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;   /* centra el h3 */
+  margin-bottom: 8px;        /* conserva el espaciado */
+}
+.events-header h3{
+  margin: 0;
+  text-align: center;
+}
+#btn-toggle-nuevo-evento{
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* === Quitar las líneas decorativas de los títulos del contenido === */
+.profile-content h3::before,
+.profile-content h3::after{
+  display: none !important;
+}
+
+/* (Opcional) Quitar la línea semitransparente del banner */
+.profile-header::after{
+  display: none !important;
+}
+/* === Panel de descripción del evento === */
+.event-item { position: relative; }
+
+/* contenedor colapsable */
+.event-desc{
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: max-height 220ms ease, opacity 160ms ease, transform 160ms ease;
+  will-change: max-height, opacity, transform;
+  margin-top: 8px;            /* aparece bajo la fila */
+  background: #fff;
+  border: 1px solid #e6e9f2;
+  border-left: 4px solid var(--brand);
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(17,24,39,.06);
+  padding: 0 12px;            /* se habilita al abrir */
+}
+
+/* estado abierto */
+.event-desc.open{
+  opacity: 1;
+  transform: translateY(0);
+  padding: 12px;              /* padding visible ya abierto */
+}
+
+/* tipografía y espaciado del texto */
+.event-desc p{
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.45;
+}
+
+/* hace “clickeable” el lado izquierdo (fecha + nombre) */
+.event-toggle{
+  cursor: pointer;
+  user-select: none;
+}
+
+/* feedback al hover/focus del área clickeable */
+.event-toggle:hover .name{ text-decoration: underline; }
+.event-toggle:focus{ outline: none; }
+.event-toggle:focus .name{
+  box-shadow: 0 0 0 3px #cfe0ff;
+  border-radius: 6px;
+}
+/* Mantener centrado + botón a la derecha (como ya lo tenías) */
+.events-header{
+  display:grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items:center;
+  gap:.5rem;
+  margin-bottom:.75rem;
+}
+.events-header h3{ grid-column:2; justify-self:center; margin:0; text-align:center; }
+.events-header #btn-toggle-nuevo-evento{ grid-column:3; justify-self:end; }
+
+/* Badge azul legible (como antes) */
+.events-list .badge{
+  display:inline-block;
+  font-size:.875rem;
+  background:#E7F1FF;        /* azul muy claro de fondo */
+  color:#0D6EFD;             /* azul Bootstrap para el texto */
+  border:1px solid #CFE2FF;  /* borde suave */
+  padding:.25rem .5rem;
+  border-radius:8px;
+}
+.events-header{
+  display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:.5rem; margin-bottom:.75rem;
+}
+.events-header h3{ grid-column:2; justify-self:center; margin:0; text-align:center; }
+
+.events-list .event-item{
+  display:flex; justify-content:space-between; align-items:flex-start;
+  border:1px solid #eee; border-radius:12px; padding:.75rem 1rem; margin-bottom:.5rem;
+}
+.events-list .left{ display:flex; align-items:center; gap:.75rem; cursor:pointer; }
+.events-list .badge{
+  display:inline-block; font-size:.875rem;
+  background:#E7F1FF; color:#0D6EFD; border:1px solid #CFE2FF;
+  padding:.25rem .5rem; border-radius:8px;
+}
+.event-desc{ overflow:hidden; max-height:0; transition:max-height .25s ease; }
+.event-desc.open{ padding-top:.5rem; }
+
+/* Visibilidad de tabs */
+.tab-content{ display:none; }
+.tab-content.active{ display:block; }
+
+/* Feedback visual en el navbar */
+.profile-nav a.active{ color:#0d6efd; font-weight:600; }

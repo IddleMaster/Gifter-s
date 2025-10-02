@@ -27,6 +27,10 @@
   <link href="{% static 'css/main.css' %}" rel="stylesheet">
   <link href="{% static 'css/gifters.css' %}" rel="stylesheet">
 
+  <!--chat jeje-->
+  <link rel="stylesheet" href="{% static 'css/chat-floating.css' %}">
+
+
   <style>
     /* Poppins global */
     body,
@@ -120,10 +124,11 @@
         <!-- CENTRO: Nav (solo desktop) -->
         <nav id="navmenu" class="navmenu d-none d-lg-block mx-auto">
           <ul>
-            <li><a href="{% url 'home' %}#hero" class="active">Inicio</a></li>
+            <!-- <li><a href="{% url 'home' %}#hero" class="active">Inicio</a></li>-->
             <li><a href="{% url 'home' %}#clients">Categorías</a></li> <!-- Ahora apunta a las categorías reales -->
             <li><a href="{% url 'home' %}#services">Amigos</a></li>
             <li><a href="{% url 'home' %}#portfolio">Regalos</a></li>
+            <li><a href="{% url 'home' %}feed">Feed</a></li>
             <!-- Ahora apunta a Tendencias/Productos Destacados -->
           </ul>
           <i class="mobile-nav-toggle d-none"></i>
@@ -160,13 +165,12 @@
 
 
         <!-- Toggle buscador móvil -->
-        <button class="btn btn-link p-0 ms-2 d-lg-none" type="button" data-bs-toggle="collapse"
+        <button id="btnMobileSearch" class="btn btn-link p-0 ms-2 d-lg-none" type="button" data-bs-toggle="collapse"
           data-bs-target="#mobileSearch" aria-expanded="false" aria-controls="mobileSearch" aria-label="Buscar">
           <i class="bi bi-search" style="font-size:1.35rem;"></i>
         </button>
 
-        <!-- Toggle menú móvil -->
-        <button class="btn btn-link p-0 ms-2 d-lg-none" type="button" data-bs-toggle="collapse"
+        <button id="btnMobileNav" class="btn btn-link p-0 ms-2 d-lg-none" type="button" data-bs-toggle="collapse"
           data-bs-target="#mobileNav" aria-expanded="false" aria-controls="mobileNav" aria-label="Menú">
           <i class="bi bi-list" style="font-size:1.6rem;"></i>
         </button>
@@ -278,6 +282,7 @@
   <script src="{% static 'vendor/swiper/swiper-bundle.min.js' %}"></script>
   <script src="{% static 'vendor/imagesloaded/imagesloaded.pkgd.min.js' %}"></script>
   <script src="{% static 'vendor/isotope-layout/isotope.pkgd.min.js' %}"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
   <!-- Main JS -->
   <script>
@@ -334,8 +339,410 @@
         });
       });
     });
+
+
   </script>
+  {% if user.is_authenticated %}
+  <!-- Floating launcher -->
+  <button id="chatFab" class="chat-fab" title="Mensajes">💬</button>
+
+  <!-- Drawer -->
+  <div id="chatDrawer" class="chat-drawer" aria-hidden="true">
+    <div class="chat-head">
+      <span class="title">Mensajes</span>
+      <button id="chatClose" class="btn btn-sm btn-light">✕</button>
+    </div>
+
+    <div class="chat-body">
+      <!-- Lista de conversaciones -->
+      <div class="chat-list" id="chatList"></div>
+
+      <!-- Panel de mensajes -->
+      <div class="chat-pane">
+        <div id="chatEmpty" class="p-3 text-muted">Selecciona un chat para empezar</div>
+        <div id="chatMessages" class="chat-messages" hidden></div>
+        <form id="chatForm" class="chat-input" hidden>
+          {% csrf_token %}
+          <textarea id="chatText" rows="1" placeholder="Escribe un mensaje…"></textarea>
+          <button type="submit">Enviar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if user.is_authenticated %}
+  <script>
+    (function () {
+      const MEDIA_PREFIX = ("{% get_media_prefix %}" || "/media/");
+      const fab = document.getElementById('chatFab');
+      const drawer = document.getElementById('chatDrawer');
+      const closeBtn = document.getElementById('chatClose');
+      const listEl = document.getElementById('chatList');
+      const msgsEl = document.getElementById('chatMessages');
+      const emptyEl = document.getElementById('chatEmpty');
+      const formEl = document.getElementById('chatForm');
+      const textEl = document.getElementById('chatText');
+      // Identidad del usuario (debe vivir dentro del mismo IIFE del chat)
+      const ME = {
+        id: Number('{{ user.id|default:"0"|escapejs }}'),
+        username: ("{{ user.nombre_usuario|default:''|escapejs }}").trim()
+      };
+
+      let currentConvId = null;
+      let pollTimer = null;
+
+      function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return decodeURIComponent(parts.pop().split(';').shift());
+      }
+      const CSRFTOKEN = getCookie('csrftoken');
+
+      function openDrawer() {
+        drawer.classList.add('open');
+        drawer.setAttribute('aria-hidden', 'false');
+        fab.style.display = 'none';           // ← OCULTA el FAB
+        loadConversations();
+      }
+
+      function closeDrawer() {
+        drawer.classList.remove('open');
+        drawer.setAttribute('aria-hidden', 'true');
+        fab.style.display = '';               // ← VUELVE A MOSTRAR el FAB
+        stopPolling();
+      }
+      fab?.addEventListener('click', openDrawer);
+      closeBtn?.addEventListener('click', closeDrawer);
+
+      async function loadConversations() {
+        listEl.innerHTML = '<div class="p-3 text-muted">Cargando…</div>';
+        const apiURL = "{% url 'conversaciones_list' %}";
+
+        try {
+          const res = await fetch(apiURL, {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' }
+          });
+
+          console.debug('[chats] status:', res.status, 'redirected:', res.redirected);
+
+          if (!res.ok) {
+            const txt = await res.text().catch(() => '');
+            console.error('[chats] respuesta no OK:', res.status, txt.slice(0, 300));
+            throw new Error('HTTP ' + res.status);
+          }
+
+          const ctype = res.headers.get('content-type') || '';
+          if (!ctype.includes('application/json')) {
+            const txt = await res.text();
+            console.error('[chats] No es JSON. Primeros 300 chars:', txt.slice(0, 300));
+            throw new Error('Respuesta no-JSON (¿redirigido al login?)');
+          }
+
+          const data = await res.json();
+          renderConversationList(data);
+        } catch (e) {
+          listEl.innerHTML = '<div class="p-3 text-danger">No se pudieron cargar tus chats.</div>';
+          console.error('[chats] Error cargando conversaciones:', e);
+        }
+      }
+
+
+      const AVATAR_FALLBACK = "{% static 'img/Gifters/favicongift.png' %}";
+
+      function toAbsoluteMedia(u) {
+        // Nada útil → fallback
+        if (!u || typeof u !== 'string') return AVATAR_FALLBACK;
+
+        try {
+          u = u.trim();
+
+          // Si viene un objeto serializado raro (a veces backend manda "[object Object]")
+          if (u === "[object Object]") return AVATAR_FALLBACK;
+
+          // Absolutas (http/https) o protocolo relativo // o ya empiezan en /
+          if (/^https?:\/\//i.test(u) || u.startsWith('//') || u.startsWith('/')) {
+            // Evita mixed-content: si el sitio es https y la imagen es http, intenta forzar https
+            if (location.protocol === 'https:' && u.startsWith('http://')) {
+              return 'https://' + u.slice('http://'.length);
+            }
+            return u;
+          }
+
+          // Rutas comunes: "media/...", "uploads/..." → anteponer "/"
+          if (/^(media|uploads|files)\//i.test(u)) {
+            return '/' + u; // => /media/archivo.jpg
+          }
+
+          // Nombre de archivo suelto → usa MEDIA_PREFIX
+          // (asegura no duplicar media/)
+          return (MEDIA_PREFIX.replace(/\/+$/, '') + '/' + u.replace(/^\/+/, '')).replace(/\/{2,}/g, '/');
+        } catch {
+          return AVATAR_FALLBACK;
+        }
+      }
+
+      function partnerFrom(conv) {
+        const ps = Array.isArray(conv.participantes) ? conv.participantes : [];
+
+        let other = ps.find(p => Number(p.id) && Number(p.id) !== ME.id);
+        if (!other && ME.username) {
+          other = ps.find(p => (p.username || p.nombre_usuario) && (p.username || p.nombre_usuario) !== ME.username);
+        }
+        if (!other) other = ps[0] || {};
+
+        const username = other.username || other.nombre_usuario || '';
+        const fullName =
+          other.nombre_completo ||
+          [other.nombre, other.apellido].filter(Boolean).join(' ') ||
+          other.display_name ||
+          username || 'Chat';
+
+        const rawAvatar =
+          other.avatar_url ||
+          other.avatar ||
+          other.foto ||
+          other.foto_url ||
+          other.image ||
+          other.image_url ||
+          other.profile_image ||
+          other.profile_image_url ||
+          other.photo ||
+          other.photo_url ||
+          other.profile_picture ||
+          other.profile_picture_url ||
+          (other.perfil && (
+            other.perfil.avatar_url ||
+            other.perfil.avatar ||
+            other.perfil.foto ||
+            other.perfil.foto_url ||
+            other.perfil.image ||
+            other.perfil.image_url ||
+            other.perfil.profile_image ||
+            other.perfil.profile_image_url ||
+            other.perfil.profile_picture ||
+            other.perfil.profile_picture_url
+          )) ||
+          null;
+
+        const avatar = toAbsoluteMedia(rawAvatar);
+        return { name: fullName, username, avatar };
+      }
+
+      function renderConversationList(items) {
+        if (!Array.isArray(items) || !items.length) {
+          listEl.innerHTML = '<div class="p-3 text-muted">Aún no tienes conversaciones.</div>';
+          return;
+        }
+        listEl.innerHTML = '';
+        items.forEach(conv => {
+          const p = partnerFrom(conv);
+          const last = conv.ultimo_mensaje || {};
+          const el = document.createElement('div');
+          el.className = 'chat-list-item' + (conv.conversacion_id === currentConvId ? ' active' : '');
+          el.dataset.convId = conv.conversacion_id;
+          el.innerHTML = `
+        <img class="chat-avatar" src="${p.avatar}" alt=""
+     onerror="this.onerror=null;this.src='{% static 'img/Gifters/favicongift.png' %}'">
+        <div class="chat-names">
+          <div class="line1">${p.name}</div>
+          <div class="line2">${last.contenido ? (last.contenido).slice(0, 72) : 'Sin mensajes'}</div>
+        </div>
+        <div class="chat-time">${last.creado_en ? formatTime(last.creado_en) : ''}</div>
+      `;
+          el.addEventListener('click', () => openConversation(conv.conversacion_id));
+          listEl.appendChild(el);
+        });
+      }
+
+      function formatTime(ts) {
+        try {
+          const d = new Date(ts);
+          return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        } catch { return ''; }
+      }
+
+      async function openConversation(convId) {
+        currentConvId = convId;
+        Array.from(listEl.children).forEach(li => {
+          li.classList.toggle('active', Number(li.dataset.convId) === Number(convId));
+        });
+        emptyEl.hidden = true;
+        msgsEl.hidden = false;
+        formEl.hidden = false;
+        msgsEl.innerHTML = '<div class="p-2 text-muted">Cargando mensajes…</div>';
+        await loadMessagesOnce();
+        scrollToBottom();
+        startPolling();
+      }
+
+      async function loadMessagesOnce() {
+        if (!currentConvId) return;
+        const url = "{% url 'mensajes_list_create' 0 %}".replace('/0/', `/${currentConvId}/`);
+        try {
+          const res = await fetch(url, { credentials: 'same-origin' });
+          if (!res.ok) throw new Error('Error cargando mensajes');
+          const data = await res.json();
+          renderMessages(Array.isArray(data) ? data : (data.results || []));
+        } catch (e) {
+          msgsEl.innerHTML = '<div class="p-2 text-danger">No se pudieron cargar los mensajes.</div>';
+          console.error(e);
+        }
+      }
+
+      function renderMessages(msgs) {
+        msgsEl.innerHTML = '';
+
+        // Inyecta el id del usuario de forma segura y como número
+        const meId = Number('{{ user.id|default:"0"|escapejs }}');
+
+        msgs.slice().reverse().forEach(m => {
+          const authorId = Number(m.remitente_id || (m.remitente && m.remitente.id));
+          const isMe = authorId === meId;
+
+          const bubble = document.createElement('div');
+          bubble.className = 'msg ' + (isMe ? 'me' : 'other');
+
+          const body = (m.contenido || '')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+
+          const when = m.creado_en ? formatTime(m.creado_en) : '';
+
+          bubble.innerHTML = `<div class="body">${body}</div><div class="meta">${when}</div>`;
+          msgsEl.appendChild(bubble);
+        });
+      }
+      function scrollToBottom() { msgsEl.scrollTop = msgsEl.scrollHeight; }
+
+      formEl.addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        const text = (textEl.value || '').trim();
+        if (!text || !currentConvId) return;
+        const url = "{% url 'mensajes_list_create' 0 %}".replace('/0/', `/${currentConvId}/`);
+        try {
+          const res = await fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRFTOKEN },
+            body: JSON.stringify({ contenido: text, tipo: 'texto' })
+          });
+          if (!res.ok) throw new Error('No se pudo enviar el mensaje');
+          textEl.value = '';
+          await loadMessagesOnce();
+          scrollToBottom();
+          loadConversations(); // refresca preview del último mensaje
+        } catch (e) {
+          console.error(e);
+          alert('No se pudo enviar el mensaje.');
+        }
+      });
+
+      textEl.addEventListener('keydown', function (e) {
+        // evita interferencias con IME (teclados de composición)
+        if (e.isComposing) return;
+
+        const isEnter = e.key === 'Enter';
+        const onlyEnter = isEnter && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey;
+
+        if (onlyEnter) {
+          e.preventDefault(); // no insertes salto de línea
+          const txt = (textEl.value || '').trim();
+          if (!txt) return;   // no envíes vacío
+
+          // reutiliza tu handler de submit existente
+          if (formEl.requestSubmit) {
+            formEl.requestSubmit();
+          } else {
+            formEl.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+          }
+        }
+      });
+
+      // (opcional) pista UX
+      textEl.setAttribute('title', 'Enter: enviar • Shift+Enter: salto de línea');
+
+      function startPolling() { stopPolling(); pollTimer = setInterval(loadMessagesOnce, 3000); }
+      function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+
+      window.openChatWith = async function (username) {
+        if (!username) return;
+
+        // abre el cajón
+        if (typeof openDrawer === 'function') {
+          openDrawer();
+        } else {
+          document.getElementById('chatFab')?.click();
+        }
+
+        // 1) intenta encontrar una conversación ya existente con ese username
+        try {
+          const res = await fetch("{% url 'conversaciones_list' %}", { credentials: 'same-origin' });
+          const data = await res.json();
+          const conv = (data || []).find(c =>
+            (c.participantes || []).some(p => p.username === username)
+          );
+          if (conv && typeof openConversation === 'function') {
+            await openConversation(conv.conversacion_id);
+            return;
+          }
+        } catch (e) {
+          console.error('No se pudo listar conversaciones', e);
+        }
+
+        // 2) si no existe, pide al backend que la garantice usando tu vista existente
+        //    chat_con_usuario (la que antes te llevaba al chat “viejo”).
+        //    Esa vista suele CREAR la conversación si no existe.
+        try {
+          const url = "{% url 'chat_con_usuario' '___u___' %}".replace('___u___', encodeURIComponent(username));
+          // Llamada “silenciosa”: no navegamos, solo disparamos la creación
+          await fetch(url, { credentials: 'same-origin' });
+
+          // recarga la lista y vuelve a buscar
+          const res2 = await fetch("{% url 'conversaciones_list' %}", { credentials: 'same-origin' });
+          const data2 = await res2.json();
+          const conv2 = (data2 || []).find(c =>
+            (c.participantes || []).some(p => p.username === username)
+          );
+          if (conv2 && typeof openConversation === 'function') {
+            await openConversation(conv2.conversacion_id);
+            return;
+          }
+        } catch (e) {
+          console.error('No se pudo crear/garantizar la conversación', e);
+        }
+
+        // 3) si aún no se pudo, al menos deja el cajón abierto
+        console.warn('No se encontró ni pudo crear conversación con', username);
+      };
+
+      window.addEventListener('beforeunload', stopPolling);
+    })();
+
+  </script>
+  {% endif %}
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const btn = document.getElementById('btnChatPerfilPublico');
+      btn?.addEventListener('click', (e) => {
+        e.preventDefault();
+        const u = btn.dataset.username;
+        if (window.openChatWith) {
+          window.openChatWith(u);  // ← abre el cajón y salta a ese chat
+        } else {
+          document.getElementById('chatFab')?.click(); // fallback: abre el cajón
+        }
+      });
+    });
+  </script>
+
+
+
   {% block extra_js %}{% endblock %}
+
+
 </body>
 
 </html>

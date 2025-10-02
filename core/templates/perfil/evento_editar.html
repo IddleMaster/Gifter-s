@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}Editar evento{% endblock %}
+
+{% block content %}
+<div class="profile-content" style="max-width:840px;margin:24px auto;">
+  <h3 style="text-align:left;margin:0 0 14px;">Editar evento</h3>
+
+  <form method="post" class="card p-3" style="background:#fff;border:1px solid #e6e9f2;border-radius:12px;padding:16px;">
+    {% csrf_token %}
+    <div style="display:grid;gap:10px;grid-template-columns: 190px 1fr 1.3fr;">
+      <div>{{ form.fecha_evento }}</div>
+      <div>{{ form.titulo }}</div>
+      <div style="grid-column:1 / -1">{{ form.descripcion }}</div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:14px;">
+      <button class="btn btn-primary">Guardar</button>
+      <a class="btn btn-secondary" href="{% url 'perfil' %}">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

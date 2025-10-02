@@ -1,7 +1,7 @@
 from django import forms
 from django.core.exceptions import ValidationError
 from django.core.validators import MinLengthValidator
-from .models import User, Perfil, PreferenciasUsuario
+from .models import User, Perfil, PreferenciasUsuario, Evento
 from .models import Post
 from datetime import date
 import re
@@ -178,4 +178,14 @@ class PreferenciasUsuarioForm(forms.ModelForm):
             'email_on_event_invite': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'email_on_birthday_reminder': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'accepts_marketing_emails': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+class EventoForm(forms.ModelForm):
+    class Meta:
+        model = Evento
+        fields = ["titulo", "fecha_evento", "descripcion"]
+        widgets = {
+            "titulo": forms.TextInput(attrs={"class":"form-control", "placeholder":"Mi cumpleaños"}),
+            "fecha_evento": forms.DateInput(attrs={"type":"date", "class":"form-control"}),
+            "descripcion": forms.Textarea(attrs={"class":"form-control", "rows":2, "placeholder":"(opcional)"}),
         }

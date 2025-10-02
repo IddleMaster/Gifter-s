@@ -1,13 +1,16 @@
 /* --- Estilos Generales para el Contenedor del Feed --- */
 .feed-container {
     padding: 20px 15px;
-    background-color: #f0f2f5; /* Un gris claro como fondo */
+    background-color: #f0f2f5;
+    /* Un gris claro como fondo */
     min-height: 100vh;
 }
 
 .feed-main-content {
-    max-width: 680px; /* Ancho estándar para un feed */
-    margin: 0 auto; /* Centrar el contenido */
+    max-width: 680px;
+    /* Ancho estándar para un feed */
+    margin: 0 auto;
+    /* Centrar el contenido */
 }
 
 /* --- Estilos para la Tarjeta de Post (Post Card) --- */
@@ -87,6 +90,7 @@
     display: flex;
     align-items: center;
 }
+
 .action-btn i {
     margin-right: 6px;
     font-size: 1.2rem;
@@ -149,10 +153,12 @@
     outline: none;
     min-height: 24px;
 }
+
 .create-post-actions {
     text-align: right;
     margin-top: 10px;
 }
+
 .btn-create-post {
     background-color: #2374e1;
     color: white;
@@ -162,23 +168,134 @@
     font-weight: 600;
     cursor: pointer;
 }
+
 .btn-create-post:hover {
     background-color: #1a64c4;
 }
+
 /* --- Estilos para el botón de Like Interactivo --- */
 .like-btn .bi-heart-fill {
-    display: none; /* Oculta el corazón relleno por defecto */
-    color: #e0245e; /* Color rojo para el like */
+    display: none;
+    /* Oculta el corazón relleno por defecto */
+    color: #e0245e;
+    /* Color rojo para el like */
 }
+
 .like-btn.liked .bi-heart-fill {
-    display: inline-block; /* Muestra el corazón relleno cuando el botón tiene la clase 'liked' */
+    display: inline-block;
+    /* Muestra el corazón relleno cuando el botón tiene la clase 'liked' */
 }
+
 .like-btn.liked .bi-heart {
-    display: none; /* Oculta el contorno cuando está 'liked' */
+    display: none;
+    /* Oculta el contorno cuando está 'liked' */
 }
+
 .like-btn.liked {
-    color: #e0245e; /* Cambia el color del texto a rojo */
+    color: #e0245e;
+    /* Cambia el color del texto a rojo */
 }
+
 .like-count {
-    margin-right: 4px; /* Pequeño espacio entre el número y el texto */
+    margin-right: 4px;
+    /* Pequeño espacio entre el número y el texto */
 }
+
+
+.comment-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex: 0 0 36px;
+}
+
+.comment-item {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+    background: #f3f6f9;
+    border-radius: 12px;
+    padding: 10px 12px;
+}
+
+.comment-body .comment-author {
+    font-weight: 600;
+    margin-right: 6px;
+}
+
+.comment-text {
+    margin: 6px 0 0 0;
+}
+
+.comments-list {
+    margin-bottom: 10px;
+}
+
+.comment-form {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.comment-input {
+    flex: 1;
+    border-radius: 16px;
+    border: 1px solid #dee2e6;
+    padding: 8px 12px;
+    }
+
+    .post-image {
+        max-height: 360px;
+        object-fit: cover;
+        width: 100%;
+        border-radius: 8px;
+    }
+
+    .comment-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .comment-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        /* autor/fecha a la izquierda, basura a la derecha */
+    }
+
+    .comment-author {
+        font-weight: 600;
+        color: #6c63ff;
+        margin-right: 6px;
+    }
+
+    .comment-date {
+        font-size: 0.8rem;
+        color: #888;
+    }
+
+    .comment-text {
+        margin: 4px 0;
+    }
+
+  /* Botón de icono limpio */
+.btn-icon {
+  background: none;       /* sin fondo */
+  border: none;           /* sin borde */
+  outline: none;          /* sin contorno */
+  color: #6c63ff;         /* azul branding */
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0;             /* quita el espacio extra */
+  margin: 0;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon:hover {
+  color: #4b44cc;         /* azul más oscuro al pasar el mouse */
+}  

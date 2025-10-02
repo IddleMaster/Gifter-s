@@ -121,23 +121,23 @@
           }
         }
       </script>
-      
+
       <!-- Contenedor del carrusel -->
       <div class="swiper-wrapper align-items-center">
         {% for categoria in categorias %}
         <div class="swiper-slide">
-          <a href="{% url 'productos_list' %}?categoria={{ categoria.id_categoria }}" 
-             class="text-decoration-none text-dark d-block w-100 h-100">
+          <a href="{% url 'productos_list' %}?categoria={{ categoria.id_categoria }}"
+            class="text-decoration-none text-dark d-block w-100 h-100">
             {{ categoria.nombre_categoria }}
           </a>
         </div>
         {% endfor %}
       </div>
-      
+
       <!-- Flechas de navegación -->
       <div class="swiper-button-next"></div>
       <div class="swiper-button-prev"></div>
-      
+
       <!-- Puntos de paginación -->
       <div class="swiper-pagination"></div>
     </div>
@@ -149,47 +149,142 @@
   </div>
 </section>
 
-<!-- Quizás Conozcas -->
+
 <section id="services" class="services section">
   <div class="container section-title" data-aos="fade-up">
-    <h2>Quizás Conozcas</h2>
-    <p><span>Personas que quizás</span> <span class="description-title">Conozcas</span></p>
+    <h2>Conecta en Gifter’s</h2>
+    {% if solicitudes_recibidas %}
+    <div class="mb-2">
+      <h3 class="h6">Solicitudes recibidas</h3>
+    </div>
+    <div class="row gy-3 mb-4">
+      {% for s in solicitudes_recibidas %}
+      <div class="col-md-6">
+        <div class="d-flex align-items-center gap-3">
+          <strong>@{{ s.emisor.nombre_usuario }}</strong>
+          <form method="post" action="{% url 'amistad_aceptar' s.emisor.nombre_usuario %}">
+            {% csrf_token %}
+            <button class="btn btn-success btn-sm">Aceptar</button>
+          </form>
+          <form method="post" action="{% url 'amistad_cancelar' s.emisor.nombre_usuario %}">
+            {% csrf_token %}
+            <button class="btn btn-outline-secondary btn-sm">Rechazar</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if solicitudes_enviadas %}
+    <div class="mb-2">
+      <h3 class="h6">Solicitudes enviadas</h3>
+    </div>
+    <div class="row gy-3 mb-4">
+      {% for s in solicitudes_enviadas %}
+      <div class="col-md-6">
+        <div class="d-flex align-items-center gap-3">
+          <span>Para @{{ s.receptor.nombre_usuario }}</span>
+          <form method="post" action="{% url 'amistad_cancelar' s.receptor.nombre_usuario %}">
+            {% csrf_token %}
+            <button class="btn btn-outline-danger btn-sm">Cancelar</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <p><span>Explora tu red</span> <span class="description-title">Amigos y sugerencias</span></p>
   </div>
 
   <div class="container">
-    <div class="row gy-4">
-      <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="100">
-        <div class="service-item position-relative">
-          <div class="">
-            <img src="{% static 'img/Gifters/favicongift.png' %}" alt="user image" height="100px" width="100px">
-          </div>
-          <a href="#" class="stretched-link">
-            <h3>Elver Golón</h3>
-          </a>
-          <p>Me encantan Los chocolates.</p>
-        </div>
-      </div>
-
-      <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="200">
-        <div class="service-item position-relative">
-          <div class="icon"><i class="bi bi-broadcast"></i></div>
-          <a href="#" class="stretched-link">
-            <h3>Esteban Quito</h3>
-          </a>
-          <p>Me robaron todas las sillas, no me siento bien. Me gustaría una.</p>
-        </div>
-      </div>
-
-      <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="300">
-        <div class="service-item position-relative">
-          <div class="icon"><i class="bi bi-easel"></i></div>
-          <a href="#" class="stretched-link">
-            <h3>Jhon Doe</h3>
-          </a>
-          <p>Me gusta jugar videojuegos!!.</p>
-        </div>
-      </div>
+    {% if request.user.is_authenticated %}
+    {% if amigos %}
+    <div class="mb-2">
+      <h3 class="h5">Tus amigos</h3>
     </div>
+
+    <div class="row gy-4 mb-5">
+      {% for a in amigos %}
+      <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="{{ forloop.counter0|add:1 }}00">
+        <div class="service-item position-relative">
+          <div>
+            {% if a.perfil and a.perfil.profile_picture %}
+            <img src="{{ a.perfil.profile_picture.url }}" alt="{{ a.nombre }} {{ a.apellido }}" height="100" width="100"
+              style="object-fit:cover;border-radius:50%;">
+            {% else %}
+            <img src="{% static 'img/Gifters/favicongift.png' %}" alt="{{ a.nombre }} {{ a.apellido }}" height="100"
+              width="100" style="object-fit:cover;border-radius:50%;">
+            {% endif %}
+          </div>
+
+          <a href="{% url 'perfil_detalle' a.nombre_usuario %}" class="stretched-link">
+            <h3>{{ a.nombre }} {{ a.apellido }}</h3>
+          </a>
+          <p class="text-muted">@{{ a.nombre_usuario }}</p>
+
+          <div class="mt-2 d-flex gap-2">
+            <!--<a href="{% url 'perfil_detalle' a.nombre_usuario %}" class="btn btn-outline-primary btn-sm">Ver perfil</a>
+            <a href="{% url 'chat_con_usuario' a.nombre_usuario %}" class="btn btn-primary btn-sm">Chatear</a>-->
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-2">
+      <p class="text-muted">Aún no tienes amigos agregados. ¡Empieza enviando solicitudes! 👇</p>
+    </div>
+    {% endif %}
+
+    {# -------------------- QUIZÁS CONOZCAS -------------------- #}
+    <div class="mb-2">
+      <h3 class="h5">Personas que quizás conozcas</h3>
+    </div>
+
+    {% if sugerencias %}
+    <div class="row gy-4">
+      {% for u in sugerencias %}
+      <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="{{ forloop.counter0|add:1 }}00">
+        <div class="service-item position-relative">
+          <div>
+            {% if u.perfil and u.perfil.profile_picture %}
+            <img src="{{ u.perfil.profile_picture.url }}" alt="{{ u.nombre }} {{ u.apellido }}" height="100" width="100"
+              style="object-fit:cover;border-radius:50%;">
+            {% else %}
+            <img src="{% static 'img/Gifters/favicongift.png' %}" alt="{{ u.nombre }} {{ u.apellido }}" height="100"
+              width="100" style="object-fit:cover;border-radius:50%;">
+            {% endif %}
+          </div>
+
+          <a href="{% url 'perfil_detalle' u.nombre_usuario %}" class="stretched-link">
+            <h3>{{ u.nombre }} {{ u.apellido }}</h3>
+          </a>
+          <p class="text-muted">@{{ u.nombre_usuario }}</p>
+
+          <div class="mt-2 d-flex gap-2">
+            <!--<a href="{% url 'perfil_detalle' u.nombre_usuario %}" class="btn btn-outline-primary btn-sm">Ver perfil</a>
+            <form method="post" action="{% url 'amistad_enviar' u.nombre_usuario %}">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-primary btn-sm">Agregar amigo</button>-->
+            </form>
+          </div>
+
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-3">
+      <p class="text-muted">No hay sugerencias por ahora. Explora más perfiles para obtener mejores recomendaciones.</p>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="text-center py-3">
+      <p class="text-muted">Inicia sesión para ver a tus amigos y sugerencias de personas que podrías conocer.</p>
+    </div>
+    {% endif %}
   </div>
 </section>
 

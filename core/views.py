@@ -4,7 +4,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login
 from django.contrib import messages
 from django.conf import settings
-from .forms import PostForm, RegisterForm, PerfilForm, PreferenciasUsuarioForm
+from .forms import PostForm, RegisterForm, PerfilForm, PreferenciasUsuarioForm, EventoForm
 from .models import *
 from .emails import send_verification_email, send_welcome_email
 from django.core.paginator import Paginator
@@ -18,60 +18,82 @@ from django.db import IntegrityError, transaction
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 import uuid
+from django.shortcuts import get_object_or_404
 from .models import User, Post, Like  # ajusta si necesitas más
+
 
 
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from core.models import User, SolicitudAmistad, Seguidor
+from core.models import User, SolicitudAmistad, Seguidor, Evento  
 from .serializers import SolicitudAmistadSerializer, UsuarioLiteSerializer
 from .models import Conversacion, Mensaje, ParticipanteConversacion, EntregaMensaje
 from .serializers import ConversacionSerializer, MensajeSerializer
 
-
+from django.contrib.auth import get_user_model
+from django.shortcuts import get_object_or_404, redirect, render
+# ajusta imports según tu app
+from core.models import Evento, Post, Seguidor, SolicitudAmistad
 from rest_framework.pagination import PageNumberPagination
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 
 from core.models import Conversacion, Mensaje, ParticipanteConversacion
 from .serializers import ConversacionLiteSerializer, MensajeSerializer
+###nuevo hoy 1 del 10 (abajo)
+from core.services_social import amigos_qs, sugerencias_qs, obtener_o_crear_conv_directa
+from django.contrib.auth import get_user_model
+from core.models import Post, Comentario 
+from django.utils.html import escape
+from django.contrib.auth.decorators import login_required
+
+from django.views.decorators.http import require_POST
+from django.http import JsonResponse, HttpResponseForbidden
 
 
+from django.urls import reverse  # puedes dejarlo, pero ya no dependemos de reverse en el fallback
 
 def home(request):
-    """Página principal con productos destacados y categorías"""
     try:
-        # Obtener productos activos (máximo 9 para la página principal)
         productos_destacados = Producto.objects.filter(activo=True).order_by('-fecha_creacion')[:9]
-        
-        # Obtener todas las categorías activas (que tengan productos)
-        categorias = Categoria.objects.filter(
-            producto__activo=True
-        ).distinct().order_by('nombre_categoria')[:12]  # Máximo 12 categorías
-        
-        # Debug en consola
-        print("🎯 VISTA HOME EJECUTADA")
-        print(f"📦 Productos encontrados: {productos_destacados.count()}")
-        print(f"📂 Categorías encontradas: {categorias.count()}")
-        
+        categorias = Categoria.objects.filter(producto__activo=True).distinct().order_by('nombre_categoria')[:12]
+
+        amigos = []
+        sugerencias = []
+        recibidas = []
+        enviadas = []
+
+        if request.user.is_authenticated:
+            amigos = amigos_qs(request.user)
+            sugerencias = sugerencias_qs(request.user, limit=9)
+            recibidas = (SolicitudAmistad.objects
+                         .filter(receptor=request.user, estado=SolicitudAmistad.Estado.PENDIENTE)
+                         .select_related('emisor')
+                         .order_by('-creada_en')[:10])
+            enviadas = (SolicitudAmistad.objects
+                        .filter(emisor=request.user, estado=SolicitudAmistad.Estado.PENDIENTE)
+                        .select_related('receptor')
+                        .order_by('-creada_en')[:10])
+
         context = {
             'productos_destacados': productos_destacados,
             'categorias': categorias,
+            'amigos': amigos,
+            'sugerencias': sugerencias,
+            'solicitudes_recibidas': recibidas,   # 👈
+            'solicitudes_enviadas': enviadas,     # 👈
         }
         return render(request, 'index.html', context)
-        
-    except Exception as e:
-        print(f"❌ Error en vista home: {e}")
-        import traceback
-        print(traceback.format_exc())
-        
-        # En caso de error, mostrar lista vacía
-        context = {
+    except Exception:
+        return render(request, 'index.html', {
             'productos_destacados': [],
             'categorias': [],
-        }
-        return render(request, 'index.html', context)
+            'amigos': [],
+            'sugerencias': [],
+            'solicitudes_recibidas': [],
+            'solicitudes_enviadas': [],
+        })
 
 def register_view(request):
     if request.method == 'POST':
@@ -311,6 +333,39 @@ def toggle_like_post_view(request, post_id):
     
     # Si no es una petición POST, devolvemos un error
     return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+@login_required
+def get_comments_view(request, post_id):
+    """
+    Devuelve los datos de un post y sus comentarios en formato JSON.
+    """
+    post = get_object_or_404(Post, id_post=post_id)
+    # Buscamos los comentarios de ese post y los ordenamos del más antiguo al más nuevo
+    comentarios = Comentario.objects.filter(id_post=post).select_related('usuario').order_by('fecha_comentario')
+
+    # Creamos una lista de diccionarios con los datos que necesitamos
+    comentarios_data = []
+    for comentario in comentarios:
+        comentarios_data.append({
+            'autor': comentario.usuario.nombre_usuario,
+            'contenido': comentario.contenido,
+            'fecha': comentario.fecha_comentario.strftime('%d de %b, %Y a las %H:%M')
+        })
+    
+    # También preparamos los datos del post principal
+    post_data = {
+        'autor': post.id_usuario.nombre_usuario,
+        'contenido': post.contenido,
+        'fecha': post.fecha_publicacion.strftime('%d de %b, %Y a las %H:%M')
+    }
+
+    # Juntamos todo en un solo objeto para enviarlo
+    data = {
+        'post': post_data,
+        'comentarios': comentarios_data
+    }
+
+    return JsonResponse(data)
 
 # FUNCIONES DE ADMINISTRACIÓN DE PRODUCTOS
 
@@ -759,18 +814,46 @@ def productos_list(request):
 
 @login_required
 def profile_view(request):
-    """
-    Muestra el perfil del usuario actual.
-    Crea Perfil y Preferencias si no existen (sin señales).
-    """
     perfil, _ = Perfil.objects.get_or_create(user=request.user)
     prefs, _ = PreferenciasUsuario.objects.get_or_create(user=request.user)
+
+    eventos = (Evento.objects
+               .filter(id_usuario=request.user)
+               .order_by('fecha_evento', 'evento_id'))
+
+    # Crear evento inline
+    if request.method == 'POST' and request.POST.get('form') == 'evento':
+        evento_form = EventoForm(request.POST)
+        if evento_form.is_valid():
+            ev = evento_form.save(commit=False)
+            ev.id_usuario = request.user
+            ev.save()
+            messages.success(request, "Evento creado.")
+            return redirect('perfil')
+    else:
+        evento_form = EventoForm()
+
+    # ===== Amigos (seguimiento mutuo) =====
+    User = get_user_model()
+    ids_yo_sigo   = Seguidor.objects.filter(seguidor=request.user)\
+                     .values_list('seguido_id', flat=True)
+    ids_me_siguen = Seguidor.objects.filter(seguido=request.user)\
+                     .values_list('seguidor_id', flat=True)
+    ids_amigos = set(ids_yo_sigo).intersection(set(ids_me_siguen))
+
+    amigos = User.objects.filter(id__in=ids_amigos)\
+             .select_related('perfil')\
+             .order_by('nombre', 'apellido')
 
     context = {
         'perfil': perfil,
         'prefs': prefs,
+        'eventos': eventos,
+        'evento_form': evento_form,
+        'amigos': amigos,   
     }
     return render(request, 'perfil.html', context)
+
 
 
 @login_required
@@ -816,6 +899,46 @@ class IsAuthenticated(permissions.IsAuthenticated):
     pass
 
 # POST /amistad/solicitudes/  (enviar)
+
+@login_required
+def evento_crear(request):
+    if request.method != "POST":
+        return redirect('perfil')
+    form = EventoForm(request.POST)
+    if form.is_valid():
+        ev = form.save(commit=False)
+        ev.id_usuario = request.user
+        ev.save()
+        messages.success(request, "Evento creado.")
+    else:
+        messages.error(request, "Revisa los campos del evento.")
+    return redirect('perfil')
+
+@login_required
+def evento_editar(request, evento_id):
+    ev = get_object_or_404(Evento, evento_id=evento_id, id_usuario=request.user)
+    if request.method == "POST":
+        form = EventoForm(request.POST, instance=ev)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Evento actualizado.")
+            return redirect('perfil')
+        else:
+            messages.error(request, "Revisa los campos del evento.")
+    else:
+        form = EventoForm(instance=ev)
+    return render(request, 'perfil/evento_editar.html', {"form": form, "evento": ev})
+
+@login_required
+def evento_eliminar(request, evento_id):
+    ev = get_object_or_404(Evento, evento_id=evento_id, id_usuario=request.user)
+    if request.method == "POST":
+        ev.delete()
+        return redirect('perfil')
+    return render(request, 'perfil/evento_eliminar.html', {"evento": ev})
+
+
+
 class EnviarSolicitudAmistad(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -891,7 +1014,7 @@ class RechazarSolicitud(APIView):
         sol.rechazar()
         return Response(SolicitudAmistadSerializer(sol).data)
 
-# POST /amistad/solicitudes/{id}/cancelar
+
 class CancelarSolicitud(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -1011,3 +1134,197 @@ class MensajesListCreate(APIView):
             pass
 
         return Response(MensajeSerializer(msg).data, status=201)                
+
+
+
+##nuevas funciones hoy 1 del 10 (abajo):
+@login_required
+def amistad_enviar(request, username):
+    User = get_user_model()
+    receptor = get_object_or_404(User, nombre_usuario=username)
+    if receptor == request.user:
+        messages.warning(request, "No puedes enviarte una solicitud a ti mismo.")
+        return redirect('home')  # o 'index' si así se llama tu url de inicio
+
+    # Respetamos tu UniqueConstraint (emisor, receptor)
+    try:
+        with transaction.atomic():
+            SolicitudAmistad.objects.create(
+                emisor=request.user, receptor=receptor, mensaje=""
+            )
+            messages.success(request, f"Solicitud enviada a {receptor.nombre}.")
+    except IntegrityError:
+        messages.info(request, "Ya existe una solicitud o relación con este usuario.")
+    return redirect('home')
+
+
+@login_required
+def amistad_aceptar(request, username):
+    User = get_user_model()
+    emisor = get_object_or_404(User, nombre_usuario=username)
+    sol = get_object_or_404(
+        SolicitudAmistad,
+        emisor=emisor,
+        receptor=request.user,
+        estado=SolicitudAmistad.Estado.PENDIENTE
+    )
+    conv = sol.aceptar()  # usa tu método: follow mutuo + crea Conversacion directa
+    messages.success(request, f"Ahora eres amigo de {emisor.nombre}.")
+    # si quieres llevar al chat inmediatamente:
+    if conv:
+        return redirect('chat_room', conversacion_id=conv.conversacion_id)
+    return redirect('home')
+
+
+@login_required
+def amistad_cancelar(request, username):
+    User = get_user_model()
+    receptor = get_object_or_404(User, nombre_usuario=username)
+    sol = get_object_or_404(
+        SolicitudAmistad,
+        emisor=request.user,
+        receptor=receptor,
+        estado=SolicitudAmistad.Estado.PENDIENTE
+    )
+    sol.cancelar()
+    messages.info(request, "Solicitud cancelada.")
+    return redirect('home')
+
+
+@login_required
+def chat_con_usuario(request, username):
+    User = get_user_model()
+    other = get_object_or_404(User, nombre_usuario=username)
+    conv = obtener_o_crear_conv_directa(request.user, other)  # por si entran desde “Amigos”
+    return redirect('chat_room', conversacion_id=conv.conversacion_id)        
+
+
+def perfil_publico(request, username):
+    User = get_user_model()
+    usuario = get_object_or_404(User, nombre_usuario=username)
+
+    # Si es tu propio perfil → redirige a tu perfil
+    if request.user.is_authenticated and request.user.id == usuario.id:
+        return redirect('perfil')
+
+    perfil = getattr(usuario, 'perfil', None)
+
+    es_mi_perfil = False
+    es_amigo = False
+    pendiente_enviada = None
+    pendiente_recibida = None
+    puede_chatear = False
+
+    if request.user.is_authenticated:
+        sigo = Seguidor.objects.filter(seguidor=request.user, seguido=usuario).exists()
+        me_sigue = Seguidor.objects.filter(seguidor=usuario, seguido=request.user).exists()
+        es_amigo = sigo and me_sigue
+        puede_chatear = es_amigo
+
+        pendiente_enviada = SolicitudAmistad.objects.filter(
+            emisor=request.user, receptor=usuario, estado=SolicitudAmistad.Estado.PENDIENTE
+        ).first()
+        pendiente_recibida = SolicitudAmistad.objects.filter(
+            emisor=usuario, receptor=request.user, estado=SolicitudAmistad.Estado.PENDIENTE
+        ).first()
+
+    
+    eventos_publicos = (
+        Evento.objects
+        .filter(id_usuario=usuario)            
+        .order_by('fecha_evento')
+        
+    )
+
+    ultimos_posts = (
+        Post.objects
+        .filter(id_usuario=usuario, es_publico=True)
+        .order_by('-fecha_publicacion')[:6]
+    )
+
+    return render(request, 'perfil_publico.html', {
+        'usuario_publico': usuario,
+        'perfil_publico': perfil,
+        'es_mi_perfil': es_mi_perfil,
+        'es_amigo': es_amigo,
+        'pendiente_enviada': pendiente_enviada,
+        'pendiente_recibida': pendiente_recibida,
+        'puede_chatear': puede_chatear,
+        'ultimos_posts': ultimos_posts,
+        'eventos_publicos': eventos_publicos,
+    })
+
+
+def _next_url(request, default='/feed/'):
+    # 1) usa 'next' del form si viene
+    nxt = request.POST.get('next')
+    if nxt:
+        return nxt
+    # 2) usa el referer si viene
+    ref = request.META.get('HTTP_REFERER')
+    if ref:
+        return ref
+    # 3) fallback duro al feed
+    return default
+
+@login_required
+@require_POST
+def post_crear(request):
+    contenido = (request.POST.get('contenido') or '').strip()
+    if not contenido:
+        return redirect(_next_url(request))  # vuelve a donde estabas
+
+    post = Post.objects.create(
+        id_usuario=request.user,   # ajusta si tu FK se llama distinto
+        contenido=contenido
+    )
+
+    # Base a donde volver (form.next o referer o 'feed')
+    base = _next_url(request)
+    # quita cualquier ancla previa y agrega la del post nuevo
+    base = base.split('#', 1)[0]
+    return redirect(f'{base}#post-{post.id_post}')
+    
+@login_required
+def feed(request):
+    # Si quieres súper simple: traes posts y el template usa post.comentarios.all
+    posts = Post.objects.select_related('id_usuario__perfil').order_by('-fecha_publicacion')
+    return render(request, 'feed/feed.html', {'posts': posts})
+
+@login_required
+@require_POST
+def comentario_crear(request):
+    post_id = request.POST.get('post_id')
+    contenido = (request.POST.get('contenido') or '').strip()
+    if not post_id or not contenido:
+        return redirect(_next_url(request))  # vuelve al feed, no al index
+
+    post = get_object_or_404(Post, pk=post_id)
+    c = Comentario.objects.create(id_post=post, usuario=request.user, contenido=contenido)
+
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        foto = getattr(getattr(request.user, 'perfil', None), 'profile_picture', None)
+        return JsonResponse({
+            'ok': True,
+            'post_id': post.id_post,
+            'comment': {
+                'id': c.id_comentario,
+                'nombre_usuario': request.user.nombre_usuario,
+                'autor_foto': (foto.url if foto else None),
+                'contenido': c.contenido,
+                'creado_en': c.fecha_comentario.strftime('%d %b, %Y %H:%M'),
+            }
+        })
+    return redirect(_next_url(request))
+
+@login_required
+@require_POST
+def comentario_eliminar(request, pk):
+    c = get_object_or_404(Comentario, pk=pk)
+    if c.usuario_id != request.user.id:
+        return HttpResponseForbidden('No permitido')
+    c.delete()
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({'ok': True, 'deleted_id': pk})
+    return redirect(_next_url(request))
+

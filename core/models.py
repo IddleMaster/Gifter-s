@@ -11,6 +11,13 @@ from datetime import timedelta
 
 from django.contrib.auth.models import BaseUserManager
 
+class genero(models.TextChoices):
+    MASCULINO = 'M', 'Masculino'
+    FEMENINO = 'F', 'Femenino'
+    OTRO = 'O', 'Otro'
+    NO_DECLARADO = 'N', 'No declarado'
+    
+
 class UserManager(BaseUserManager):
     def create_user(self, correo, nombre, apellido, nombre_usuario=None, password=None, **extra_fields):
         if not correo:
@@ -61,6 +68,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     correo = models.EmailField(unique=True, default='')
     nombre_usuario = models.CharField(max_length=50, unique=True, blank=True)
     es_admin = models.BooleanField(default=False)
+    genero = models.CharField(
+        max_length=1, 
+        choices=genero.choices,
+        default=genero.NO_DECLARADO
+    )
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)

@@ -13,20 +13,22 @@ services:
 
   web:
     build: .
-    command: daphne -b 0.0.0.0 -p 8000 myproject.asgi:application
+    command: python manage.py runserver 0.0.0.0:8000   # <-- autoreload en dev
     ports:
       - "8000:8000"
     volumes:
       - .:/app
       - media_volume:/app/media
     depends_on:
-      - redis 
+      - redis
       - db
     environment:
       DJANGO_DB_HOST: db
       DJANGO_DB_NAME: gifters
       DJANGO_DB_USER: gifters_user
       DJANGO_DB_PASSWORD: gifters_pass
+      DEBUG: "1"                                # <-- importante en dev
+      REDIS_URL: "redis://redis:6379/0"         # <-- Channels/Redis
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
     ports:
