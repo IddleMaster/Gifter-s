@@ -845,14 +845,12 @@ class Like(models.Model):
     
     def clean(self):
         """Validaciones personalizadas"""
-        # Debe tener exactamente un elemento likeado (post O comentario)
         if not self.id_post and not self.id_comentario:
             raise ValidationError("Debe especificar un post o un comentario para el like")
         
         if self.id_post and self.id_comentario:
             raise ValidationError("No puede dar like a un post y un comentario simultáneamente")
         
-        # El tipo_like debe coincidir con el elemento likeado
         if self.id_post and self.tipo_like != self.TipoLike.POST:
             raise ValidationError("El tipo de like debe ser 'post' cuando se likea un post")
         
@@ -860,7 +858,6 @@ class Like(models.Model):
             raise ValidationError("El tipo de like debe ser 'comentario' cuando se likea un comentario")
     
     def save(self, *args, **kwargs):
-        # Auto-determinar el tipo_like basado en qué FK está llena
         if self.id_post:
             self.tipo_like = self.TipoLike.POST
         elif self.id_comentario:
@@ -873,8 +870,6 @@ class Like(models.Model):
     def elemento_likeado(self):
         """Propiedad para obtener el elemento likeado"""
         return self.id_post if self.tipo_like == self.TipoLike.POST else self.id_comentario
-    
-    # MÉTODOS ESTÁTICOS
     @classmethod
     def toggle_like_post(cls, usuario, post):
         """Alternar like en un post (dar/quitar like)"""
@@ -900,7 +895,6 @@ class Like(models.Model):
             like.delete()
             return False  # Like removido
         return True  # Like agregado
-    
     @classmethod
     def usuario_dio_like_post(cls, usuario, post):
         """Verificar si un usuario ya dio like a un post"""
@@ -933,9 +927,6 @@ class Like(models.Model):
         if tipo:
             queryset = queryset.filter(tipo_like=tipo)
         return queryset.order_by('-fecha_like')
-
-#Lukaaaaa
-
 class Categoria(models.Model):
     id_categoria = models.AutoField(primary_key=True)  # Identificador único
     nombre_categoria = models.CharField(max_length=100)  # Nombre de la categoría
@@ -943,16 +934,12 @@ class Categoria(models.Model):
 
     def __str__(self):
         return self.nombre_categoria
-
-
 class Marca(models.Model):
     id_marca = models.AutoField(primary_key=True)     # Identificador único
     nombre_marca = models.CharField(max_length=100)   # Nombre de la marca
 
     def __str__(self):
         return self.nombre_marca
-
-
 class Producto(models.Model):
     id_producto = models.AutoField(primary_key=True)
     nombre_producto = models.CharField(max_length=255)
@@ -1843,7 +1830,3 @@ class EntregaMensaje(models.Model):
 
     def __str__(self):
         return f"Entrega msg {self.mensaje_id} → user {self.usuario_id} [{self.estado}]"
-
-
-
-        ###########################

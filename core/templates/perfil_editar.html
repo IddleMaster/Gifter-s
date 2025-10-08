@@ -7,53 +7,107 @@
 <div class="container my-4">
   <h2 class="mb-3">Editar perfil</h2>
 
-  <form method="post" enctype="multipart/form-data" class="row g-4">
+  <form method="post" enctype="multipart/form-data" class="row g-4" novalidate>
     {% csrf_token %}
 
+    <!-- Columna izquierda: Datos de usuario + Perfil -->
     <div class="col-12 col-lg-6">
       <div class="card p-3 h-100">
         <h4 class="mb-3">Datos de perfil</h4>
 
+        {{ u_form.non_field_errors }}
+
         <div class="mb-3">
-          <label class="form-label">Nombre</label>
-          <input class="form-control" value="{{ request.user.nombre }}" disabled>
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Apellido</label>
-          <input class="form-control" value="{{ request.user.apellido }}" disabled>
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Usuario</label>
-          <input class="form-control" value="@{{ request.user.nombre_usuario }}" disabled>
+          <label class="form-label" for="{{ u_form.nombre.id_for_label }}">Nombre</label>
+          {{ u_form.nombre }}
+          {% for e in u_form.nombre.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
         </div>
 
+        <div class="mb-3">
+          <label class="form-label" for="{{ u_form.apellido.id_for_label }}">Apellido</label>
+          {{ u_form.apellido }}
+          {% for e in u_form.apellido.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label" for="{{ u_form.nombre_usuario.id_for_label }}">Usuario</label>
+          <div class="input-group">
+            <span class="input-group-text">@</span>
+            {{ u_form.nombre_usuario }}  <!-- Editable; no uses disabled/readonly -->
+          </div>
+          {% for e in u_form.nombre_usuario.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          <div class="form-text">Usa letras, números o guiones; se normaliza automáticamente.</div>
+        </div>
+
+        <hr class="my-3">
+
         {{ p_form.non_field_errors }}
+
         <div class="mb-3">
           <label class="form-label">{{ p_form.bio.label }}</label>
           {{ p_form.bio }}
-          {{ p_form.bio.errors }}
+          {% for e in p_form.bio.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
         </div>
 
         <div class="mb-3">
           <label class="form-label">{{ p_form.profile_picture.label }}</label><br>
           {% if request.user.perfil.profile_picture %}
-            <img src="{{ request.user.perfil.profile_picture.url }}" alt="Foto actual" style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin-bottom:8px;">
+            <img src="{{ request.user.perfil.profile_picture.url }}" alt="Foto actual"
+                 style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin-bottom:8px;">
           {% endif %}
           {{ p_form.profile_picture }}
-          {{ p_form.profile_picture.errors }}
+          {% for e in p_form.profile_picture.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
         </div>
 
         <div class="mb-3">
           <label class="form-label">{{ p_form.birth_date.label }}</label>
           {{ p_form.birth_date }}
-          {{ p_form.birth_date.errors }}
+          {% for e in p_form.birth_date.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
         </div>
       </div>
     </div>
 
+    <!-- Columna derecha: Preferencias 
     <div class="col-12 col-lg-6">
+      <div class="card p-3 h-100">
+        <h4 class="mb-3">Preferencias</h4>
 
+        {{ pref_form.non_field_errors }}
+
+        <div class="form-check mb-2">
+          {{ pref_form.email_on_new_follower }}
+          <label class="form-check-label" for="{{ pref_form.email_on_new_follower.id_for_label }}">
+            {{ pref_form.fields.email_on_new_follower.label }}
+          </label>
+          {% for e in pref_form.email_on_new_follower.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+
+        <div class="form-check mb-2">
+          {{ pref_form.email_on_event_invite }}
+          <label class="form-check-label" for="{{ pref_form.email_on_event_invite.id_for_label }}">
+            {{ pref_form.fields.email_on_event_invite.label }}
+          </label>
+          {% for e in pref_form.email_on_event_invite.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+
+        <div class="form-check mb-2">
+          {{ pref_form.email_on_birthday_reminder }}
+          <label class="form-check-label" for="{{ pref_form.email_on_birthday_reminder.id_for_label }}">
+            {{ pref_form.fields.email_on_birthday_reminder.label }}
+          </label>
+          {% for e in pref_form.email_on_birthday_reminder.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+
+        <div class="form-check mb-2">
+          {{ pref_form.accepts_marketing_emails }}
+          <label class="form-check-label" for="{{ pref_form.accepts_marketing_emails.id_for_label }}">
+            {{ pref_form.fields.accepts_marketing_emails.label }}
+          </label>
+          {% for e in pref_form.accepts_marketing_emails.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+      </div>
     </div>
+    -->
 
     <div class="col-12 d-flex gap-2">
       <a href="{% url 'perfil' %}" class="btn btn-outline-secondary">Cancelar</a>

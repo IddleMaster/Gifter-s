@@ -48,7 +48,7 @@ INSTALLED_APPS = [
     'rest_framework', 
 
     'core',
-    'django_bootstrap5'
+    'django_bootstrap5',
 
 ]
 
@@ -218,9 +218,14 @@ SOCIALACCOUNT_PROVIDERS = {
     }
 }
 
+ACCOUNT_ADAPTER = "core.adapters.CustomAccountAdapter"
+SOCIALACCOUNT_ADAPTER = "core.adapters.CustomSocialAccountAdapter"
+ACCOUNT_PRESERVE_USERNAME_CASING = False
+
 # Allauth sin username
 ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None   # <- clave para que no busque 'username'
 ACCOUNT_AUTHENTICATION_METHOD = "email"
 ACCOUNT_USER_MODEL_EMAIL_FIELD = "correo"
 ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_UNIQUE_EMAIL = True

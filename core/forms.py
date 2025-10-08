@@ -5,6 +5,21 @@ from .models import User, Perfil, PreferenciasUsuario, Evento
 from .models import Post
 from datetime import date
 import re
+from django.utils.text import slugify
+
+def _normalize_username(raw: str, max_len: int = 50) -> str:
+    return (slugify(raw or "") or "user")[:max_len]
+
+def _suggest_username(base: str, max_len: int = 50) -> str:
+    base = _normalize_username(base, max_len)
+    if not User.objects.filter(nombre_usuario__iexact=base).exists():
+        return base
+    i = 1
+    while True:
+        candidate = f"{base[:max_len - (len(str(i)) + 1)]}-{i}"
+        if not User.objects.filter(nombre_usuario__iexact=candidate).exists():
+            return candidate
+        i += 1
 
 class LoginForm(forms.Form):
     correo = forms.EmailField(
@@ -116,11 +131,14 @@ class RegisterForm(forms.ModelForm):
             raise ValidationError("Este correo ya está registrado")
         return correo
     
-    def clean_nombre_usuario(self):
-        nombre_usuario = self.cleaned_data.get('nombre_usuario')
-        if User.objects.filter(nombre_usuario=nombre_usuario).exists():
-            raise ValidationError("Este nombre de usuario ya existe")
-        return nombre_usuario
+def clean_nombre_usuario(self):
+    raw = self.cleaned_data.get('nombre_usuario', '')
+    normalized = _normalize_username(raw)
+    # excluye coincidencias case-insensitive
+    if User.objects.filter(nombre_usuario__iexact=normalized).exists():
+        suggestion = _suggest_username(normalized)
+        raise ValidationError(f"Este nombre de usuario ya existe. Prueba con “{suggestion}”.")
+    return normalized
     
     #formulario de feed
 class PostForm(forms.ModelForm):
@@ -157,6 +175,33 @@ class PerfilForm(forms.ModelForm):
             'profile_picture': 'Foto de perfil',
             'birth_date': 'Fecha de nacimiento',
         }
+
+class ProfileEditForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ["nombre", "apellido", "nombre_usuario"]
+        widgets = {
+            "nombre": forms.TextInput(attrs={"class": "form-control"}),
+            "apellido": forms.TextInput(attrs={"class": "form-control"}),
+            "nombre_usuario": forms.TextInput(attrs={"class": "form-control", "autocomplete": "off"}),
+        }
+        labels = {
+            "nombre": "Nombre",
+            "apellido": "Apellido",
+            "nombre_usuario": "Nombre de usuario",
+        }
+
+    def clean_nombre_usuario(self):
+        raw = self.cleaned_data.get("nombre_usuario", "")
+        normalized = _normalize_username(raw)
+        qs = User.objects.filter(nombre_usuario__iexact=normalized)
+        if self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            suggestion = _suggest_username(normalized)
+            raise ValidationError(f"Este nombre de usuario ya está en uso. Prueba con “{suggestion}”.")
+        return normalized
+
 
 class PreferenciasUsuarioForm(forms.ModelForm):
     class Meta:

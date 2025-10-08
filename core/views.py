@@ -20,7 +20,7 @@ from django.utils import timezone
 import uuid
 from django.shortcuts import get_object_or_404
 from .models import User, Post, Like  # ajusta si necesitas más
-
+from core.forms import ProfileEditForm
 
 
 from rest_framework import generics, permissions, status
@@ -859,30 +859,37 @@ def profile_view(request):
 @login_required
 def profile_edit(request):
     """
-    Edita perfil (bio, foto, fecha) y preferencias.
+    Edita: datos del User (nombre, apellido, nombre_usuario),
+    más Perfil (bio, foto, birth_date) y Preferencias.
     """
-    perfil, _ = Perfil.objects.get_or_create(user=request.user)
-    prefs, _ = PreferenciasUsuario.objects.get_or_create(user=request.user)
+    user = request.user
+    perfil, _ = Perfil.objects.get_or_create(user=user)
+    prefs, _ = PreferenciasUsuario.objects.get_or_create(user=user)
 
     if request.method == 'POST':
-        p_form = PerfilForm(request.POST, request.FILES, instance=perfil)
+        u_form   = ProfileEditForm(request.POST, instance=user)
+        p_form   = PerfilForm(request.POST, request.FILES, instance=perfil)
         pref_form = PreferenciasUsuarioForm(request.POST, instance=prefs)
 
-        if p_form.is_valid() and pref_form.is_valid():
+        if u_form.is_valid() and p_form.is_valid() and pref_form.is_valid():
+            u = u_form.save()      # guarda nombre/apellido/nombre_usuario (con unicidad)
             p_form.save()
             pref_form.save()
             messages.success(request, 'Perfil actualizado correctamente.')
-            return redirect('perfil')
+            return redirect('perfil')  # o a donde corresponda
         else:
             messages.error(request, 'Revisa los campos marcados.')
     else:
-        p_form = PerfilForm(instance=perfil)
+        u_form   = ProfileEditForm(instance=user)
+        p_form   = PerfilForm(instance=perfil)
         pref_form = PreferenciasUsuarioForm(instance=prefs)
 
     return render(request, 'perfil_editar.html', {
+        'u_form': u_form,
         'p_form': p_form,
         'pref_form': pref_form,
     })
+
 
 def chat_room(request, conversacion_id):
     conv = get_object_or_404(Conversacion, pk=conversacion_id)
