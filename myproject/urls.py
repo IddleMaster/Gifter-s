@@ -1,4 +1,3 @@
-# myproject/urls.py
 from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import TemplateView, RedirectView
@@ -57,6 +56,10 @@ urlpatterns = [
     path('feed/', views.feed_view, name='feed'),
     path('post/<int:post_id>/like/', views.toggle_like_post_view, name='toggle_like'),
     path('api/post/<int:post_id>/comments/', get_comments_view, name='get_comments'),
+    path('post/crear/', views.post_crear, name='post_crear'),
+    path('post/<int:pk>/eliminar/', views.post_eliminar, name='post_eliminar'), 
+    path('comentarios/crear/', views.comentario_crear, name='comentario_crear'),
+    path('comentarios/<int:pk>/eliminar/', views.comentario_eliminar, name='comentario_eliminar'),
 
     # Chat HTML
     path('chat/room/<int:conversacion_id>/', views.chat_room, name='chat_room'),
@@ -88,7 +91,19 @@ urlpatterns = [
     path('', views.feed, name='feed'),
     path('comentarios/crear/', views.comentario_crear, name='comentario_crear'),
     path('comentarios/<int:pk>/eliminar/', views.comentario_eliminar, name='comentario_eliminar'),
-    path('post/crear/', views.post_crear, name='post_crear')
+    path('post/crear/', views.post_crear, name='post_crear'),
+
+    # Favoritos (toggle)
+    path('favoritos/toggle/<int:product_id>/', views.toggle_favorito, name='favoritos_toggle'),
+    # Wishlist (acciones)
+    path('wishlist/item/<int:item_id>/recibir/', views.wishlist_marcar_recibido, name='wishlist_marcar_recibido'),
+
+    path('wishlist/item/<int:item_id>/desmarcar/',views.wishlist_desmarcar_recibido,name='wishlist_desmarcar_recibido'),
+
+    
+
+
+    
 
 
 ]

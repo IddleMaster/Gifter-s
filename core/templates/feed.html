@@ -13,6 +13,7 @@
     <div class="feed-main-content">
         <div class="feed-posts-column">
 
+            <!-- Formulario para crear un nuevo post -->
             <div class="post-card create-post-card">
                 <form method="POST" action="{% url 'post_crear' %}">
                     {% csrf_token %}
@@ -22,18 +23,16 @@
                         {% else %}
                         <img src="{% static 'img/Gifters/favicongift.png' %}" alt="Sin foto" class="profile-pic">
                         {% endif %}
-
                         <textarea name="contenido" class="create-post-input" rows="2"
                             placeholder="¿Qué quieres compartir?" required></textarea>
-                        {# si aún usas form.contenido, elimínalo o asegúrate de pasarlo en el contexto #}
                     </div>
-
                     <div class="create-post-actions">
                         <button type="submit" class="btn-create-post">Publicar</button>
                     </div>
                 </form>
             </div>
 
+            <!-- Bucle para mostrar cada post en el feed -->
             {% for post in posts %}
             <div class="post-card" id="post-{{ post.id_post }}">
                 <div class="post-header">
@@ -47,13 +46,25 @@
                         <img src="{% static 'img/Gifters/favicongift.png' %}" alt="Sin foto" class="profile-pic">
                     </a>
                     {% endif %}
-
                     <div class="post-author-info">
                         <a href="{% url 'perfil_detalle' post.id_usuario.nombre_usuario %}" class="author-name">
                             {{ post.id_usuario.nombre_usuario }}
                         </a>
                         <span class="post-timestamp">{{ post.fecha_publicacion|date:"d M, Y H:i" }}</span>
                     </div>
+
+                    <!-- Botón de opciones para eliminar el POST -->
+                    {% if user.id == post.id_usuario.id %}
+                    <div class="post-options ms-auto">
+                        <form method="post" action="{% url 'post_eliminar' post.id_post %}" class="delete-action">
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="/feed/">
+                            <button type="submit" class="btn-icon" aria-label="Eliminar Post" onclick="return confirm('¿Estás seguro de que quieres eliminar esta publicación?');">
+                                <i class="bi bi-trash-fill"></i>
+                            </button>
+                        </form>
+                    </div>
+                    {% endif %}
                 </div>
 
                 <div class="post-content">
@@ -70,47 +81,60 @@
                         <i class="bi bi-heart"></i>
                         <span class="like-count">{{ post.likes.count }}</span> Me gusta
                     </a>
-                    <a href="#" class="action-btn"><i class="bi bi-chat-dots"></i> Comentar</a>
+                    <a href="#" class="action-btn"
+                            data-bs-toggle="modal" 
+                            data-bs-target="#commentsModal" 
+                            data-post-id="{{ post.id_post }}"><i class="bi bi-chat-dots"></i>Comentarios</a>
                     <a href="#" class="action-btn"><i class="bi bi-share"></i> Compartir</a>
                 </div>
 
+                <!-- SECCIÓN DE COMENTARIOS MODIFICADA -->
                 <div class="post-comments" id="comments-{{ post.id_post }}">
-                    {% if post.comentarios.all %}
-                    <div class="comments-list">
-                        {% for c in post.comentarios.all %}
-                        <div class="comment-item" id="comment-{{ c.id_comentario }}">
-                            <a href="{% url 'perfil_detalle' c.usuario.nombre_usuario %}">
-                                {% if c.usuario.perfil.profile_picture %}
-                                <img src="{{ c.usuario.perfil.profile_picture.url }}"
-                                    alt="{{ c.usuario.nombre_usuario }}" class="comment-avatar">
-                                {% else %}
-                                <img src="{% static 'img/Gifters/favicongift.png' %}" alt="Sin foto"
-                                    class="comment-avatar">
-                                {% endif %}
-                            </a>
-
-                            <div class="comment-body">
-                                <div class="comment-header">
-                                    <a href="{% url 'perfil_detalle' c.usuario.nombre_usuario %}"
-                                        class="comment-author">{{ c.usuario.nombre_usuario }}</a>
-                                    <span class="comment-date">{{ c.fecha_comentario|date:"d M, Y H:i" }}</span>
+                    {% with comentarios=post.comentarios.all %}
+                        {% if comentarios %}
+                        <div class="comments-list">
+                            {% for c in comentarios|slice:":2" %}
+                            <div class="comment-item" id="comment-{{ c.id_comentario }}">
+                                <a href="{% url 'perfil_detalle' c.usuario.nombre_usuario %}">
+                                    {% if c.usuario.perfil.profile_picture %}
+                                    <img src="{{ c.usuario.perfil.profile_picture.url }}"
+                                        alt="{{ c.usuario.nombre_usuario }}" class="comment-avatar">
+                                    {% else %}
+                                    <img src="{% static 'img/Gifters/favicongift.png' %}" alt="Sin foto"
+                                        class="comment-avatar">
+                                    {% endif %}
+                                </a>
+                                <div class="comment-body">
+                                    <div class="comment-header">
+                                        <a href="{% url 'perfil_detalle' c.usuario.nombre_usuario %}"
+                                            class="comment-author">{{ c.usuario.nombre_usuario }}</a>
+                                        <span class="comment-date">{{ c.fecha_comentario|date:"d M, Y H:i" }}</span>
+                                    </div>
+                                    <p class="comment-text">{{ c.contenido }}</p>
                                 </div>
-                                <p class="comment-text">{{ c.contenido }}</p>
+                                {% if user.id == c.usuario.id %}
+                                <form method="post" action="{% url 'comentario_eliminar' c.id_comentario %}"
+                                    class="delete-action">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="/feed/#post-{{ post.id_post }}">
+                                    <button class="btn-icon" aria-label="Eliminar"><i class="bi bi-trash-fill"></i></button>
+                                </form>
+                                {% endif %}
                             </div>
-
-                            {% if user.id == c.usuario.id %}
-                            <form method="post" action="{% url 'comentario_eliminar' c.id_comentario %}"
-                                class="delete-action">
-                                {% csrf_token %}
-                                <input type="hidden" name="next" value="/feed/#post-{{ post.id_post }}">
-                                <button class="btn-icon" aria-label="Eliminar"><i class="bi bi-trash-fill"></i></button>
-                            </form>
-                            {% endif %}
+                            {% endfor %}
                         </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-
+                        {% if comentarios.count > 2 %}
+                        <div class="view-all-wrapper mt-2">
+                            <a href="#" class="view-all-comments" 
+                               data-bs-toggle="modal" 
+                               data-bs-target="#commentsModal" 
+                               data-post-id="{{ post.id_post }}">
+                               Ver los {{ comentarios.count }} comentarios
+                            </a>
+                        </div>
+                        {% endif %}
+                        {% endif %}
+                    {% endwith %}
                     <form method="post" class="comment-form" action="{% url 'comentario_crear' %}">
                         {% csrf_token %}
                         <input type="hidden" name="post_id" value="{{ post.id_post }}">
@@ -122,14 +146,154 @@
                 </div>
             </div>
             {% empty %}
-            <div class="post-card" id="post-{{ post.id_post }}">
+            <div class="post-card">
                 <p>Aún no hay publicaciones. ¡Sé el primero en compartir algo!</p>
             </div>
             {% endfor %}
         </div>
     </div>
-
-
-
 </main>
+
+<!-- HTML PARA LA VENTANA MODAL (ACTUALIZADO) -->
+<div class="modal fade" id="commentsModal" tabindex="-1" aria-labelledby="commentsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="commentsModalLabel">Comentarios</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="modal-comments-body">
+                <!-- El contenido se cargará aquí -->
+            </div>
+            <div class="modal-footer">
+                <form id="modal-comment-form" class="comment-form w-100">
+                    {% csrf_token %}
+                    <input type="hidden" name="post_id" id="modal-post-id-input">
+                    <input type="text" name="contenido" class="comment-input" placeholder="Escribe un comentario..." required>
+                    <button type="submit" class="btn btn-icon"><i class="bi bi-send-fill"></i></button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
+
+{% block extra_js %}
+<!-- CÓDIGO JAVASCRIPT ACTUALIZADO -->
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const commentsModal = document.getElementById('commentsModal');
+    const modalForm = document.getElementById('modal-comment-form');
+    const modalPostIdInput = document.getElementById('modal-post-id-input');
+    const modalBody = document.getElementById('modal-comments-body');
+    const defaultAvatar = "{% static 'img/Gifters/favicongift.png' %}";
+    
+    // Función para crear el HTML de un comentario en el modal
+    function createCommentElement(comentario) {
+        const commentElement = document.createElement('div');
+        commentElement.classList.add('comment-item-modal', 'mb-3');
+        commentElement.setAttribute('id', `modal-comment-${comentario.id}`);
+
+        let deleteFormHTML = '';
+        if (comentario.es_propietario) {
+            deleteFormHTML = `
+                <form method="post" action="/comentarios/${comentario.id}/eliminar/" class="delete-action modal-delete-comment-form">
+                    <input type="hidden" name="csrfmiddlewaretoken" value="${modalForm.querySelector('[name=csrfmiddlewaretoken]').value}">
+                    <input type="hidden" name="next" value="/feed/">
+                    <button type="submit" class="btn-icon" aria-label="Eliminar"><i class="bi bi-trash-fill"></i></button>
+                </form>
+            `;
+        }
+
+        commentElement.innerHTML = `
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="d-flex">
+                    <img src="${comentario.autor_foto || defaultAvatar}" alt="avatar" class="comment-avatar">
+                    <div class="comment-body ms-2">
+                        <div class="comment-header">
+                            <a href="/u/${comentario.autor}/" class="comment-author">${comentario.autor}</a>
+                            <span class="comment-date">${comentario.fecha}</span>
+                        </div>
+                        <p class="comment-text mb-0">${comentario.contenido}</p>
+                    </div>
+                </div>
+                ${deleteFormHTML}
+            </div>
+        `;
+        return commentElement;
+    }
+
+    // Evento que se dispara al ABRIR el modal
+    commentsModal.addEventListener('show.bs.modal', function (event) {
+        const triggerLink = event.relatedTarget;
+        const postId = triggerLink.getAttribute('data-post-id');
+        modalPostIdInput.value = postId;
+        modalBody.innerHTML = `<div class="text-center p-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Cargando...</span></div></div>`;
+
+        fetch(`/api/post/${postId}/comments/`)
+            .then(response => response.json())
+            .then(data => {
+                modalBody.innerHTML = '';
+                if (data.comentarios.length === 0) {
+                    modalBody.innerHTML = '<p class="text-center text-muted no-comments-message">Este post aún no tiene comentarios.</p>';
+                    return;
+                }
+                data.comentarios.forEach(comentario => {
+                    const commentElement = createCommentElement(comentario);
+                    modalBody.appendChild(commentElement);
+                });
+            });
+    });
+
+    // Evento para ENVIAR un nuevo comentario desde el modal
+    modalForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        const formData = new FormData(modalForm);
+        fetch("{% url 'comentario_crear' %}", {
+            method: 'POST',
+            headers: {'X-Requested-With': 'XMLHttpRequest'},
+            body: formData
+        }).then(response => response.json()).then(data => {
+            if (data.ok) {
+                const newComment = createCommentElement({
+                    id: data.comment.id,
+                    autor: data.comment.nombre_usuario,
+                    contenido: data.comment.contenido,
+                    fecha: data.comment.creado_en,
+                    autor_foto: data.comment.autor_foto,
+                    es_propietario: true
+                });
+                const noCommentsMessage = modalBody.querySelector('.no-comments-message');
+                if (noCommentsMessage) noCommentsMessage.remove();
+                modalBody.appendChild(newComment);
+                modalForm.reset();
+            }
+        });
+    });
+
+    // Evento para ESCUCHAR la eliminación de comentarios dentro del modal
+    modalBody.addEventListener('submit', function(event) {
+        if (!event.target.classList.contains('modal-delete-comment-form')) return;
+        event.preventDefault();
+        
+        if (!confirm('¿Estás seguro de que quieres eliminar este comentario?')) return;
+
+        const form = event.target;
+        fetch(form.action, {
+            method: 'POST',
+            headers: {'X-Requested-With': 'XMLHttpRequest'},
+            body: new FormData(form)
+        }).then(response => response.json()).then(data => {
+            if (data.ok) {
+                document.getElementById(`modal-comment-${data.deleted_id}`).remove();
+                // Opcional: podrías también eliminarlo del feed principal si está visible
+                const mainFeedComment = document.getElementById(`comment-${data.deleted_id}`);
+                if (mainFeedComment) mainFeedComment.remove();
+            }
+        });
+    });
+});
+</script>
+{% endblock %}
+

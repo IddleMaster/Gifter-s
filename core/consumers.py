@@ -1,8 +1,13 @@
+# core/consumers.py
+
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.utils import timezone
-from .models import Conversacion, Mensaje, ParticipanteConversacion, EntregaMensaje
+from django.templatetags.static import static
+
+# ¡Asegúrate de que User y Perfil estén importados!
+from .models import Conversacion, Mensaje, ParticipanteConversacion, EntregaMensaje, User, Perfil
 
 class ChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
@@ -21,19 +26,31 @@ class ChatConsumer(AsyncWebsocketConsumer):
         conv.ultimo_mensaje = msg
         conv.actualizada_en = timezone.now()
         conv.save(update_fields=['ultimo_mensaje', 'actualizada_en'])
-
-        parts = ParticipanteConversacion.objects.filter(conversacion_id=conv_id).values_list('usuario_id', flat=True)
-        for uid in parts:
-            if uid == user_id:
-                continue
-            EntregaMensaje.objects.get_or_create(mensaje=msg, usuario_id=uid)
         return msg
+
+    # Función para obtener los datos del usuario (incluida la foto)
+    @database_sync_to_async
+    def _get_user_info(self, user_id):
+        try:
+            # Usamos select_related para ser más eficientes
+            user = User.objects.select_related('perfil').get(id=user_id)
+            avatar_url = static('img/avatar-placeholder.png') # Valor por defecto
+            if hasattr(user, 'perfil') and user.perfil.profile_picture:
+                avatar_url = user.perfil.profile_picture.url
+
+            return {
+                "id": user_id,
+                "nombre_usuario": user.nombre_usuario,
+                "avatar_url": avatar_url
+            }
+        except User.DoesNotExist:
+            return None
 
     async def connect(self):
         self.conv_id = int(self.scope["url_route"]["kwargs"]["conversacion_id"])
         self.group_name = f"chat_{self.conv_id}"
-
         user = self.scope["user"]
+
         if not user.is_authenticated:
             await self.close(code=4001)
             return
@@ -57,21 +74,32 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         if data.get("action") == "send_message":
             contenido = (data.get("contenido") or "").strip()
-            tipo = data.get("tipo") or "texto"
             if not contenido:
                 return
-            msg = await self._crear_mensaje(self.conv_id, self.scope["user"].id, contenido, tipo)
 
+            # Obtenemos la información del remitente
+            user_info = await self._get_user_info(self.scope["user"].id)
+            if not user_info:
+                return
+
+            msg = await self._crear_mensaje(self.conv_id, user_info["id"], contenido, "texto")
+
+            # Creamos el payload con la información del perfil
             payload = {
-                "type": "chat.message",
                 "mensaje_id": msg.mensaje_id,
-                "conversacion_id": self.conv_id,
-                "remitente_id": self.scope["user"].id,
                 "contenido": msg.contenido,
-                "tipo": msg.tipo,
                 "creado_en": msg.creado_en.isoformat(),
+                "remitente_id": user_info["id"],
+                "remitente_nombre_usuario": user_info["nombre_usuario"],
+                "remitente_foto": user_info["avatar_url"], # <-- Enviamos la foto
             }
-            await self.channel_layer.group_send(self.group_name, {"type": "broadcast", "payload": payload})
 
-    async def broadcast(self, event):
+            # Enviamos el mensaje al grupo
+            await self.channel_layer.group_send(
+                self.group_name,
+                {"type": "broadcast.message", "payload": payload}
+            )
+
+    # Este método recibe los mensajes del grupo y los reenvía al cliente
+    async def broadcast_message(self, event):
         await self.send(text_data=json.dumps(event["payload"]))

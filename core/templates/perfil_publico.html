@@ -64,6 +64,9 @@
   <nav class="profile-nav">
     <ul>
       <li>
+        <a href="#" data-tab="wishlist">Wishlist</a>
+      </li>
+      <li>
         <a href="#" data-tab="actividad" class="{% if ultimos_posts %}active{% endif %}">Actividad pública</a>
       </li>
       <li>
@@ -139,6 +142,48 @@
       {% endif %}
     </div>
   </section>
+  <!-- Wishlist pública -->
+  <section id="wishlist" class="tab-content">
+    <h3>Wishlist de “{{ usuario_publico.nombre_usuario }}”</h3>
+
+    {% if not es_amigo %}
+    <p class="text-muted">Solo los amigos pueden ver la wishlist.</p>
+    {% else %}
+    {% if wishlist_items_publicos %}
+    <div class="gift-grid">
+      {% for it in wishlist_items_publicos %}
+      {% with p=it.id_producto %}
+      <div class="gift-card">
+        <img
+          src="{% if p.imagen and p.imagen.url %}{{ p.imagen.url }}{% else %}{% static 'img/Gifters/favicongift.png' %}{% endif %}"
+          alt="{{ p.nombre_producto }}">
+
+        <div class="gift-info">
+          <h4>{{ p.nombre_producto }}</h4>
+          <p>{{ p.id_marca.nombre_marca }}</p>
+        </div>
+
+        <div class="gift-actions">
+          <a class="btn btn-sm btn-outline-primary" href="{% url 'producto_detalle' p.id_producto %}"
+            title="Ver detalle">Ver</a>
+
+          {% with url_tienda=p.urls_tienda.first %}
+          {% if url_tienda %}
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_tienda.url }}" target="_blank" rel="noopener"
+            title="Ver en tienda">Tienda</a>
+          {% endif %}
+          {% endwith %}
+        </div>
+      </div>
+      {% endwith %}
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted">No tiene productos en su wishlist (o no es visible).</p>
+    {% endif %}
+    {% endif %}
+  </section>
+
 
 </div>
 {% endblock %}

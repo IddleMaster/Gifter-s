@@ -102,96 +102,128 @@
   .event-desc.open {
     padding-top: .5rem;
   }
+
   /* ===== Formulario de nuevo evento ===== */
-.events-form{
-  display:grid;
-  grid-template-columns: 160px 1fr;   /* columna de label + campo */
-  gap:.75rem 1rem;
-  align-items:center;
-}
+  .events-form {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    /* columna de label + campo */
+    gap: .75rem 1rem;
+    align-items: center;
+  }
 
-.events-form label{ font-weight:600; color:#333; }
+  .events-form label {
+    font-weight: 600;
+    color: #333;
+  }
 
-.events-form input[type="text"],
-.events-form input[type="date"],
-.events-form textarea,
-.events-form select{
-  width:100%;
-  box-sizing:border-box;
-  padding:.5rem .65rem;
-  border:1px solid #cfe2ff;
-  border-radius:10px;
-  background:#fff;
-}
+  .events-form input[type="text"],
+  .events-form input[type="date"],
+  .events-form textarea,
+  .events-form select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: .5rem .65rem;
+    border: 1px solid #cfe2ff;
+    border-radius: 10px;
+    background: #fff;
+  }
 
-.events-form textarea{ resize:vertical; min-height:90px; }
+  .events-form textarea {
+    resize: vertical;
+    min-height: 90px;
+  }
 
-/* Fila de acciones al final, alineada a la derecha */
-.events-form .actions{
-  grid-column:1 / -1;
-  display:flex;
-  justify-content:flex-end;
-  gap:.5rem;
-}
+  /* Fila de acciones al final, alineada a la derecha */
+  .events-form .actions {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: flex-end;
+    gap: .5rem;
+  }
 
-/* Evitar que los botones se estiren en alto */
-.events-form .btn{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  height:auto;
-  line-height:1.2;
-  padding:.5rem .9rem;
-}
-/* ===== Amigos: grid uniforme ===== */
-.friends-grid{
-  display:grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap:16px;
-}
+  /* Evitar que los botones se estiren en alto */
+  .events-form .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: auto;
+    line-height: 1.2;
+    padding: .5rem .9rem;
+  }
 
-.friend-card{
-  display:grid;
-  grid-template-columns: 72px 1fr;
-  grid-template-rows: auto auto 1fr auto; /* nombre, @, filler, acciones */
-  align-items:center;
-  column-gap:14px;
-  row-gap:6px;
+  /* ===== Amigos: grid uniforme ===== */
+  .friends-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
 
-  border:1px solid #eee;
-  border-radius:12px;
-  padding:14px;
-  background:#fff;
+  .friend-card {
+    display: grid;
+    grid-template-columns: 72px 1fr;
+    grid-template-rows: auto auto 1fr auto;
+    /* nombre, @, filler, acciones */
+    align-items: center;
+    column-gap: 14px;
+    row-gap: 6px;
 
-  min-height:140px;            /* alto consistente */
-}
+    border: 1px solid #eee;
+    border-radius: 12px;
+    padding: 14px;
+    background: #fff;
 
-/* Avatar */
-.friend-card .avatar{
-  grid-row: 1 / span 3;        /* ocupa alto del texto */
-  width:72px; height:72px; border-radius:50%; overflow:hidden;
-}
-.friend-card .avatar img{ width:100%; height:100%; object-fit:cover; }
+    min-height: 140px;
+    /* alto consistente */
+  }
 
-/* Nombre + usuario con clamp para que todas alineen */
-.friend-card .name{
-  font-weight:700; font-size:1.25rem; line-height:1.1;
-  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
-  overflow:hidden;
-  margin:0;
-}
-.friend-card .handle{ color:#6c757d; margin:0; }
+  /* Avatar */
+  .friend-card .avatar {
+    grid-row: 1 / span 3;
+    /* ocupa alto del texto */
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    overflow: hidden;
+  }
 
-/* Acciones al fondo y a la derecha */
-.friend-card .actions{
-  grid-column: 2;
-  align-self:end;
-  display:flex; gap:.5rem; justify-content:flex-start;
-}
+  .friend-card .avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
 
-/* Botones consistentes */
-.friend-card .btn{ padding:.4rem .7rem; line-height:1.2; }
+  /* Nombre + usuario con clamp para que todas alineen */
+  .friend-card .name {
+    font-weight: 700;
+    font-size: 1.25rem;
+    line-height: 1.1;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin: 0;
+  }
 
+  .friend-card .handle {
+    color: #6c757d;
+    margin: 0;
+  }
+
+  /* Acciones al fondo y a la derecha */
+  .friend-card .actions {
+    grid-column: 2;
+    align-self: end;
+    display: flex;
+    gap: .5rem;
+    justify-content: flex-start;
+  }
+
+  /* Botones consistentes */
+  .friend-card .btn {
+    padding: .4rem .7rem;
+    line-height: 1.2;
+  }
 </style>
 {% endblock %}
 
@@ -210,7 +242,7 @@
     </div>
 
     <div class="edit-profile">
-      
+
       <a href="{% url 'perfil_editar' %}" class="btn-edit">Editar perfil ✎</a>
     </div>
 
@@ -229,41 +261,108 @@
 <div class="profile-content">
 
   <!-- Wishlist -->
-  <section id="wishlist" class="tab-content active">
-    <h3>A “{{ request.user.nombre_usuario }}” le encantaría</h3>
-    <div class="gift-grid">
-      <div class="gift-card">
-        <img src="{% static 'img/logo.png' %}" alt="Producto">
-        <div class="gift-info">
-          <h4>Nestle Trencito</h4>
-          <p>Chocolate de leche</p>
+<section id="wishlist" class="tab-content active">
+  <h3>WishList</h3>
+
+  {# Placeholder de vacío (se oculta si hay items) #}
+  <p id="empty-wishlist" class="text-muted" {% if wishlist_items %}hidden{% endif %}>
+    Tu wishlist está vacía. Agrega productos desde el catálogo.
+  </p>
+
+  <div id="wishlist-container" class="gift-grid">
+    {% if wishlist_items %}
+      {% for it in wishlist_items %}
+        {% with p=it.id_producto url_tienda=p.urls_tienda_activas.first %}
+        <div class="gift-card"
+             id="wl-item-{{ it.id_item }}"
+             data-product-id="{{ p.id_producto }}"
+             data-is-fav="1"
+             data-shop-url="{% if url_tienda %}{{ url_tienda.url }}{% endif %}">
+          <img src="{% if p.imagen and p.imagen.url %}{{ p.imagen.url }}{% else %}{% static 'img/Gifters/favicongift.png' %}{% endif %}"
+               alt="{{ p.nombre_producto }}">
+
+          <div class="gift-info">
+            <h4>{{ p.nombre_producto }}</h4>
+            <p>{{ p.id_marca.nombre_marca }}</p>
+            {% if p.precio %}<div class="price">${{ p.precio }}</div>{% endif %}
+          </div>
+
+          <div class="gift-actions">
+            <a href="#" class="wishlist-btn {% if p.id_producto in favoritos_ids %}is-fav{% endif %}"
+               data-product-id="{{ p.id_producto }}"
+               title="Quitar de wishlist" aria-pressed="true">
+              <i class="bi {% if p.id_producto in favoritos_ids %}bi-heart-fill text-danger{% else %}bi-heart{% endif %}"></i>
+            </a>
+
+            <a href="#" class="mark-received"
+               data-item-id="{{ it.id_item }}"
+               data-url="{% url 'wishlist_marcar_recibido' it.id_item %}"
+               title="Marcar como recibido">
+              <i class="bi bi-bag-check-fill text-success"></i>
+            </a>
+
+            {% if url_tienda %}
+            <a href="{{ url_tienda.url }}" target="_blank" rel="noopener" title="Ver en tienda">
+              <i class="bi bi-link-45deg"></i>
+            </a>
+            {% endif %}
+          </div>
         </div>
-        <div class="gift-actions">
-          <button title="Marcar">✔</button>
-          <button title="Ver">🔍</button>
-          <button title="Copiar enlace">🔗</button>
-        </div>
-      </div>
-    </div>
-  </section>
+        {% endwith %}
+      {% endfor %}
+    {% endif %}
+  </div>
+</section>
+
+
+
 
   <!-- Regalos recibidos -->
-  <section id="recibidos" class="tab-content">
-    <h3>“Usuario” ya recibió</h3>
-    <div class="gift-grid">
-      <div class="gift-card">
-        <img src="{% static 'img/logo.png' %}" alt="Producto recibido">
-        <div class="gift-info">
-          <h4>Nestle Trencito</h4>
-          <p>Chocolate de leche</p>
+<section id="recibidos" class="tab-content">
+  <h3>Tus Regalos Recibidos</h3>
+
+  {# Placeholder de vacío (se oculta si hay items) #}
+  <p id="empty-recibidos" class="text-muted" {% if recibidos_items %}hidden{% endif %}>
+    Aún no registras regalos recibidos.
+  </p>
+
+  <div id="recibidos-container" class="gift-grid">
+    {% if recibidos_items %}
+      {% for it in recibidos_items %}
+        {% with p=it.id_producto %}
+        <div class="gift-card"
+             id="wl-item-{{ it.id_item }}"
+             data-product-id="{{ p.id_producto }}"
+             data-is-fav="1">
+          <img src="{% if p.imagen and p.imagen.url %}{{ p.imagen.url }}{% else %}{% static 'img/Gifters/favicongift.png' %}{% endif %}"
+               alt="{{ p.nombre_producto }}">
+
+          <div class="gift-info">
+            <h4>{{ p.nombre_producto }}</h4>
+            <p>{{ p.id_marca.nombre_marca }}</p>
+            {% if p.precio %}<div class="price">${{ p.precio }}</div>{% endif %}
+            <div class="text-muted" style="font-size:.85rem">
+              Recibido el {{ it.fecha_comprado|date:"d/m/Y H:i" }}
+            </div>
+          </div>
+
+          <div class="gift-actions">
+            {# Solo basurero en Recibidos #}
+            <a href="#" class="undo-received"
+               data-url="{% url 'wishlist_desmarcar_recibido' it.id_item %}"
+               title="Quitar de 'Recibidos' (volver a Wishlist)">
+              <i class="bi bi-trash"></i>
+            </a>
+          </div>
         </div>
-        <div class="gift-actions">
-          <button title="Ver" alt="emoji lupa">🔍</button>
-          <button title="Copiar enlace" alt="emoji link">🔗</button>
-        </div>
-      </div>
-    </div>
-  </section>
+        {% endwith %}
+      {% endfor %}
+    {% endif %}
+  </div>
+</section>
+
+
+
 
   {% load i18n %}
 
@@ -277,27 +376,27 @@
     </div>
 
     <!-- Panel colapsable (contenido del formulario de nuevo evento) -->
-<div id="panel-nuevo-evento" class="collapse-panel" hidden>
-  <form method="post" action="" class="events-form">
-    {% csrf_token %}
-    <input type="hidden" name="form" value="evento">
+    <div id="panel-nuevo-evento" class="collapse-panel" hidden>
+      <form method="post" action="" class="events-form">
+        {% csrf_token %}
+        <input type="hidden" name="form" value="evento">
 
-    <label for="{{ evento_form.fecha_evento.id_for_label }}">Fecha</label>
-    {{ evento_form.fecha_evento }}
+        <label for="{{ evento_form.fecha_evento.id_for_label }}">Fecha</label>
+        {{ evento_form.fecha_evento }}
 
-    <label for="{{ evento_form.titulo.id_for_label }}">Título</label>
-    {{ evento_form.titulo }}
+        <label for="{{ evento_form.titulo.id_for_label }}">Título</label>
+        {{ evento_form.titulo }}
 
-    <label for="{{ evento_form.descripcion.id_for_label }}">Descripción</label>
-    {{ evento_form.descripcion }}
+        <label for="{{ evento_form.descripcion.id_for_label }}">Descripción</label>
+        {{ evento_form.descripcion }}
 
-    <div class="actions">
-      <button type="submit" class="btn btn-primary">Guardar</button>
-      <button type="button" class="btn btn-outline-secondary"
-              onclick="document.getElementById('btn-toggle-nuevo-evento').click()">Cancelar</button>
+        <div class="actions">
+          <button type="submit" class="btn btn-primary">Guardar</button>
+          <button type="button" class="btn btn-outline-secondary"
+            onclick="document.getElementById('btn-toggle-nuevo-evento').click()">Cancelar</button>
+        </div>
+      </form>
     </div>
-  </form>
-</div>
 
 
 
@@ -337,19 +436,19 @@
   </section>
   {% endlanguage %}
 
-<!-- Amigos -->
-<section id="amigos" class="tab-content">
-  <h3>Tus amigos</h3>
+  <!-- Amigos -->
+  <section id="amigos" class="tab-content">
+    <h3>Tus amigos</h3>
 
-  {% if amigos %}
+    {% if amigos %}
     <div class="friends-grid">
       {% for a in amigos %}
       <div class="friend-card">
         <div class="avatar">
           {% if a.perfil and a.perfil.profile_picture %}
-            <img src="{{ a.perfil.profile_picture.url }}" alt="{{ a.nombre }} {{ a.apellido }}">
+          <img src="{{ a.perfil.profile_picture.url }}" alt="{{ a.nombre }} {{ a.apellido }}">
           {% else %}
-            <img src="{% static 'img/Gifters/favicongift.png' %}" alt="{{ a.nombre }} {{ a.apellido }}">
+          <img src="{% static 'img/Gifters/favicongift.png' %}" alt="{{ a.nombre }} {{ a.apellido }}">
           {% endif %}
         </div>
 
@@ -363,10 +462,10 @@
       </div>
       {% endfor %}
     </div>
-  {% else %}
+    {% else %}
     <p class="text-muted">Aún no tienes amigos agregados. ¡Empieza enviando solicitudes!</p>
-  {% endif %}
-</section>
+    {% endif %}
+  </section>
 
 
 
@@ -379,196 +478,433 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-  /* ===== Panel “Nuevo evento” ===== */
-  const btn = document.getElementById("btn-toggle-nuevo-evento");
-  const panel = document.getElementById("panel-nuevo-evento");
+  document.addEventListener("DOMContentLoaded", function () {
+    /* ===== Helpers: placeholders vacíos ===== */
+    const emptyWishlist  = document.getElementById("empty-wishlist");
+    const emptyRecibidos = document.getElementById("empty-recibidos");
+    const wlContainer    = document.getElementById("wishlist-container");
+    const rcContainer    = document.getElementById("recibidos-container");
 
-  if (btn && panel) {
-    panel.hidden = true;
-    panel.style.maxHeight = "0px";
-    panel.style.overflow = "hidden";
-    btn.setAttribute("aria-expanded", "false");
-    btn.textContent = "＋";
-
-    const setMaxPanel = (el) => el.style.maxHeight = el.scrollHeight + "px";
-    const openP = () => {
-      panel.hidden = false;
-      panel.classList.add("open");
-      setMaxPanel(panel);
-      btn.setAttribute("aria-expanded", "true");
-      btn.textContent = "–";
-    };
-    const closeP = () => {
-      if (!panel.style.maxHeight || panel.style.maxHeight === "0px") {
-        panel.style.maxHeight = panel.scrollHeight + "px";
+    function updateEmptyStates() {
+      if (emptyWishlist && wlContainer) {
+        const hasWL = wlContainer.querySelector(".gift-card");
+        emptyWishlist.hidden = !!hasWL;
       }
-      requestAnimationFrame(() => {
-        panel.classList.remove("open");
-        panel.style.maxHeight = "0px";
-      });
+      if (emptyRecibidos && rcContainer) {
+        const hasRC = rcContainer.querySelector(".gift-card");
+        emptyRecibidos.hidden = !!hasRC;
+      }
+    }
+
+    /* estado inicial de placeholders */
+    updateEmptyStates();
+
+    /* ===== Panel “Nuevo evento” ===== */
+    const btn = document.getElementById("btn-toggle-nuevo-evento");
+    const panel = document.getElementById("panel-nuevo-evento");
+
+    if (btn && panel) {
+      panel.hidden = true;
+      panel.style.maxHeight = "0px";
+      panel.style.overflow = "hidden";
       btn.setAttribute("aria-expanded", "false");
       btn.textContent = "＋";
-    };
 
-    btn.addEventListener("click", () =>
-      btn.getAttribute("aria-expanded") === "true" ? closeP() : openP()
-    );
+      const setMaxPanel = (el) => el.style.maxHeight = el.scrollHeight + "px";
+      const openP = () => {
+        panel.hidden = false;
+        panel.classList.add("open");
+        setMaxPanel(panel);
+        btn.setAttribute("aria-expanded", "true");
+        btn.textContent = "–";
+      };
+      const closeP = () => {
+        if (!panel.style.maxHeight || panel.style.maxHeight === "0px") {
+          panel.style.maxHeight = panel.scrollHeight + "px";
+        }
+        requestAnimationFrame(() => {
+          panel.classList.remove("open");
+          panel.style.maxHeight = "0px";
+        });
+        btn.setAttribute("aria-expanded", "false");
+        btn.textContent = "＋";
+      };
 
-    panel.addEventListener("transitionend", (ev) => {
-      if (ev.propertyName !== "max-height") return;
-      btn.getAttribute("aria-expanded") === "true"
-        ? setMaxPanel(panel)
-        : (panel.hidden = true);
-    });
+      btn.addEventListener("click", () =>
+        btn.getAttribute("aria-expanded") === "true" ? closeP() : openP()
+      );
 
-    window.addEventListener("resize", () => {
-      if (btn.getAttribute("aria-expanded") === "true") setMaxPanel(panel);
-    });
-    panel.addEventListener("input", () => {
-      if (btn.getAttribute("aria-expanded") === "true") setMaxPanel(panel);
-    });
-  }
+      panel.addEventListener("transitionend", (ev) => {
+        if (ev.propertyName !== "max-height") return;
+        btn.getAttribute("aria-expanded") === "true"
+          ? setMaxPanel(panel)
+          : (panel.hidden = true);
+      });
 
-  /* ===== Tabs ===== */
-  const nav = document.querySelector(".profile-nav");
-const sections = document.querySelectorAll(".tab-content");
-
-function activateTab(key){
-  if (!key) return;
-  // desactivar todo
-  nav.querySelectorAll("a[data-tab]").forEach(a => a.classList.remove("active"));
-  sections.forEach(s => s.classList.remove("active"));
-  // activar elegidos
-  const link = nav.querySelector(`a[data-tab="${key}"]`);
-  const target = document.getElementById(key);
-  if (link) link.classList.add("active");
-  if (target) target.classList.add("active");
-}
-
-// estado inicial seguro (por si algo llega sin .active)
-let initial = nav.querySelector("a[data-tab].active");
-activateTab(initial ? initial.getAttribute("data-tab") : "wishlist");
-
-// delegación de eventos (un solo listener)
-nav.addEventListener("click", function(e){
-  const a = e.target.closest("a[data-tab]");
-  if (!a) return;
-  e.preventDefault();
-  activateTab(a.getAttribute("data-tab"));
-});
-
-  /* ===== Descripción por evento (acordeón) ===== */
-  const items = document.querySelectorAll(".events-list .event-item");
-  const setMaxDesc = (el) => (el.style.maxHeight = el.scrollHeight + "px");
-
-  function openDesc(descPanel, toggle) {
-    descPanel.hidden = false;
-    descPanel.classList.add("open");
-    setMaxDesc(descPanel);
-    toggle.setAttribute("aria-expanded", "true");
-  }
-
-  function closeDesc(descPanel, toggle) {
-    if (!descPanel.style.maxHeight || descPanel.style.maxHeight === "0px") {
-      descPanel.style.maxHeight = descPanel.scrollHeight + "px";
-    }
-    requestAnimationFrame(() => {
-      descPanel.classList.remove("open");
-      descPanel.style.maxHeight = "0px";
-    });
-    toggle.setAttribute("aria-expanded", "false");
-  }
-
-  function closeAllExcept(current) {
-    items.forEach((it) => {
-      const tg = it.querySelector(".event-toggle");
-      const pn = it.querySelector(".event-desc");
-      if (pn && pn !== current && tg.getAttribute("aria-expanded") === "true") {
-        closeDesc(pn, tg);
-      }
-    });
-  }
-
-  items.forEach((item) => {
-    const toggle = item.querySelector(".event-toggle");
-    const descPanel = item.querySelector(".event-desc");
-    if (!toggle || !descPanel) return;
-
-    toggle.setAttribute("role", "button");
-    toggle.setAttribute("tabindex", "0");
-    toggle.setAttribute("aria-expanded", "false");
-    toggle.setAttribute("aria-controls", descPanel.id);
-
-    toggle.addEventListener("click", () => {
-      const isOpen = toggle.getAttribute("aria-expanded") === "true";
-      if (isOpen) {
-        closeDesc(descPanel, toggle);
-      } else {
-        closeAllExcept(descPanel);
-        openDesc(descPanel, toggle);
-      }
-    });
-    toggle.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        toggle.click();
-      }
-    });
-    descPanel.addEventListener("transitionend", (ev) => {
-      if (ev.propertyName !== "max-height") return;
-      toggle.getAttribute("aria-expanded") === "true"
-        ? setMaxDesc(descPanel)
-        : (descPanel.hidden = true);
-    });
-  });
-
-  window.addEventListener("resize", () =>
-    document.querySelectorAll(".event-desc.open").forEach((p) => setMaxDesc(p))
-  );
-
-  /* ===== Confirmar eliminación (SweetAlert2 con fetch) ===== */
-  document.body.addEventListener("click", function (e) {
-    const btnDel = e.target.closest(".delete-form .delete-link");
-    if (!btnDel) return;
-
-    e.preventDefault();
-    const form = btnDel.closest("form");
-    const titulo = btnDel.getAttribute("data-title") || "este evento";
-
-    if (btnDel.type && btnDel.type.toLowerCase() === "submit") {
-      btnDel.type = "button";
+      window.addEventListener("resize", () => {
+        if (btn.getAttribute("aria-expanded") === "true") setMaxPanel(panel);
+      });
+      panel.addEventListener("input", () => {
+        if (btn.getAttribute("aria-expanded") === "true") setMaxPanel(panel);
+      });
     }
 
-    Swal.fire({
-      title: "¿Estás seguro?",
-      text: `Se eliminará «${titulo}» y no podrás recuperarlo.`,
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Sí, eliminar",
-      cancelButtonText: "Cancelar",
-    }).then((result) => {
-      if (!result.isConfirmed) return;
+    /* ===== Tabs ===== */
+    const nav = document.querySelector(".profile-nav");
+    const sections = document.querySelectorAll(".tab-content");
 
-      fetch(form.action, {
-        method: "POST",
-        body: new FormData(form),
-        headers: { "X-Requested-With": "XMLHttpRequest" },
-      }).then((r) => {
-        if (r.ok) {
-          Swal.fire({
-            title: "¡Eliminado!",
-            text: "El evento fue eliminado con éxito.",
-            icon: "success",
-            confirmButtonText: "OK",
-          }).then(() => window.location.reload());
+    function activateTab(key) {
+      if (!key) return;
+      nav.querySelectorAll("a[data-tab]").forEach(a => a.classList.remove("active"));
+      sections.forEach(s => s.classList.remove("active"));
+      const link = nav.querySelector(`a[data-tab="${key}"]`);
+      const target = document.getElementById(key);
+      if (link) link.classList.add("active");
+      if (target) target.classList.add("active");
+    }
+
+    let initial = nav.querySelector("a[data-tab].active");
+    activateTab(initial ? initial.getAttribute("data-tab") : "wishlist");
+
+    nav.addEventListener("click", function (e) {
+      const a = e.target.closest("a[data-tab]");
+      if (!a) return;
+      e.preventDefault();
+      activateTab(a.getAttribute("data-tab"));
+    });
+
+    /* ===== Acordeón eventos ===== */
+    const items = document.querySelectorAll(".events-list .event-item");
+    const setMaxDesc = (el) => (el.style.maxHeight = el.scrollHeight + "px");
+
+    function openDesc(descPanel, toggle) {
+      descPanel.hidden = false;
+      descPanel.classList.add("open");
+      setMaxDesc(descPanel);
+      toggle.setAttribute("aria-expanded", "true");
+    }
+    function closeDesc(descPanel, toggle) {
+      if (!descPanel.style.maxHeight || descPanel.style.maxHeight === "0px") {
+        descPanel.style.maxHeight = descPanel.scrollHeight + "px";
+      }
+      requestAnimationFrame(() => {
+        descPanel.classList.remove("open");
+        descPanel.style.maxHeight = "0px";
+      });
+      toggle.setAttribute("aria-expanded", "false");
+    }
+    function closeAllExcept(current) {
+      items.forEach((it) => {
+        const tg = it.querySelector(".event-toggle");
+        const pn = it.querySelector(".event-desc");
+        if (pn && pn !== current && tg.getAttribute("aria-expanded") === "true") {
+          closeDesc(pn, tg);
         }
       });
+    }
+    items.forEach((item) => {
+      const toggle = item.querySelector(".event-toggle");
+      const descPanel = item.querySelector(".event-desc");
+      if (!toggle || !descPanel) return;
+
+      toggle.setAttribute("role", "button");
+      toggle.setAttribute("tabindex", "0");
+      toggle.setAttribute("aria-expanded", "false");
+      toggle.setAttribute("aria-controls", descPanel.id);
+
+      toggle.addEventListener("click", () => {
+        const isOpen = toggle.getAttribute("aria-expanded") === "true";
+        if (isOpen) { closeDesc(descPanel, toggle); }
+        else { closeAllExcept(descPanel); openDesc(descPanel, toggle); }
+      });
+      toggle.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          toggle.click();
+        }
+      });
+      descPanel.addEventListener("transitionend", (ev) => {
+        if (ev.propertyName !== "max-height") return;
+        toggle.getAttribute("aria-expanded") === "true"
+          ? setMaxDesc(descPanel)
+          : (descPanel.hidden = true);
+      });
     });
+    window.addEventListener("resize", () =>
+      document.querySelectorAll(".event-desc.open").forEach((p) => setMaxDesc(p))
+    );
+
+    /* ===== Confirmar eliminación (SweetAlert2 con fetch) ===== */
+    document.body.addEventListener("click", function (e) {
+      const btnDel = e.target.closest(".delete-form .delete-link");
+      if (!btnDel) return;
+
+      e.preventDefault();
+      const form = btnDel.closest("form");
+      const titulo = btnDel.getAttribute("data-title") || "este evento";
+
+      if (btnDel.type && btnDel.type.toLowerCase() === "submit") {
+        btnDel.type = "button";
+      }
+
+      Swal.fire({
+        title: "¿Estás seguro?",
+        text: `Se eliminará «${titulo}» y no podrás recuperarlo.`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sí, eliminar",
+        cancelButtonText: "Cancelar",
+      }).then((result) => {
+        if (!result.isConfirmed) return;
+
+        fetch(form.action, {
+          method: "POST",
+          body: new FormData(form),
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+        }).then((r) => {
+          if (r.ok) {
+            Swal.fire({
+              title: "¡Eliminado!",
+              text: "El evento fue eliminado con éxito.",
+              icon: "success",
+              confirmButtonText: "OK",
+            }).then(() => window.location.reload());
+          }
+        });
+      });
+    });
+
+    /* ===== Wishlist (toggle desde el perfil) ===== */
+    function getCookie(name) {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(";").shift();
+    }
+    const csrftoken = getCookie("csrftoken");
+
+    document.body.addEventListener("click", async function (e) {
+      const btn = e.target.closest(".wishlist-btn");
+      if (!btn) return;
+
+      e.preventDefault();
+
+      const id = btn.getAttribute("data-product-id");
+      const icon = btn.querySelector("i");
+      const wasFav = btn.classList.contains("is-fav");
+      const prevTitle = btn.title;
+
+      try {
+        const url = `{% url 'favoritos_toggle' 0 %}`.replace("/0/", `/${id}/`);
+        const resp = await fetch(url, {
+          method: "POST",
+          headers: {
+            "X-CSRFToken": csrftoken,
+            "X-Requested-With": "XMLHttpRequest"
+          }
+        });
+
+        if (resp.redirected || resp.url.includes("{% url 'login' %}")) {
+          window.location.href = "{% url 'login' %}?next={{ request.get_full_path|urlencode }}";
+          return;
+        }
+
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        const data = await resp.json();
+        const isFav = data.state === "added";
+
+        btn.classList.toggle("is-fav", isFav);
+        btn.setAttribute("aria-pressed", isFav ? "true" : "false");
+        btn.title = isFav ? "Quitar de wishlist" : "Agregar a wishlist";
+        if (icon) icon.className = isFav ? "bi bi-heart-fill text-danger" : "bi bi-heart";
+
+        if (!isFav) {
+          const card = btn.closest(".gift-card, .product-card");
+          if (card) {
+            card.remove();
+            updateEmptyStates();  // <— actualizar placeholder
+          }
+        }
+      } catch (err) {
+        console.error(err);
+        btn.classList.toggle("is-fav", wasFav);
+        btn.setAttribute("aria-pressed", wasFav ? "true" : "false");
+        btn.title = prevTitle;
+        if (icon) icon.className = wasFav ? "bi bi-heart-fill text-danger" : "bi bi-heart";
+      }
+    });
+
+    /* ===== Marcar como recibido ===== */
+    document.body.addEventListener("click", async function (e) {
+      const btnMark = e.target.closest(".mark-received");
+      if (!btnMark) return;
+
+      e.preventDefault();
+
+      const url = btnMark.getAttribute("data-url");
+      const card = btnMark.closest(".gift-card, .product-card");
+
+      const confirm = await Swal.fire({
+        title: "¿Marcar como recibido?",
+        text: "Este producto saldrá de tu wishlist.",
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonText: "Sí, marcar",
+        cancelButtonText: "Cancelar"
+      });
+      if (!confirm.isConfirmed) return;
+
+      try {
+        const resp = await fetch(url, {
+          method: "POST",
+          headers: {
+            "X-CSRFToken": getCookie("csrftoken"),
+            "X-Requested-With": "XMLHttpRequest"
+          }
+        });
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        const data = await resp.json();
+        if (!data.ok) throw new Error("Respuesta inesperada");
+
+        const recibidos = document.getElementById("recibidos-container");
+        if (recibidos && card) {
+          const info = card.querySelector(".gift-info");
+          if (info) {
+            let lbl = info.querySelector(".js-recibido-label");
+            if (!lbl) {
+              lbl = document.createElement("div");
+              lbl.className = "text-muted js-recibido-label";
+              lbl.style.fontSize = ".85rem";
+              info.appendChild(lbl);
+            }
+            lbl.textContent = "Recibido el " + (data.fecha || "");
+          }
+
+          const actions = card.querySelector(".gift-actions");
+          if (actions) {
+            const oldBtn = actions.querySelector(".mark-received");
+            if (oldBtn) oldBtn.remove();
+            actions.querySelectorAll(".wishlist-btn, .bi-link-45deg").forEach(el => {
+              const a = el.closest("a") || el;
+              a.remove();
+            });
+
+            const undo = document.createElement("a");
+            undo.href = "#";
+            undo.className = "undo-received";
+            undo.setAttribute("data-url","{% url 'wishlist_desmarcar_recibido' 0 %}".replace("/0/", `/${data.item_id}/`));
+            undo.title = "Quitar de 'Recibidos' (volver a Wishlist)";
+            undo.innerHTML = '<i class="bi bi-trash"></i>';
+            actions.prepend(undo);
+          }
+
+          recibidos.prepend(card);
+          updateEmptyStates();   // <— actualizar placeholders
+        }
+
+        Swal.fire({
+          title: "¡Listo!",
+          text: "El regalo se marcó como recibido.",
+          icon: "success",
+          timer: 1600,
+          showConfirmButton: false
+        });
+      } catch (err) {
+        console.error(err);
+        Swal.fire("Ups…", "No pudimos marcarlo como recibido.", "error");
+      }
+    });
+
+    /* ===== Deshacer recibido (volver a Wishlist) ===== */
+    document.body.addEventListener("click", async function (e) {
+      const btnUndo = e.target.closest(".undo-received");
+      if (!btnUndo) return;
+
+      e.preventDefault();
+
+      const url = btnUndo.getAttribute("data-url");
+      const card = btnUndo.closest(".gift-card, .product-card");
+
+      function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(";").shift();
+      }
+
+      try {
+        const resp = await fetch(url, {
+          method: "POST",
+          headers: {
+            "X-CSRFToken": getCookie("csrftoken"),
+            "X-Requested-With": "XMLHttpRequest"
+          }
+        });
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        const data = await resp.json();
+        if (!data.ok) throw new Error("Respuesta inesperada");
+
+        const lbl = card.querySelector(".js-recibido-label");
+        if (lbl) lbl.remove();
+
+        const actions = card.querySelector(".gift-actions");
+        if (actions) {
+          actions.innerHTML = "";
+
+          const pid = card.dataset.productId;
+          const isFav = card.dataset.isFav === "1";
+          const heart = document.createElement("a");
+          heart.href = "#";
+          heart.className = `wishlist-btn ${isFav ? "is-fav" : ""}`;
+          heart.setAttribute("data-product-id", pid);
+          heart.title = isFav ? "Quitar de wishlist" : "Agregar a wishlist";
+          heart.setAttribute("aria-pressed", isFav ? "true" : "false");
+          heart.innerHTML = `<i class="bi ${isFav ? "bi-heart-fill text-danger" : "bi-heart"}"></i>`;
+          actions.appendChild(heart);
+
+          const mark = document.createElement("a");
+          mark.href = "#";
+          mark.className = "mark-received";
+          mark.setAttribute("data-item-id", data.item_id);
+          mark.setAttribute("data-url", "{% url 'wishlist_marcar_recibido' 0 %}".replace("/0/", `/${data.item_id}/`));
+          mark.title = "Marcar como recibido";
+          mark.innerHTML = '<i class="bi bi-bag-check-fill text-success"></i>';
+          actions.appendChild(mark);
+
+          const shopUrl = (card.dataset.shopUrl || "").trim();
+          if (shopUrl) {
+            const shop = document.createElement("a");
+            shop.href = shopUrl;
+            shop.target = "_blank";
+            shop.rel = "noopener";
+            shop.title = "Ver en tienda";
+            shop.innerHTML = '<i class="bi bi-link-45deg"></i>';
+            actions.appendChild(shop);
+          }
+        }
+
+        const wl = document.getElementById("wishlist-container");
+        if (wl && card) wl.prepend(card);
+
+        const goWishlist = document.querySelector('.profile-nav a[data-tab="wishlist"]');
+        if (goWishlist) goWishlist.click();
+
+        updateEmptyStates();    // <— actualizar placeholders
+
+        Swal.fire({
+          title: "Deshecho",
+          text: "Volvió a tu Wishlist.",
+          icon: "success",
+          timer: 1400,
+          showConfirmButton: false
+        });
+      } catch (err) {
+        console.error(err);
+        Swal.fire("Ups…", "No pudimos deshacerlo.", "error");
+      }
+    });
+
+    /* ===== /NUEVO ===== */
   });
-}); 
-
-
-
 </script>
+
+
 {% endblock %}

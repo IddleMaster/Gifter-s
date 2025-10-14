@@ -69,7 +69,6 @@
       color: #fff;
     }
   </style>
-  <link href="{% static 'css/gifters.css' %}" rel="stylesheet">
 
   {% block extra_css %}{% endblock %}
 </head>
@@ -191,24 +190,13 @@
               <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#clients">Categorías</a></li>
               <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#services">Amigos</a></li>
               <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#portfolio">Regalos</a></li>
+              <li class="nav-item"><a class="nav-link" href="{% url 'home' %}feed">Feed</a></li>
             </ul>
           </nav>
         </div>
       </div>
 
-      <!-- Menú móvil colapsable -->
-      <div id="mobileNav" class="collapse border-top bg-white" data-bs-parent="#mobileCollapses">
-        <div class="container py-2">
-          <nav aria-label="Navegación principal móvil">
-            <ul class="nav flex-column mobile-nav">
-              <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#hero">Inicio</a></li>
-              <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#clients">Categorías</a></li>
-              <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#services">Amigos</a></li>
-              <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#portfolio">Regalos</a></li>
-            </ul>
-          </nav>
-        </div>
-      </div>
+      
 
     </div>
 

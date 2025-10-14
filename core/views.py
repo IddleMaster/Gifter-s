@@ -21,7 +21,7 @@ import uuid
 from django.shortcuts import get_object_or_404
 from .models import User, Post, Like  # ajusta si necesitas más
 from core.forms import ProfileEditForm
-
+from .utils import get_default_wishlist
 
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
@@ -38,6 +38,8 @@ from core.models import Evento, Post, Seguidor, SolicitudAmistad
 from rest_framework.pagination import PageNumberPagination
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+from core.models import Wishlist, ItemEnWishlist  
+
 
 from core.models import Conversacion, Mensaje, ParticipanteConversacion
 from .serializers import ConversacionLiteSerializer, MensajeSerializer
@@ -53,6 +55,11 @@ from django.http import JsonResponse, HttpResponseForbidden
 
 
 from django.urls import reverse  # puedes dejarlo, pero ya no dependemos de reverse en el fallback
+
+
+
+
+
 
 def home(request):
     try:
@@ -81,8 +88,8 @@ def home(request):
             'categorias': categorias,
             'amigos': amigos,
             'sugerencias': sugerencias,
-            'solicitudes_recibidas': recibidas,   # 👈
-            'solicitudes_enviadas': enviadas,     # 👈
+            'solicitudes_recibidas': recibidas,   
+            'solicitudes_enviadas': enviadas,     
         }
         return render(request, 'index.html', context)
     except Exception:
@@ -213,41 +220,82 @@ def obtener_info_likes_post(request, post_id):
 
     
 ###PRODUCTOS
+@login_required
+@require_POST
+def toggle_favorito(request, product_id):
+    """
+    Alterna un producto en la wishlist 'Favoritos' del usuario:
+    - Si existe, lo quita.
+    - Si no existe, lo agrega con cantidad=1.
+    """
+    producto = get_object_or_404(Producto, pk=product_id, activo=True)
+    wl = get_default_wishlist(request.user)
+
+    item = ItemEnWishlist.objects.filter(id_wishlist=wl, id_producto=producto).first()
+    if item:
+        item.delete()
+        state = "removed"
+    else:
+        # Requiere que ItemEnWishlist.cantidad use MinValueValidator(1)
+        ItemEnWishlist.objects.create(id_wishlist=wl, id_producto=producto, cantidad=1)
+        state = "added"
+
+    return JsonResponse({"status": "ok", "state": state, "product_id": product_id})
+
     
 def productos_list(request):
     """Vista para listar todos los productos activos"""
     query = request.GET.get('q', '')
     categoria_id = request.GET.get('categoria', '')
-    
+    marca_id = request.GET.get('marca', '')
+
     productos = Producto.objects.filter(activo=True)
-    
+
     if query:
         productos = productos.filter(
             Q(nombre_producto__icontains=query) |
             Q(descripcion__icontains=query) |
             Q(id_marca__nombre_marca__icontains=query)
         )
-    
+
     if categoria_id:
         productos = productos.filter(id_categoria_id=categoria_id)
-    
+
+    if marca_id:
+        productos = productos.filter(id_marca_id=marca_id)
+
     # Ordenar por rating promedio
     productos = productos.annotate(avg_rating=Avg('resenas__calificacion')).order_by('-avg_rating')
-    
+
     # Paginación
-    paginator = Paginator(productos, 12)  # 12 productos por página
+    paginator = Paginator(productos, 12)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    
+
     categorias = Categoria.objects.all()
-    
+    marcas = Marca.objects.all()
+
+    # === NUEVO: ids de productos favoritos del usuario ===
+    favoritos_ids = set()
+    if request.user.is_authenticated:
+        wl = get_default_wishlist(request.user)
+        favoritos_ids = set(
+            ItemEnWishlist.objects
+            .filter(id_wishlist=wl)
+            .values_list('id_producto', flat=True)
+        )
+
     context = {
         'productos': page_obj,
         'categorias': categorias,
+        'marcas': marcas,
         'query': query,
         'selected_categoria': categoria_id,
+        'selected_marca': marca_id,
+        'favoritos_ids': favoritos_ids,  # <--- NUEVO
     }
-    return render(request, 'productos/list.html', context)
+    return render(request, 'productos_list.html', context)
+
 
 def producto_detalle(request, producto_id):
     """Vista para detalle de producto"""
@@ -340,16 +388,24 @@ def get_comments_view(request, post_id):
     Devuelve los datos de un post y sus comentarios en formato JSON.
     """
     post = get_object_or_404(Post, id_post=post_id)
-    # Buscamos los comentarios de ese post y los ordenamos del más antiguo al más nuevo
-    comentarios = Comentario.objects.filter(id_post=post).select_related('usuario').order_by('fecha_comentario')
+    # Optimizamos la consulta para incluir el perfil del autor del comentario
+    comentarios = Comentario.objects.filter(id_post=post).select_related('usuario__perfil').order_by('fecha_comentario')
 
     # Creamos una lista de diccionarios con los datos que necesitamos
     comentarios_data = []
     for comentario in comentarios:
+        # Obtenemos la URL de la foto de perfil si existe
+        autor_foto_url = None
+        if hasattr(comentario.usuario, 'perfil') and comentario.usuario.perfil.profile_picture:
+            autor_foto_url = comentario.usuario.perfil.profile_picture.url
+
         comentarios_data.append({
+            'id': comentario.id_comentario,  # Añadimos el ID del comentario
             'autor': comentario.usuario.nombre_usuario,
             'contenido': comentario.contenido,
-            'fecha': comentario.fecha_comentario.strftime('%d de %b, %Y a las %H:%M')
+            'fecha': comentario.fecha_comentario.strftime('%d de %b, %Y a las %H:%M'),
+            'autor_foto': autor_foto_url,
+            'es_propietario': comentario.usuario.id == request.user.id # Flag para saber si el usuario actual es el dueño
         })
     
     # También preparamos los datos del post principal
@@ -366,6 +422,25 @@ def get_comments_view(request, post_id):
     }
 
     return JsonResponse(data)
+
+@login_required
+@require_POST
+def post_eliminar(request, pk):
+    """
+    Vista para eliminar una publicación.
+    """
+    post = get_object_or_404(Post, pk=pk)
+    # Solo el autor del post puede eliminarlo
+    if post.id_usuario != request.user:
+        return HttpResponseForbidden("No tienes permiso para eliminar esta publicación.")
+    
+    post.delete()
+    messages.success(request, "Publicación eliminada correctamente.")
+    
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({'ok': True, 'deleted_id': pk})
+        
+    return redirect(_next_url(request, default='/feed/'))
 
 # FUNCIONES DE ADMINISTRACIÓN DE PRODUCTOS
 
@@ -768,49 +843,49 @@ def login_view(request):
 
     return render(request, 'login.html', {'form': form})
 
-def productos_list(request):
-    """Vista para listar todos los productos activos con filtros"""
-    query = request.GET.get('q', '')
-    categoria_id = request.GET.get('categoria', '')
-    marca_id = request.GET.get('marca', '')
+#def productos_list(request):
+#    """Vista para listar todos los productos activos con filtros"""
+#   query = request.GET.get('q', '')
+#    categoria_id = request.GET.get('categoria', '')
+#    marca_id = request.GET.get('marca', '')
+#    
+#    productos = Producto.objects.filter(activo=True)
+#    
+#    # Aplicar filtros
+#    if query:
+#        productos = productos.filter(
+#            Q(nombre_producto__icontains=query) |
+#            Q(descripcion__icontains=query) |
+#            Q(id_marca__nombre_marca__icontains=query)
+#        )
+#    
+#    if categoria_id:
+#        productos = productos.filter(id_categoria_id=categoria_id)
+#    
+#    if marca_id:
+#        productos = productos.filter(id_marca_id=marca_id)
+#    
+#    # Ordenar por fecha de creación (más recientes primero)
+#    productos = productos.order_by('-fecha_creacion')
     
-    productos = Producto.objects.filter(activo=True)
-    
-    # Aplicar filtros
-    if query:
-        productos = productos.filter(
-            Q(nombre_producto__icontains=query) |
-            Q(descripcion__icontains=query) |
-            Q(id_marca__nombre_marca__icontains=query)
-        )
-    
-    if categoria_id:
-        productos = productos.filter(id_categoria_id=categoria_id)
-    
-    if marca_id:
-        productos = productos.filter(id_marca_id=marca_id)
-    
-    # Ordenar por fecha de creación (más recientes primero)
-    productos = productos.order_by('-fecha_creacion')
-    
-    # Paginación
-    paginator = Paginator(productos, 12)  # 12 productos por página
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    
-    # Obtener todas las categorías y marcas para los filtros
-    categorias = Categoria.objects.all()
-    marcas = Marca.objects.all()
-    
-    context = {
-        'productos': page_obj,
-        'categorias': categorias,
-        'marcas': marcas,
-        'query': query,
-        'selected_categoria': categoria_id,
-        'selected_marca': marca_id,
-    }
-    return render(request, 'productos_list.html', context)  # ← CORREGIDO
+#    # Paginación
+#    paginator = Paginator(productos, 12)  # 12 productos por página
+#    page_number = request.GET.get('page')
+#    page_obj = paginator.get_page(page_number)
+#    
+#    # Obtener todas las categorías y marcas para los filtros
+#    categorias = Categoria.objects.all()
+#    marcas = Marca.objects.all()
+#    
+#    context = {
+#        'productos': page_obj,
+#        'categorias': categorias,
+#        'marcas': marcas,
+#        'query': query,
+#        'selected_categoria': categoria_id,
+#        'selected_marca': marca_id,
+#    }
+#    return render(request, 'productos_list.html', context)  # ← CORREGIDO
 
 @login_required
 def profile_view(request):
@@ -844,13 +919,40 @@ def profile_view(request):
     amigos = User.objects.filter(id__in=ids_amigos)\
              .select_related('perfil')\
              .order_by('nombre', 'apellido')
+    
+    wl = get_default_wishlist(request.user)
+
+    # ⬇️ PEQUEÑO ajuste: sólo items NO recibidos en la wishlist
+    wishlist_items = (
+        ItemEnWishlist.objects
+        .filter(id_wishlist=wl, fecha_comprado__isnull=True)
+        .select_related('id_producto', 'id_producto__id_marca')
+        .prefetch_related('id_producto__urls_tienda')
+        .order_by('-id_item')
+    )
+
+    # ⬇️ NUEVO: items YA recibidos para la pestaña "Regalos recibidos"
+    recibidos_items = (
+        ItemEnWishlist.objects
+        .filter(id_wishlist=wl, fecha_comprado__isnull=False)
+        .select_related('id_producto', 'id_producto__id_marca')
+        .prefetch_related('id_producto__urls_tienda')
+        .order_by('-fecha_comprado', '-id_item')
+    )
+
+    favoritos_ids = set(
+        wishlist_items.values_list('id_producto', flat=True)
+    )
 
     context = {
         'perfil': perfil,
         'prefs': prefs,
         'eventos': eventos,
         'evento_form': evento_form,
-        'amigos': amigos,   
+        'amigos': amigos, 
+        'wishlist_items': wishlist_items,
+        'favoritos_ids': favoritos_ids,
+        'recibidos_items': recibidos_items,
     }
     return render(request, 'perfil.html', context)
 
@@ -895,8 +997,16 @@ def chat_room(request, conversacion_id):
     conv = get_object_or_404(Conversacion, pk=conversacion_id)
     if not ParticipanteConversacion.objects.filter(conversacion=conv, usuario=request.user).exists():
         return HttpResponseForbidden("No eres participante de esta conversación.")
-    return render(request, "chat/room.html", {"conversacion_id": conv.conversacion_id})
 
+    # Asegúrate de que el perfil del usuario exista
+    perfil, created = Perfil.objects.get_or_create(user=request.user)
+    
+    # Pasamos el usuario y su perfil al contexto de la plantilla
+    return render(request, "chat/room.html", {
+        "conversacion_id": conv.conversacion_id,
+        "user": request.user,
+        "user_perfil": perfil,
+    })
 
     ##########   ##########   ##########   ##########   ##########   
   ##########   ##########     ##########   ##########   ##########   
@@ -1235,12 +1345,10 @@ def perfil_publico(request, username):
             emisor=usuario, receptor=request.user, estado=SolicitudAmistad.Estado.PENDIENTE
         ).first()
 
-    
     eventos_publicos = (
         Evento.objects
-        .filter(id_usuario=usuario)            
+        .filter(id_usuario=usuario)
         .order_by('fecha_evento')
-        
     )
 
     ultimos_posts = (
@@ -1248,6 +1356,19 @@ def perfil_publico(request, username):
         .filter(id_usuario=usuario, es_publico=True)
         .order_by('-fecha_publicacion')[:6]
     )
+
+    # --- NUEVO: Wishlist pública (solo visible si son amigos) ---
+    from core.models import Wishlist, ItemEnWishlist  # import local para no tocar el encabezado del archivo
+    wishlist_items_publicos = []
+    wl = Wishlist.objects.filter(usuario=usuario).first()
+    if wl and es_amigo:
+        wishlist_items_publicos = (
+            ItemEnWishlist.objects
+            .filter(id_wishlist=wl)
+            .select_related('id_producto', 'id_producto__id_marca')
+            .prefetch_related('id_producto__urls_tienda')  # usa la relación real (no el manager filtrado)
+            .order_by('-pk')
+        )
 
     return render(request, 'perfil_publico.html', {
         'usuario_publico': usuario,
@@ -1259,7 +1380,9 @@ def perfil_publico(request, username):
         'puede_chatear': puede_chatear,
         'ultimos_posts': ultimos_posts,
         'eventos_publicos': eventos_publicos,
+        'wishlist_items_publicos': wishlist_items_publicos,
     })
+
 
 
 def _next_url(request, default='/feed/'):
@@ -1334,4 +1457,32 @@ def comentario_eliminar(request, pk):
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
         return JsonResponse({'ok': True, 'deleted_id': pk})
     return redirect(_next_url(request))
+
+@login_required
+@require_POST
+def wishlist_marcar_recibido(request, item_id):
+    wl = get_default_wishlist(request.user)
+    item = get_object_or_404(ItemEnWishlist, id_wishlist=wl, pk=item_id)
+
+    now = timezone.now()
+    item.fecha_comprado = now
+    item.save(update_fields=['fecha_comprado'])
+
+    # fecha formateada para pintarla sin recargar
+    fecha_text = now.strftime('%d/%m/%Y %H:%M')
+    return JsonResponse({'ok': True, 'item_id': item_id, 'fecha': fecha_text})
+
+
+@login_required
+@require_POST
+def wishlist_desmarcar_recibido(request, item_id):
+    wl = get_default_wishlist(request.user)
+    item = get_object_or_404(ItemEnWishlist, id_wishlist=wl, pk=item_id)
+
+    item.fecha_comprado = None
+    item.save(update_fields=['fecha_comprado'])
+
+    return JsonResponse({'ok': True, 'item_id': item_id})
+
+
 

@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
-from django.core.validators import MinLengthValidator, MaxValueValidator, MinValueValidator
+from django.core.validators import MinLengthValidator, MaxValueValidator, MinValueValidator, MinValueValidator
 import uuid
 from django.utils import timezone
 from django.core.exceptions import ValidationError
@@ -530,7 +530,7 @@ class ItemEnWishlist(models.Model):
     cantidad = models.PositiveIntegerField(
         default=1,
         verbose_name='Cantidad deseada',
-        validators=[MinLengthValidator(1)]
+        validators=[MinValueValidator(1)]
     )
     
     # Prioridad - usando TextChoices
