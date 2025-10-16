@@ -21,3 +21,4 @@ PyJWT
 channels
 channels-redis
 daphne
+meilisearch==0.31.5

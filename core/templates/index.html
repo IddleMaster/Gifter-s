@@ -5,8 +5,7 @@
 {% block body_class %}index-page{% endblock %}
 
 {% block content %}
-
-<!-- Hero Section -->
+{% if not user.is_authenticated %}
 <section id="hero" class="hero section light-background">
   <div class="container">
     <div class="row gy-4">
@@ -64,18 +63,29 @@
     </div>
   </div>
 </section>
+{% endif %}
 
 
 
-<!-- Categorías recomendadas -->
+
+{% if not user.is_authenticated %}
 <div class="container section-title" data-aos="fade-up">
   <h2>Categorías</h2>
   <p><span>&nbsp;</span> <span class="description-title">Explora nuestras categorías</span></p>
+</div>
+{% endif %}
+
+<br><br>
+
+    <div class="container section-title" data-aos="fade-up">
+  <h2>Bienvenido</h2>
+  <p><span>&nbsp;</span> <span class="brand">Comienza a buscar regalos</span><span class="description-title"> {{ user.nombre }}!</span></p>
 </div>
 
 <!-- Clients Section - CATEGORÍAS DINÁMICAS CON FLECHAS -->
 <section id="clients" class="clients section light-background categorias-carousel">
   <div class="container">
+
     {% if categorias %}
     <div class="swiper init-swiper">
       <script type="application/json" class="swiper-config">
@@ -126,9 +136,8 @@
       <div class="swiper-wrapper align-items-center">
         {% for categoria in categorias %}
         <div class="swiper-slide">
-          <a href="{% url 'productos_list' %}?categoria={{ categoria.id_categoria }}"
-            class="text-decoration-none text-dark d-block w-100 h-100">
-            {{ categoria.nombre_categoria }}
+          <a href="{% url 'productos_list' %}?categoria={{ categoria.id_categoria }}" class="cat-card">
+            <span class="cat-name">{{ categoria.nombre_categoria }}</span>
           </a>
         </div>
         {% endfor %}
@@ -144,6 +153,104 @@
     {% else %}
     <div class="text-center py-4">
       <p class="text-muted">No hay categorías disponibles en este momento.</p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<section id="portfolio" class="portfolio section">
+  <div class="container section-title" data-aos="fade-up">
+    <h2>Tendencias</h2>
+    <p><span>&nbsp;</span> <span class="description-title">Productos más populares</span></p>
+  </div>
+
+  <div class="container">
+    <div class="isotope-layout" data-default-filter="*" data-layout="masonry" data-sort="original-order">
+      <div class="row gy-4 isotope-container" data-aos="fade-up" data-aos-delay="200">
+        {% for producto in productos_destacados %}
+        <div class="col-lg-4 col-md-6 portfolio-item isotope-item filter-app">
+
+          <!-- Imagen del producto -->
+          <div class="product-image-container" style="height: 250px; overflow: hidden; border-radius: 8px;">
+            <!-- Corazón flotante -->
+            <a href="#"
+              class="wishlist-badge wishlist-btn {% if producto.id_producto in favoritos_ids %}is-fav{% endif %}"
+              data-product-id="{{ producto.id_producto }}"
+              title="{% if producto.id_producto in favoritos_ids %}Quitar de wishlist{% else %}Agregar a wishlist{% endif %}"
+              aria-pressed="{% if producto.id_producto in favoritos_ids %}true{% else %}false{% endif %}">
+              {% if producto.id_producto in favoritos_ids %}
+              <i class="bi bi-heart-fill text-danger"></i>
+              {% else %}
+              <i class="bi bi-heart"></i>
+              {% endif %}
+            </a>
+
+            {% if producto.imagen and producto.imagen.url %}
+            <img src="{{ producto.imagen.url }}" class="img-fluid" alt="{{ producto.nombre_producto }}"
+              style="width: 100%; height: 100%; object-fit: cover;">
+            {% else %}
+            <img src="{% static 'img/Gifters/favicongift.png' %}" class="img-fluid" alt="{{ producto.nombre_producto }}"
+              style="width: 100%; height: 100%; object-fit: cover;">
+            {% endif %}
+          </div>
+
+
+          <div class="portfolio-info">
+            <h4>{{ producto.nombre_producto }}</h4>
+            <p class="text-primary">{{ producto.id_marca.nombre_marca }}</p>
+
+            {% if producto.precio %}
+            <p class="h5 text-success">${{ producto.precio }}</p>
+            {% endif %}
+
+            <!-- Botones -->
+            <div class="product-actions">
+              {# quita todo el <a> del corazón aquí #}
+                {% if producto.imagen and producto.imagen.url %}
+                <a href="{{ producto.imagen.url }}" class="glightbox preview-link"
+                  data-gallery="gal-producto-{{ producto.id_producto }}">
+                  <i class="bi bi-zoom-in"></i>
+                </a>
+                {% else %}
+                <a href="{% static 'img/Gifters/favicongift.png' %}" class="glightbox preview-link"
+                  data-gallery="gal-producto-{{ producto.id_producto }}">
+                  <i class="bi bi-zoom-in"></i>
+                </a>
+                {% endif %}
+
+                {% with producto.urls_tienda_activas.first as url_tienda %}
+                {% if url_tienda %}
+                <a href="{{ url_tienda.url }}" target="_blank" rel="noopener" class="details-link">
+                  <i class="bi bi-link-45deg"></i>
+                </a>
+                {% else %}
+                <a href="{% url 'producto_detalle' producto.id_producto %}" class="details-link">
+                  <i class="bi bi-eye"></i>
+                </a>
+                {% endif %}
+                {% endwith %}
+            </div>
+
+          </div>
+
+        </div>
+        {% empty %}
+        <div class="col-12 text-center">
+          <div class="alert alert-info">
+            <h4>📦 No hay productos destacados</h4>
+            <p>Pronto agregaremos nuevos productos interesantes.</p>
+            <a href="{% url 'productos_list' %}" class="btn btn-primary mt-2">Explorar todos los productos</a>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    
+
+    <!-- Botón para ver más productos -->
+    {% if productos_destacados %}
+    <div class="text-center mt-4">
+      <a href="{% url 'productos_list' %}" class="btn btn-primary">Ver todos los productos</a>
     </div>
     {% endif %}
   </div>
@@ -194,15 +301,13 @@
       {% endfor %}
     </div>
     {% endif %}
-    <p><span>Explora tu red</span> <span class="description-title">Amigos y sugerencias</span></p>
+    <p><span>Personas que quizás conozcas
+</span> <span class="description-title"></span></p>
   </div>
 
   <div class="container">
     {% if request.user.is_authenticated %}
     {% if amigos %}
-    <div class="mb-2">
-      <h3 class="h5">Tus amigos</h3>
-    </div>
 
     <div class="row gy-4 mb-5">
       {% for a in amigos %}
@@ -229,6 +334,8 @@
           </div>
         </div>
       </div>
+      
+
       {% endfor %}
     </div>
     {% else %}
@@ -289,89 +396,7 @@
 </section>
 
 <!-- Tendencias - AHORA CON PRODUCTOS DESTACADOS -->
-<section id="portfolio" class="portfolio section">
-  <div class="container section-title" data-aos="fade-up">
-    <h2>Tendencias</h2>
-    <p><span>&nbsp;</span> <span class="description-title">Productos más populares</span></p>
-  </div>
 
-  <div class="container">
-    <div class="isotope-layout" data-default-filter="*" data-layout="masonry" data-sort="original-order">
-      <div class="row gy-4 isotope-container" data-aos="fade-up" data-aos-delay="200">
-        {% for producto in productos_destacados %}
-        <div class="col-lg-4 col-md-6 portfolio-item isotope-item filter-app">
-
-          <!-- Imagen del producto -->
-          <div class="product-image-container" style="height: 250px; overflow: hidden; border-radius: 8px;">
-            {% if producto.imagen and producto.imagen.url %}
-            <img src="{{ producto.imagen.url }}" class="img-fluid" alt="{{ producto.nombre_producto }}"
-              style="width: 100%; height: 100%; object-fit: cover;">
-            {% else %}
-            <img src="{% static 'img/Gifters/favicongift.png' %}" class="img-fluid" alt="{{ producto.nombre_producto }}"
-              style="width: 100%; height: 100%; object-fit: cover;">
-            {% endif %}
-          </div>
-
-          <div class="portfolio-info">
-            <h4>{{ producto.nombre_producto }}</h4>
-            <p class="text-primary">{{ producto.id_marca.nombre_marca }}</p>
-
-            {% if producto.precio %}
-            <p class="h5 text-success">${{ producto.precio }}</p>
-            {% endif %}
-
-            <!-- Botones -->
-            <div class="product-actions">
-              <!-- Lupa para ampliar -->
-              {% if producto.imagen and producto.imagen.url %}
-              <a href="{{ producto.imagen.url }}" class="glightbox preview-link"
-                data-gallery="gal-producto-{{ producto.id_producto }}">
-                <i class="bi bi-zoom-in"></i>
-              </a>
-              {% else %}
-              <a href="{% static 'img/Gifters/favicongift.png' %}" class="glightbox preview-link"
-                data-gallery="gal-producto-{{ producto.id_producto }}">
-                <i class="bi bi-zoom-in"></i>
-              </a>
-              {% endif %}
-
-              <!-- Link a la tienda -->
-              {% with producto.urls_tienda_activas.first as url_tienda %}
-              {% if url_tienda %}
-              <a href="{{ url_tienda.url }}" target="_blank" rel="noopener" class="details-link">
-                <i class="bi bi-link-45deg"></i>
-              </a>
-              {% else %}
-              <!-- Si no hay URL de tienda, link al detalle del producto -->
-              <a href="{% url 'producto_detalle' producto.id_producto %}" class="details-link">
-                <i class="bi bi-eye"></i>
-              </a>
-              {% endif %}
-              {% endwith %}
-            </div>
-          </div>
-
-        </div>
-        {% empty %}
-        <div class="col-12 text-center">
-          <div class="alert alert-info">
-            <h4>📦 No hay productos destacados</h4>
-            <p>Pronto agregaremos nuevos productos interesantes.</p>
-            <a href="{% url 'productos_list' %}" class="btn btn-primary mt-2">Explorar todos los productos</a>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
-    </div>
-
-    <!-- Botón para ver más productos -->
-    {% if productos_destacados %}
-    <div class="text-center mt-4">
-      <a href="{% url 'productos_list' %}" class="btn btn-primary">Ver todos los productos</a>
-    </div>
-    {% endif %}
-  </div>
-</section>
 
 
 
@@ -472,5 +497,168 @@
     <a href="ayuda.html" class="gift">Contactanos!</a>
   </div>
 </section>
+<style>
+  .wishlist-btn .bi {
+    transition: transform .18s ease;
+  }
+
+  .wishlist-btn.heart-pop .bi {
+    animation: heartPop .28s ease;
+  }
+
+  @keyframes heartPop {
+    0% {
+      transform: scale(1)
+    }
+
+    50% {
+      transform: scale(1.35)
+    }
+
+    100% {
+      transform: scale(1)
+    }
+  }
+</style>
+
+<style>
+  /* Corazón flotante en la foto */
+  .product-image-container {
+    position: relative;
+  }
+
+  .wishlist-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 38px;
+    height: 38px;
+    display: grid;
+    place-items: center;
+    background: rgba(255, 255, 255, .95);
+    border-radius: 9999px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .12);
+    z-index: 2;
+    text-decoration: none;
+  }
+
+  .wishlist-badge:hover {
+    transform: translateY(-1px);
+  }
+
+  /* (reutiliza tu anim) */
+  .wishlist-badge .bi {
+    transition: transform .18s ease;
+  }
+
+  .wishlist-badge.heart-pop .bi {
+    animation: heartPop .28s ease;
+  }
+  /* Texto azul para los nombres de categorías */
+  .categorias-carousel .cat-name { 
+    color: #4D6BFF;
+    font-weight: 700;
+  }
+
+  /* Por si alguna card no usa <span class="cat-name"> (fallback) */
+  .categorias-carousel .swiper-slide a {
+    color: #4D6BFF !important;
+    text-decoration: none;
+  }
+  .categorias-carousel .swiper-slide a:hover,
+  .categorias-carousel .swiper-slide a:focus {
+    color: #4D6BFF !important;
+    text-decoration: none;
+  }
+
+
+  @keyframes heartPop {
+    0% {
+      transform: scale(1)
+    }
+
+    50% {
+      transform: scale(1.35)
+    }
+
+    100% {
+      transform: scale(1)
+    }
+  }
+</style>
+
+
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+  const Toast = Swal.mixin({
+    toast: true,
+    position: 'top-end',
+    showConfirmButton: false,
+    timer: 1600,
+    timerProgressBar: true
+  });
+
+  function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+  }
+  const csrftoken = getCookie('csrftoken');
+
+  document.addEventListener('click', async function (e) {
+    const btn = e.target.closest('.wishlist-btn');
+    if (!btn) return;
+
+    e.preventDefault();
+    const id = btn.getAttribute('data-product-id');
+    const icon = btn.querySelector('i');
+    const wasFav = btn.classList.contains('is-fav');
+    const prevTitle = btn.title;
+
+    // Animación táctil rápida
+    btn.classList.add('heart-pop');
+    setTimeout(() => btn.classList.remove('heart-pop'), 320);
+
+    try {
+      const url = `{% url 'favoritos_toggle' 0 %}`.replace('/0/', `/${id}/`);
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }
+      });
+
+      if (resp.redirected || resp.url.includes('{% url "login" %}')) {
+        window.location.href = "{% url 'login' %}?next={{ request.get_full_path|urlencode }}";
+        return;
+      }
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+
+      const data = await resp.json();
+      const isFav = data.state === 'added';
+
+      // Actualiza UI del botón
+      btn.classList.toggle('is-fav', isFav);
+      btn.setAttribute('aria-pressed', isFav ? 'true' : 'false');
+      btn.title = isFav ? 'Quitar de wishlist' : 'Agregar a wishlist';
+      if (icon) icon.className = isFav ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
+
+      // Feedback
+      Toast.fire({
+        icon: isFav ? 'success' : 'info',
+        title: isFav ? 'Agregado a tu wishlist' : 'Quitado de tu wishlist'
+      });
+
+    } catch (err) {
+      console.error(err);
+      // Revertir UI si falla
+      btn.classList.toggle('is-fav', wasFav);
+      btn.setAttribute('aria-pressed', wasFav ? 'true' : 'false');
+      btn.title = prevTitle;
+      if (icon) icon.className = wasFav ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
+
+      Toast.fire({ icon: 'error', title: 'Ups, no pudimos actualizar' });
+    }
+  });
+</script>
 
 {% endblock %}

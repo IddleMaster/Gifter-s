@@ -3,36 +3,32 @@
 <html lang="es">
 
 <head>
-  <meta charset="utf-8">
-  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
   <title>{% block title %}Gifter’s{% endblock %}</title>
 
   <!-- Favicons -->
-  <link rel="icon" href="{% static 'img/Gifters/favicongift.png' %}" type="image/png">
-  <link rel="apple-touch-icon" href="{% static 'img/Gifters/logo-sin-letras.png' %}">
+  <link rel="icon" href="{% static 'img/Gifters/favicongift.png' %}" type="image/png" />
+  <link rel="apple-touch-icon" href="{% static 'img/Gifters/logo-sin-letras.png' %}" />
 
   <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com" rel="preconnect">
-  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com" rel="preconnect" />
+  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700;900&display=swap" rel="stylesheet" />
 
   <!-- Vendor CSS (via STATIC_URL=/assets/) -->
-  <link href="{% static 'vendor/bootstrap/css/bootstrap.min.css' %}" rel="stylesheet">
-  <link href="{% static 'vendor/bootstrap-icons/bootstrap-icons.css' %}" rel="stylesheet">
-  <link href="{% static 'vendor/aos/aos.css' %}" rel="stylesheet">
-  <link href="{% static 'vendor/glightbox/css/glightbox.min.css' %}" rel="stylesheet">
-  <link href="{% static 'vendor/swiper/swiper-bundle.min.css' %}" rel="stylesheet">
+  <link href="{% static 'vendor/bootstrap/css/bootstrap.min.css' %}" rel="stylesheet" />
+  <link href="{% static 'vendor/bootstrap-icons/bootstrap-icons.css' %}" rel="stylesheet" />
+  <link href="{% static 'vendor/aos/aos.css' %}" rel="stylesheet" />
+  <link href="{% static 'vendor/glightbox/css/glightbox.min.css' %}" rel="stylesheet" />
+  <link href="{% static 'vendor/swiper/swiper-bundle.min.css' %}" rel="stylesheet" />
 
   <!-- Main CSS -->
-  <link href="{% static 'css/main.css' %}" rel="stylesheet">
-  <link href="{% static 'css/gifters.css' %}" rel="stylesheet">
-
-  <!--chat jeje-->
-  <link rel="stylesheet" href="{% static 'css/chat-floating.css' %}">
-
+  <link href="{% static 'css/main.css' %}" rel="stylesheet" />
+  <link href="{% static 'css/gifters.css' %}" rel="stylesheet" />
+  <link rel="stylesheet" href="{% static 'css/chat-floating.css' %}" />
 
   <style>
-    
     /* Poppins global */
     body,
     h1,
@@ -47,7 +43,6 @@
       font-family: 'Poppins', sans-serif !important;
     }
 
-    /* Igual que en tu index */
     .logo-img {
       height: 64px;
       width: auto;
@@ -68,18 +63,415 @@
       filter: brightness(.92);
       color: #fff;
     }
+
+    /* Oculta los mensajes Bootstrap clásicos */
+    #flash-messages,
+    .messages,
+    .django-messages,
+    .alert[role="alert"][data-django-message] {
+      display: none !important;
+    }
   </style>
+
+  <style>
+    /* ===== Drawer: estilo "teléfono" ===== */
+    .chat-drawer.phone-ui {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      width: 100%;
+      max-width: 920px;
+      height: 70vh;
+      border-radius: 16px;
+      overflow: hidden;
+      background: #fff;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, .18);
+      transform: translateY(8px);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform .25s ease, opacity .25s ease;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chat-drawer.phone-ui.open {
+      transform: none;
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .phone-header {
+      background: #0d6efd;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+    }
+
+    .phone-header .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+    }
+
+    .phone-header .brand img {
+      width: 28px;
+      height: 28px;
+      display: block;
+    }
+
+    .phone-tabs {
+      display: flex;
+      gap: 8px;
+      padding: 10px;
+      border-bottom: 1px solid #eef1f5;
+      background: #f8fafc;
+    }
+
+    .phone-tabs .tab-btn {
+      appearance: none;
+      border: 1px solid #e5e7eb;
+      background: #fff;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: .95rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .phone-tabs .tab-btn.active {
+      border-color: #0d6efd;
+      color: #0d6efd;
+    }
+
+    .phone-body {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 0;
+      height: 100%;
+      min-height: 0;
+      /* para que flexbox/grid permitan scroll interno */
+    }
+
+    .phone-list {
+      border-right: 1px solid #eef1f5;
+      overflow: auto;
+    }
+
+    .list-pane {
+      display: none;
+      height: 100%;
+    }
+
+    .list-pane.active {
+      display: block;
+    }
+
+    .phone-chat {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .chat-head,
+    .chat-input {
+      border-top: 1px solid #eef1f5;
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow: auto;
+      padding: 16px;
+      background: #fbfbfd;
+    }
+
+    /* Lista reusando tu markup existente */
+    .chat-list {
+      padding: 8px;
+    }
+
+    .chat-list-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+
+    .chat-list-item:hover {
+      background: #f4f6fb;
+    }
+
+    .chat-list-item.active {
+      background: #ecf2ff;
+    }
+
+    .chat-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .chat-names .line1 {
+      font-weight: 700;
+    }
+
+    .chat-names .line2 {
+      font-size: .9rem;
+      color: #6b7280;
+    }
+
+    .chat-time {
+      margin-left: auto;
+      font-size: .8rem;
+      color: #9ca3af;
+    }
+
+    /* Burbujas (respetando tus IDs/estructura) */
+    .msg {
+      display: flex;
+      gap: 8px;
+      margin: 6px 0;
+      align-items: flex-end;
+    }
+
+    .msg.me {
+      justify-content: flex-end;
+    }
+
+    .msg-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .bubble,
+    .msg-bubble {
+      max-width: 72%;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: #fff;
+      border: 1px solid #eef1f5;
+    }
+
+    .msg.me .bubble,
+    .msg.me .msg-bubble {
+      background: #e8f0ff;
+      border-color: #dae6ff;
+    }
+
+    .body,
+    .msg-body {
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .meta,
+    .msg-meta {
+      font-size: .75rem;
+      color: #9ca3af;
+      margin-top: 4px;
+      text-align: right;
+    }
+
+    .chat-input {
+      display: flex;
+      gap: 10px;
+      padding: 10px;
+      background: #fff;
+    }
+
+    #chatText {
+      flex: 1;
+      resize: none;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 10px 12px;
+      outline: none;
+    }
+
+    #chatForm button {
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: none;
+      background: #0d6efd;
+      color: #fff;
+      font-weight: 700;
+    }
+
+    /* Bottom nav (móvil) */
+    .phone-bottom-nav {
+      display: none;
+      border-top: 1px solid #eef1f5;
+      background: #fff;
+      padding: 6px 10px;
+      gap: 10px;
+    }
+
+    .phone-bottom-nav .tab-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      border: none;
+      background: transparent;
+      padding: 6px 8px;
+      font-weight: 600;
+      color: #6b7280;
+    }
+
+    .phone-bottom-nav .tab-btn.active {
+      color: #0d6efd;
+    }
+
+    /* Responsivo: en pantallas chicas, lista arriba y chat abajo (tipo app) */
+    @media (max-width: 860px) {
+      .chat-drawer.phone-ui {
+        right: 10px;
+        left: 10px;
+        height: 80vh;
+      }
+
+      .phone-body {
+        grid-template-columns: 1fr;
+      }
+
+      .phone-bottom-nav {
+        display: flex;
+      }
+
+      .phone-list {
+        height: 45%;
+      }
+
+      .phone-chat {
+        height: 55%;
+        border-top: 1px solid #eef1f5;
+      }
+    }
+
+    /* Avatar arriba para ambos lados */
+    .msg {
+      align-items: flex-start;
+    }
+
+    .msg.me {
+      flex-direction: row-reverse;
+      align-items: flex-start;
+    }
+
+    .msg .msg-avatar {
+      align-self: flex-start;
+    }
+
+    /* Cuando NO mostramos avatar, damos margen para que la burbuja no “salte” */
+    .msg.other.compact .bubble {
+      margin-left: 36px;
+    }
+
+    /* 28px avatar + 8px gap */
+    .msg.me.compact .bubble {
+      margin-right: 36px;
+    }
+
+    /* Separador de día */
+    .day-sep {
+      text-align: center;
+      font-size: .85rem;
+      font-style: italic;
+      color: #6b7280;
+      margin: 14px 0;
+    }
+
+
+    .typing-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      margin: 0 12px 6px;
+      border-radius: 12px;
+      background: #f5f7ff;
+      color: #4b5563;
+      font-size: .9rem;
+    }
+
+    .typing-indicator .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #9aa7ff;
+      display: inline-block;
+      animation: blink 1.2s infinite ease-in-out;
+    }
+
+    .typing-indicator .dot:nth-child(1) {
+      animation-delay: 0s
+    }
+
+    .typing-indicator .dot:nth-child(2) {
+      animation-delay: .2s
+    }
+
+    .typing-indicator .dot:nth-child(3) {
+      animation-delay: .4s
+    }
+
+    @keyframes blink {
+
+      0%,
+      80%,
+      100% {
+        opacity: .2
+      }
+
+      40% {
+        opacity: 1
+      }
+    }
+
+    /* Asegura que el área derecha sea una columna con el input al final */
+    .chat-pane {
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* El listado scrollea, el resto queda debajo */
+    .chat-messages {
+      flex: 1;
+      overflow: auto;
+    }
+
+    /* El indicador queda justo encima del input, sin scrollearse */
+    #typingIndicator {
+      position: sticky;
+      /* queda “pegado” dentro de su contenedor */
+      bottom: 0;
+      /* pegado abajo */
+      z-index: 1;
+      /* por encima del fondo */
+      margin-top: 0;
+      margin-bottom: 6px;
+    }
+  </style>
+
+
 
   {% block extra_css %}{% endblock %}
 </head>
 
 <body class="{% block body_class %}{% endblock %}">
-
-  <!-- HEADER = el mismo del index -->
+  <!-- HEADER -->
   <header id="header" class="header sticky-top">
-
-
-
     <!-- Topbar -->
     <div class="topbar d-flex align-items-center">
       <div class="container d-flex justify-content-center justify-content-md-between">
@@ -98,12 +490,11 @@
     <!-- Barra principal -->
     <div class="branding d-flex align-items-center">
       <div class="container position-relative d-flex align-items-center" style="min-height:84px;">
-
         <!-- IZQUIERDA: Marca + buscador (desktop) -->
         <div class="brand-left d-flex align-items-center gap-3 flex-shrink-0">
           <a href="{% url 'home' %}" class="logo brand d-flex align-items-center" style="z-index:2;">
             <span class="brand-text">Gifter’s</span>
-            <img src="{% static 'img/Gifters/favicongift.png' %}" alt="Isotipo Gifter’s" class="brand-mark">
+            <img src="{% static 'img/Gifters/favicongift.png' %}" alt="Isotipo Gifter’s" class="brand-mark" />
           </a>
 
           <!-- Buscador solo en ≥ LG -->
@@ -111,11 +502,10 @@
             <div class="input-group search-pill position-relative">
               <input type="search" class="form-control search-input" name="q" id="searchInputDesktop"
                 placeholder="Búsqueda: regalos, categorías, amigos..." aria-label="Buscar" value="{{ request.GET.q }}"
-                autocomplete="off">
+                autocomplete="off" />
               <button class="btn btn-search" type="submit" aria-label="Buscar">
                 <i class="bi bi-search"></i>
               </button>
-              <!-- Contenedor de sugerencias DEBE estar dentro del input-group -->
               <div id="sugerenciasDesktop" class="sugerencias-container"></div>
             </div>
           </form>
@@ -124,12 +514,10 @@
         <!-- CENTRO: Nav (solo desktop) -->
         <nav id="navmenu" class="navmenu d-none d-lg-block mx-auto">
           <ul>
-            <!-- <li><a href="{% url 'home' %}#hero" class="active">Inicio</a></li>-->
-            <li><a href="{% url 'home' %}#clients">Categorías</a></li> <!-- Ahora apunta a las categorías reales -->
+            <li><a href="{% url 'home' %}#clients">Categorías</a></li>
             <li><a href="{% url 'home' %}#services">Amigos</a></li>
             <li><a href="{% url 'home' %}#portfolio">Regalos</a></li>
             <li><a href="{% url 'home' %}feed">Feed</a></li>
-            <!-- Ahora apunta a Tendencias/Productos Destacados -->
           </ul>
           <i class="mobile-nav-toggle d-none"></i>
         </nav>
@@ -140,12 +528,10 @@
             data-bs-toggle="dropdown" aria-expanded="false">
             <span>Hola, {{ user.nombre }}</span>
           </a>
-
           <ul class="dropdown-menu dropdown-menu-end shadow">
             <li><a class="dropdown-item" href="{% url 'perfil' %}">Mi perfil</a></li>
-
             <li>
-              <hr class="dropdown-divider">
+              <hr class="dropdown-divider" />
             </li>
             <li>
               <form method="post" action="{% url 'account_logout' %}">
@@ -159,11 +545,6 @@
         <a href="{% url 'account_login' %}" class="btn btn-primary">Iniciar Sesión</a>
         {% endif %}
 
-
-
-
-
-
         <!-- Toggle buscador móvil -->
         <button id="btnMobileSearch" class="btn btn-link p-0 ms-2 d-lg-none" type="button" data-bs-toggle="collapse"
           data-bs-target="#mobileSearch" aria-expanded="false" aria-controls="mobileSearch" aria-label="Buscar">
@@ -176,11 +557,9 @@
         </button>
       </div>
     </div>
-    </div>
 
     <!-- Agrupador de colapsables móviles -->
     <div id="mobileCollapses" class="d-lg-none">
-
       <!-- Menú móvil colapsable -->
       <div id="mobileNav" class="collapse border-top bg-white" data-bs-parent="#mobileCollapses">
         <div class="container py-2">
@@ -195,32 +574,28 @@
           </nav>
         </div>
       </div>
-
-      
-
     </div>
-
-    <!-- OPCIONAL: no se pisan buscador y menú; cerrar menú al click -->
-
+    <!-- /OPCIONAL -->
   </header>
+
+  {% block flash_messages %}
   {% if messages %}
-  <div class="container my-2">
+  <div id="flash-messages" class="container my-2">
     {% for message in messages %}
-    <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-2" role="alert">
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-2" role="alert" data-django-message>
       {{ message }}
       <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
     </div>
     {% endfor %}
   </div>
   {% endif %}
+  {% endblock %}
 
   <main class="main">
-    <!-- /HEADER -->
-
     {% block content %}{% endblock %}
   </main>
 
-  <!-- FOOTER (puedes reemplazar por el tuyo si prefieres) -->
+  <!-- FOOTER -->
   <footer id="footer" class="footer">
     <div class="container footer-top">
       <div class="row gy-4">
@@ -235,6 +610,7 @@
             <p><strong>Email:</strong> <span>info@gifters.com</span></p>
           </div>
         </div>
+
         <div class="col-lg-2 col-md-3 footer-links">
           <h4>Enlaces útiles</h4>
           <ul>
@@ -243,6 +619,7 @@
             <li><i class="bi bi-chevron-right"></i> <a href="{% url 'ayuda' %}">Contáctanos</a></li>
           </ul>
         </div>
+
         <div class="col-lg-4 col-md-12">
           <h4>Síguenos</h4>
           <div class="social-links d-flex">
@@ -257,11 +634,11 @@
   </footer>
 
   <!-- Scroll Top -->
-  <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center">
-    <i class="bi bi-arrow-up-short"></i>
+  <a href="#" id="" class="scroll-top d-flex align-items-center justify-content-center">
+
   </a>
 
-  <!-- Vendor JS (vía STATIC_URL) -->
+  <!-- Vendor JS -->
   <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
   <script src="{% static 'vendor/php-email-form/validate.js' %}"></script>
   <script src="{% static 'vendor/aos/aos.js' %}"></script>
@@ -284,72 +661,77 @@
       }, 4000);
     });
   </script>
-
   <script src="{% static 'js/main.js' %}"></script>
+
   <script>
+    // Control de colapsables móviles
     document.addEventListener('DOMContentLoaded', function () {
-      // Elementos
       const msEl = document.getElementById('mobileSearch');
       const mnEl = document.getElementById('mobileNav');
       const bSearch = document.getElementById('btnMobileSearch');
       const bMenu = document.getElementById('btnMobileNav');
 
-      // Si falta algo, salimos
       if (!window.bootstrap || !msEl || !mnEl || !bSearch || !bMenu) return;
 
-      // Instancias de Collapse sin auto-toggle
       const ms = new bootstrap.Collapse(msEl, { toggle: false });
       const mn = new bootstrap.Collapse(mnEl, { toggle: false });
 
-      // Evitar propagación/accidentes con otros listeners
       function stop(e) { e.preventDefault(); e.stopPropagation(); }
 
-      // Clicks controlados: al abrir uno, cerramos el otro
-      bSearch.addEventListener('click', function (e) {
-        stop(e);
-        mn.hide();
-        ms.toggle();
-      });
+      bSearch.addEventListener('click', function (e) { stop(e); mn.hide(); ms.toggle(); });
+      bMenu.addEventListener('click', function (e) { stop(e); ms.hide(); mn.toggle(); });
 
-      bMenu.addEventListener('click', function (e) {
-        stop(e);
-        ms.hide();
-        mn.toggle();
-      });
-
-      // Redundante (pero seguro): si uno se abre por otra causa, cierra el otro
       msEl.addEventListener('show.bs.collapse', function () { mn.hide(); });
       mnEl.addEventListener('show.bs.collapse', function () { ms.hide(); });
 
-      // Cierra el menú al elegir una opción
       document.querySelectorAll('#mobileNav .nav-link').forEach(function (a) {
-        a.addEventListener('click', function () {
-          mn.hide();
-        });
+        a.addEventListener('click', function () { mn.hide(); });
       });
     });
-
-
   </script>
+
   {% if user.is_authenticated %}
   <!-- Floating launcher -->
   <button id="chatFab" class="chat-fab" title="Mensajes">💬</button>
 
-  <!-- Drawer -->
-  <div id="chatDrawer" class="chat-drawer" aria-hidden="true">
-    <div class="chat-head">
-      <span class="title">Mensajes</span>
+  <!-- Drawer (interfaz clásica simple) -->
+  <div id="chatDrawer" class="chat-drawer phone-ui" aria-hidden="true">
+    <div class="phone-header">
+      <div class="brand">
+        <img src="{% static 'img/Gifters/favicongift.png' %}" alt="Gifter’s" />
+        <span>Gifter’s</span>
+      </div>
       <button id="chatClose" class="btn btn-sm btn-light">✕</button>
     </div>
 
-    <div class="chat-body">
-      <!-- Lista de conversaciones -->
-      <div class="chat-list" id="chatList"></div>
+    <div class="phone-tabs" role="tablist">
+      <button class="tab-btn" data-tab="amigos"><i class="bi bi-people"></i> Amigos</button>
+      <button class="tab-btn active" data-tab="chats"><i class="bi bi-chat-left-dots"></i> Chats</button>
+      <button class="tab-btn" data-tab="grupos"><i class="bi bi-collection"></i> Grupos</button>
+    </div>
 
-      <!-- Panel de mensajes -->
-      <div class="chat-pane">
+    <div class="chat-head" hidden></div>
+
+    <!-- OJO: todo dentro de .chat-body -->
+    <div class="chat-body" style="display:flex; height:100%;">
+
+      <!-- Columna izquierda (lista) con position:relative -->
+      <div style="position:relative; width:340px; border-right:1px solid #eee; overflow:auto;">
+        <div class="chat-list" id="chatList"></div>
+
+        <!-- Lista de amigos superpuesta -->
+        <div id="friendsList" class="chat-list"
+          style="display:none; position:absolute; inset:0; overflow:auto; background:#fff;"></div>
+      </div>
+
+      <!-- Columna derecha (mensajes) -->
+      <div class="chat-pane" style="flex:1; display:flex; flex-direction:column;">
         <div id="chatEmpty" class="p-3 text-muted">Selecciona un chat para empezar</div>
         <div id="chatMessages" class="chat-messages" hidden></div>
+        <div id="typingIndicator" class="typing-indicator" hidden>
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <em class="who"></em> está escribiendo…
+        </div>
         <form id="chatForm" class="chat-input" hidden>
           {% csrf_token %}
           <textarea id="chatText" rows="1" placeholder="Escribe un mensaje…"></textarea>
@@ -359,7 +741,16 @@
     </div>
   </div>
   {% endif %}
-
+  <script>
+    window.URLS = {
+      amigos: "{% url 'amistad_amigos' %}",
+      conversaciones: "{% url 'conversaciones_list' %}",
+      mensajesBase: "{% url 'mensajes_list_create' 0 %}", // luego se reemplaza el /0/
+      convConUsuarioId: "{% url 'chat_con_usuario_id' '__USER__' %}",
+      typing: "{% url 'chat_typing' 0 %}",  // ← nuevo (placeholder /0/) // placeholder literal
+      typingSummary: "{% url 'chat_typing_summary' %}"   <!-- NUEVO -->
+    };
+  </script>
   {% if user.is_authenticated %}
   <script>
     (function () {
@@ -372,7 +763,8 @@
       const emptyEl = document.getElementById('chatEmpty');
       const formEl = document.getElementById('chatForm');
       const textEl = document.getElementById('chatText');
-      // Identidad del usuario (debe vivir dentro del mismo IIFE del chat)
+
+      // Usuario actual
       const ME = {
         id: Number('{{ user.id|default:"0"|escapejs }}'),
         username: ("{{ user.nombre_usuario|default:''|escapejs }}").trim()
@@ -381,6 +773,7 @@
       let currentConvId = null;
       let pollTimer = null;
 
+      // FIX: esta función estaba rota en tu código (comillas/plantillas)
       function getCookie(name) {
         const value = `; ${document.cookie}`;
         const parts = value.split(`; ${name}=`);
@@ -391,14 +784,13 @@
       function openDrawer() {
         drawer.classList.add('open');
         drawer.setAttribute('aria-hidden', 'false');
-        fab.style.display = 'none';           // ← OCULTA el FAB
+        fab.style.display = 'none';
         loadConversations();
       }
-
       function closeDrawer() {
         drawer.classList.remove('open');
         drawer.setAttribute('aria-hidden', 'true');
-        fab.style.display = '';               // ← VUELVE A MOSTRAR el FAB
+        fab.style.display = '';
         stopPolling();
       }
       fab?.addEventListener('click', openDrawer);
@@ -409,25 +801,11 @@
         const apiURL = "{% url 'conversaciones_list' %}";
 
         try {
-          const res = await fetch(apiURL, {
-            credentials: 'same-origin',
-            headers: { 'Accept': 'application/json' }
-          });
-
-          console.debug('[chats] status:', res.status, 'redirected:', res.redirected);
-
-          if (!res.ok) {
-            const txt = await res.text().catch(() => '');
-            console.error('[chats] respuesta no OK:', res.status, txt.slice(0, 300));
-            throw new Error('HTTP ' + res.status);
-          }
+          const res = await fetch(apiURL, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
 
           const ctype = res.headers.get('content-type') || '';
-          if (!ctype.includes('application/json')) {
-            const txt = await res.text();
-            console.error('[chats] No es JSON. Primeros 300 chars:', txt.slice(0, 300));
-            throw new Error('Respuesta no-JSON (¿redirigido al login?)');
-          }
+          if (!ctype.includes('application/json')) throw new Error('Respuesta no-JSON');
 
           const data = await res.json();
           renderConversationList(data);
@@ -437,35 +815,18 @@
         }
       }
 
-
       const AVATAR_FALLBACK = "{% static 'img/Gifters/favicongift.png' %}";
 
       function toAbsoluteMedia(u) {
-        // Nada útil → fallback
         if (!u || typeof u !== 'string') return AVATAR_FALLBACK;
-
         try {
           u = u.trim();
-
-          // Si viene un objeto serializado raro (a veces backend manda "[object Object]")
           if (u === "[object Object]") return AVATAR_FALLBACK;
-
-          // Absolutas (http/https) o protocolo relativo // o ya empiezan en /
           if (/^https?:\/\//i.test(u) || u.startsWith('//') || u.startsWith('/')) {
-            // Evita mixed-content: si el sitio es https y la imagen es http, intenta forzar https
-            if (location.protocol === 'https:' && u.startsWith('http://')) {
-              return 'https://' + u.slice('http://'.length);
-            }
+            if (location.protocol === 'https:' && u.startsWith('http://')) return 'https://' + u.slice(7);
             return u;
           }
-
-          // Rutas comunes: "media/...", "uploads/..." → anteponer "/"
-          if (/^(media|uploads|files)\//i.test(u)) {
-            return '/' + u; // => /media/archivo.jpg
-          }
-
-          // Nombre de archivo suelto → usa MEDIA_PREFIX
-          // (asegura no duplicar media/)
+          if (/^(media|uploads|files)\//i.test(u)) return '/' + u;
           return (MEDIA_PREFIX.replace(/\/+$/, '') + '/' + u.replace(/^\/+/, '')).replace(/\/{2,}/g, '/');
         } catch {
           return AVATAR_FALLBACK;
@@ -474,7 +835,6 @@
 
       function partnerFrom(conv) {
         const ps = Array.isArray(conv.participantes) ? conv.participantes : [];
-
         let other = ps.find(p => Number(p.id) && Number(p.id) !== ME.id);
         if (!other && ME.username) {
           other = ps.find(p => (p.username || p.nombre_usuario) && (p.username || p.nombre_usuario) !== ME.username);
@@ -489,31 +849,14 @@
           username || 'Chat';
 
         const rawAvatar =
-          other.avatar_url ||
-          other.avatar ||
-          other.foto ||
-          other.foto_url ||
-          other.image ||
-          other.image_url ||
-          other.profile_image ||
-          other.profile_image_url ||
-          other.photo ||
-          other.photo_url ||
-          other.profile_picture ||
-          other.profile_picture_url ||
+          other.avatar_url || other.avatar || other.foto || other.foto_url || other.image || other.image_url ||
+          other.profile_image || other.profile_image_url || other.photo || other.photo_url ||
+          other.profile_picture || other.profile_picture_url ||
           (other.perfil && (
-            other.perfil.avatar_url ||
-            other.perfil.avatar ||
-            other.perfil.foto ||
-            other.perfil.foto_url ||
-            other.perfil.image ||
-            other.perfil.image_url ||
-            other.perfil.profile_image ||
-            other.perfil.profile_image_url ||
-            other.perfil.profile_picture ||
-            other.perfil.profile_picture_url
-          )) ||
-          null;
+            other.perfil.avatar_url || other.perfil.avatar || other.perfil.foto || other.perfil.foto_url ||
+            other.perfil.image || other.perfil.image_url || other.perfil.profile_image ||
+            other.perfil.profile_image_url || other.perfil.profile_picture || other.perfil.profile_picture_url
+          )) || null;
 
         const avatar = toAbsoluteMedia(rawAvatar);
         return { name: fullName, username, avatar };
@@ -524,32 +867,41 @@
           listEl.innerHTML = '<div class="p-3 text-muted">Aún no tienes conversaciones.</div>';
           return;
         }
+
+        const filtered = items.filter(conv => {
+          if (Number(conv.conversacion_id) === Number(currentConvId)) return true; // conserva la abierta
+          return !!conv.ultimo_mensaje; // solo chats con mensajes
+        });
+
+        if (!filtered.length) {
+          listEl.innerHTML = '<div class="p-3 text-muted">Aún no tienes conversaciones con mensajes.</div>';
+          return;
+        }
+
         listEl.innerHTML = '';
-        items.forEach(conv => {
+        filtered.forEach(conv => {
           const p = partnerFrom(conv);
           const last = conv.ultimo_mensaje || {};
-          const el = document.createElement('div');
-          el.className = 'chat-list-item' + (conv.conversacion_id === currentConvId ? ' active' : '');
-          el.dataset.convId = conv.conversacion_id;
-          el.innerHTML = `
-        <img class="chat-avatar" src="${p.avatar}" alt=""
-     onerror="this.onerror=null;this.src='{% static 'img/Gifters/favicongift.png' %}'">
-        <div class="chat-names">
-          <div class="line1">${p.name}</div>
-          <div class="line2">${last.contenido ? (last.contenido).slice(0, 72) : 'Sin mensajes'}</div>
-        </div>
-        <div class="chat-time">${last.creado_en ? formatTime(last.creado_en) : ''}</div>
-      `;
-          el.addEventListener('click', () => openConversation(conv.conversacion_id));
-          listEl.appendChild(el);
+          const row = document.createElement('div');
+          row.className = 'chat-list-item' + (conv.conversacion_id === currentConvId ? ' active' : '');
+          row.dataset.convId = conv.conversacion_id;
+
+          row.innerHTML = `
+      <img class="chat-avatar" src="${p.avatar}" alt=""
+           onerror="this.onerror=null;this.src='{{ STATIC_URL }}img/Gifters/favicongift.png'">
+      <div class="chat-names">
+        <div class="line1">${p.name}</div>
+        <div class="line2">${last.contenido ? String(last.contenido).slice(0, 72) : ''}</div>
+      </div>
+      <div class="chat-time">${last.creado_en ? formatTime(last.creado_en) : ''}</div>
+    `;
+          row.addEventListener('click', () => openConversation(conv.conversacion_id));
+          listEl.appendChild(row);
         });
       }
-
       function formatTime(ts) {
-        try {
-          const d = new Date(ts);
-          return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        } catch { return ''; }
+        try { return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+        catch { return ''; }
       }
 
       async function openConversation(convId) {
@@ -557,9 +909,11 @@
         Array.from(listEl.children).forEach(li => {
           li.classList.toggle('active', Number(li.dataset.convId) === Number(convId));
         });
+
         emptyEl.hidden = true;
         msgsEl.hidden = false;
         formEl.hidden = false;
+
         msgsEl.innerHTML = '<div class="p-2 text-muted">Cargando mensajes…</div>';
         await loadMessagesOnce();
         scrollToBottom();
@@ -568,6 +922,7 @@
 
       async function loadMessagesOnce() {
         if (!currentConvId) return;
+        // FIX: el replace tenía una RegExp mal formada; usar template string
         const url = "{% url 'mensajes_list_create' 0 %}".replace('/0/', `/${currentConvId}/`);
         try {
           const res = await fetch(url, { credentials: 'same-origin' });
@@ -582,33 +937,92 @@
 
       function renderMessages(msgs) {
         msgsEl.innerHTML = '';
-
-        // Inyecta el id del usuario de forma segura y como número
         const meId = Number('{{ user.id|default:"0"|escapejs }}');
 
-        msgs.slice().reverse().forEach(m => {
-          const authorId = Number(m.remitente_id || (m.remitente && m.remitente.id));
+        // Orden cronológico en pantalla
+        const ordered = msgs.slice().reverse();
+
+        let prevAuthorId = null;
+        let prevWhenMs = 0;
+        let prevDayKey = null;   // <-- para detectar cambio de día
+
+        const GAP_MS = 5 * 60 * 1000; // 5 minutos
+
+        function parseMs(iso) {
+          try { return new Date(iso).getTime(); } catch { return 0; }
+        }
+        function dayKeyFromMs(ms) {
+          const d = new Date(ms);
+          return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+        }
+        function formatDayLabel(ms) {
+          const d = new Date(ms);
+          const today = new Date(); today.setHours(0, 0, 0, 0);
+          const dd = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+          const diff = Math.round((dd - today) / 86400000);
+          if (diff === 0) return 'Hoy';
+          if (diff === -1) return 'Ayer';
+          return new Intl.DateTimeFormat('es', { day: '2-digit', month: 'short', year: 'numeric' }).format(d);
+        }
+        function isBlockStart(authorId, whenMs) {
+          if (authorId !== prevAuthorId) return true;
+          if (!prevWhenMs) return true;
+          return (whenMs - prevWhenMs) > GAP_MS;
+        }
+
+        ordered.forEach(m => {
+          const authorId = Number(m.remitente && m.remitente.id);
           const isMe = authorId === meId;
+          const whenMs = parseMs(m.creado_en);
+          const showAvatar = isBlockStart(authorId, whenMs);
 
-          const bubble = document.createElement('div');
-          bubble.className = 'msg ' + (isMe ? 'me' : 'other');
+          // —— Separador de día si cambió
+          const dayKey = dayKeyFromMs(whenMs || Date.now());
+          if (dayKey !== prevDayKey) {
+            const sep = document.createElement('div');
+            sep.className = 'day-sep';
+            sep.textContent = formatDayLabel(whenMs || Date.now());
+            msgsEl.appendChild(sep);
+            prevDayKey = dayKey;
+          }
 
-          const body = (m.contenido || '')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
+          const row = document.createElement('div');
+          row.className = 'msg ' + (isMe ? 'me' : 'other') + (showAvatar ? '' : ' compact');
 
+          const avatarUrl =
+            toAbsoluteMedia((m.remitente && (m.remitente.avatar || m.remitente.avatar_url)) || null) ||
+            "{% static 'img/Gifters/favicongift.png' %}";
+
+          const body = String(m.contenido || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
           const when = m.creado_en ? formatTime(m.creado_en) : '';
 
-          bubble.innerHTML = `<div class="body">${body}</div><div class="meta">${when}</div>`;
-          msgsEl.appendChild(bubble);
+          row.innerHTML = `
+      ${showAvatar ? `
+        <img class="msg-avatar" src="${avatarUrl}" alt=""
+             onerror="this.onerror=null;this.src='{% static 'img/Gifters/favicongift.png' %}'">
+      ` : ''}
+      <div class="bubble">
+        <div class="body">${body}</div>
+        <div class="meta">${when}</div>
+      </div>
+    `;
+
+          msgsEl.appendChild(row);
+
+          // actualizar punteros para el siguiente mensaje
+          prevAuthorId = authorId;
+          prevWhenMs = whenMs;
         });
       }
+
       function scrollToBottom() { msgsEl.scrollTop = msgsEl.scrollHeight; }
 
       formEl.addEventListener('submit', async (ev) => {
         ev.preventDefault();
         const text = (textEl.value || '').trim();
         if (!text || !currentConvId) return;
+
+        // FIX: igual que arriba con el replace
         const url = "{% url 'mensajes_list_create' 0 %}".replace('/0/', `/${currentConvId}/`);
         try {
           const res = await fetch(url, {
@@ -629,27 +1043,17 @@
       });
 
       textEl.addEventListener('keydown', function (e) {
-        // evita interferencias con IME (teclados de composición)
         if (e.isComposing) return;
-
         const isEnter = e.key === 'Enter';
         const onlyEnter = isEnter && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey;
-
         if (onlyEnter) {
-          e.preventDefault(); // no insertes salto de línea
+          e.preventDefault();
           const txt = (textEl.value || '').trim();
-          if (!txt) return;   // no envíes vacío
-
-          // reutiliza tu handler de submit existente
-          if (formEl.requestSubmit) {
-            formEl.requestSubmit();
-          } else {
-            formEl.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-          }
+          if (!txt) return;
+          if (formEl.requestSubmit) formEl.requestSubmit();
+          else formEl.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
         }
       });
-
-      // (opcional) pista UX
       textEl.setAttribute('title', 'Enter: enviar • Shift+Enter: salto de línea');
 
       function startPolling() { stopPolling(); pollTimer = setInterval(loadMessagesOnce, 3000); }
@@ -659,79 +1063,282 @@
         if (!username) return;
 
         // abre el cajón
-        if (typeof openDrawer === 'function') {
-          openDrawer();
-        } else {
-          document.getElementById('chatFab')?.click();
-        }
+        if (typeof openDrawer === 'function') openDrawer();
+        else document.getElementById('chatFab')?.click();
 
-        // 1) intenta encontrar una conversación ya existente con ese username
+        // 1) intenta encontrar una conversación con mensajes
         try {
-          const res = await fetch("{% url 'conversaciones_list' %}", { credentials: 'same-origin' });
+          const res = await fetch(window.URLS.conversaciones, { credentials: 'same-origin' });
           const data = await res.json();
-          const conv = (data || []).find(c =>
-            (c.participantes || []).some(p => p.username === username)
-          );
-          if (conv && typeof openConversation === 'function') {
+          const conv = (data || []).find(c => (c.participantes || []).some(p =>
+            (p.username || p.nombre_usuario) === username
+          ));
+          if (conv && conv.ultimo_mensaje) {
             await openConversation(conv.conversacion_id);
             return;
           }
         } catch (e) {
-          console.error('No se pudo listar conversaciones', e);
+          console.warn('No se pudo listar conversaciones', e);
         }
 
-        // 2) si no existe, pide al backend que la garantice usando tu vista existente
-        //    chat_con_usuario (la que antes te llevaba al chat “viejo”).
-        //    Esa vista suele CREAR la conversación si no existe.
+        // 2) pide/crea la conversación (usa el placeholder __USER__)
         try {
-          const url = "{% url 'chat_con_usuario' '___u___' %}".replace('___u___', encodeURIComponent(username));
-          // Llamada “silenciosa”: no navegamos, solo disparamos la creación
-          await fetch(url, { credentials: 'same-origin' });
-
-          // recarga la lista y vuelve a buscar
-          const res2 = await fetch("{% url 'conversaciones_list' %}", { credentials: 'same-origin' });
-          const data2 = await res2.json();
-          const conv2 = (data2 || []).find(c =>
-            (c.participantes || []).some(p => p.username === username)
-          );
-          if (conv2 && typeof openConversation === 'function') {
-            await openConversation(conv2.conversacion_id);
+          const url = window.URLS.convConUsuarioId.replace('__USER__', encodeURIComponent(username));
+          const r = await fetch(url, { credentials: 'same-origin' });
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          const j = await r.json();
+          if (j && j.conversacion_id) {
+            await openConversation(j.conversacion_id);
+            if (typeof window.loadConversations === 'function') window.loadConversations();
             return;
           }
         } catch (e) {
-          console.error('No se pudo crear/garantizar la conversación', e);
+          console.error('No se pudo obtener/crear conversacion_id', e);
         }
 
-        // 3) si aún no se pudo, al menos deja el cajón abierto
-        console.warn('No se encontró ni pudo crear conversación con', username);
+        alert('No se pudo abrir el chat con ' + username);
       };
 
       window.addEventListener('beforeunload', stopPolling);
-    })();
 
+      let typingPingTimer = null;     // throttle para enviar pings
+      let typingStopTimer = null;     // timer para “dejó de escribir”
+      let typingPollTimer = null;     // polling para ver si el otro escribe
+
+      const typingEl = document.getElementById('typingIndicator');
+      const typingWhoEl = typingEl?.querySelector('.who');
+
+      function typingUrl() {
+        // usa el placeholder /0/
+        return window.URLS.typing.replace('/0/', `/${currentConvId}/`);
+      }
+
+      async function sendTyping(isTyping) {
+        if (!currentConvId) return;
+        try {
+          await fetch(typingUrl(), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRFTOKEN },
+            body: JSON.stringify({ typing: !!isTyping })
+          });
+        } catch (e) { /* silencioso */ }
+      }
+
+      function scheduleTypingPing() {
+        // limita a 1 ping cada ~2s
+        if (typingPingTimer) return;
+        sendTyping(true);
+        typingPingTimer = setTimeout(() => { typingPingTimer = null; }, 2000);
+
+        // si no hay nuevos inputs por 2.5s, marca stop
+        clearTimeout(typingStopTimer);
+        typingStopTimer = setTimeout(() => sendTyping(false), 2500);
+      }
+
+      async function pollTyping() {
+        if (!currentConvId) return;
+        try {
+          const r = await fetch(typingUrl(), { credentials: 'same-origin' });
+          if (!r.ok) return;
+          const j = await r.json();
+          const typing = (j && j.typing) || [];
+          renderTyping(typing);
+        } catch (e) { /* noop */ }
+      }
+
+      function renderTyping(list) {
+        if (!typingEl) return;
+        if (!list.length) {
+          typingEl.hidden = true;
+          return;
+        }
+        // si hay uno, mostramos nombre; si >1, “Varios”
+        const first = list[0];
+        const nombre = (first.nombre || '').trim() || (first.username || '').trim() || 'Alguien';
+        typingWhoEl.textContent = (list.length === 1) ? nombre : 'Varios';
+        typingEl.hidden = false;
+      }
+
+      // engancha eventos del textarea
+      if (textEl) {
+        textEl.addEventListener('input', scheduleTypingPing);
+        textEl.addEventListener('blur', () => sendTyping(false));
+      }
+
+      // integra con tu ciclo de polling existente
+      const _startPollingOriginal = startPolling;
+      startPolling = function () {
+        _startPollingOriginal();
+        // además del polling de mensajes, hacemos uno para typing algo más frecuente
+        clearInterval(typingPollTimer);
+        typingPollTimer = setInterval(pollTyping, 1500);
+      };
+
+      const _stopPollingOriginal = stopPolling;
+      stopPolling = function () {
+        _stopPollingOriginal();
+        clearInterval(typingPollTimer); typingPollTimer = null;
+        clearTimeout(typingPingTimer); typingPingTimer = null;
+        clearTimeout(typingStopTimer); typingStopTimer = null;
+        sendTyping(false);
+        if (typingEl) typingEl.hidden = true;
+      };
+
+      // cuando cambies de conversación:
+      const _openConversationOriginal = openConversation;
+      openConversation = async function (convId) {
+        await _openConversationOriginal(convId);
+        pollTyping(); // primer fetch inmediato
+      };
+    })();
   </script>
+  <script>
+    (function () {
+      const drawer = document.getElementById('chatDrawer');
+      if (!drawer) return;
+
+      // Elementos de la columna izquierda
+      const chatsEl = drawer.querySelector('#chatList');
+      const friendsEl = drawer.querySelector('#friendsList');
+      const leftCol = chatsEl?.parentElement;
+
+      // Asegura posicionamiento para el absolute de friendsList
+      if (leftCol && getComputedStyle(leftCol).position === 'static') {
+        leftCol.style.position = 'relative';
+      }
+
+      // Botones de tabs
+      const tabBtns = drawer.querySelectorAll('.phone-tabs .tab-btn');
+      const btnAmigos = drawer.querySelector('.phone-tabs .tab-btn[data-tab="amigos"]');
+      const btnChats = drawer.querySelector('.phone-tabs .tab-btn[data-tab="chats"]');
+      const btnGrupos = drawer.querySelector('.phone-tabs .tab-btn[data-tab="grupos"]');
+
+      // URL del endpoint que ya tienes
+      const FRIENDS_API = window.URLS.amigos;
+
+      // Reutilizamos helpers existentes si están (toAbsoluteMedia)
+      const AVATAR_FALLBACK = "{% static 'img/Gifters/favicongift.png' %}";
+
+      let friendsLoaded = false;
+
+      function friendUsername(u) {
+        return u.nombre_usuario || u.username || '';
+      }
+      function friendName(u) {
+        return u.nombre_completo ||
+          [u.nombre, u.apellido].filter(Boolean).join(' ') ||
+          u.display_name ||
+          friendUsername(u) || 'Amigo';
+      }
+      function friendAvatar(u) {
+        const raw =
+          u.avatar_url || u.avatar || u.foto_url || u.foto ||
+          (u.perfil && (u.perfil.profile_picture_url || u.perfil.foto_url || u.perfil.profile_picture)) ||
+          u.profile_image_url || u.profile_picture_url || null;
+        try {
+          return (typeof toAbsoluteMedia === 'function') ? toAbsoluteMedia(raw) : (raw || AVATAR_FALLBACK);
+        } catch {
+          return AVATAR_FALLBACK;
+        }
+      }
+
+      function renderFriends(list) {
+        friendsEl.innerHTML = '';
+        if (!Array.isArray(list) || list.length === 0) {
+          friendsEl.innerHTML = '<div class="p-3 text-muted">Aún no tienes amigos.</div>';
+          return;
+        }
+        list.forEach(u => {
+          const row = document.createElement('div');
+          row.className = 'chat-list-item';
+          row.innerHTML = `
+        <img class="chat-avatar" src="${friendAvatar(u)}" alt="">
+        <div class="chat-names">
+          <div class="line1">${friendName(u)}</div>
+          <div class="line2">@${friendUsername(u)}</div>
+        </div>
+        <div class="chat-time"></div>
+      `;
+          row.addEventListener('click', () => {
+            const uname = friendUsername(u);
+            if (uname && typeof window.openChatWith === 'function') {
+              window.openChatWith(uname);  // usa TU lógica para abrir/crear el chat en el mismo drawer
+            }
+          });
+          friendsEl.appendChild(row);
+        });
+      }
+
+      async function loadFriends() {
+        if (friendsLoaded) return;
+        friendsEl.innerHTML = '<div class="p-3 text-muted">Cargando amigos…</div>';
+        try {
+          const res = await fetch(FRIENDS_API, {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' }
+          });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const data = await res.json();
+          renderFriends(data);
+          friendsLoaded = true;
+        } catch (e) {
+          console.error('Error cargando amigos:', e);
+          friendsEl.innerHTML = '<div class="p-3 text-danger">No se pudieron cargar tus amigos.</div>';
+        }
+      }
+
+      function setActiveTab(tab) {
+        tabBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+        if (tab === 'amigos') {
+          friendsEl.style.display = 'block';
+          if (chatsEl) chatsEl.style.visibility = 'hidden';
+          loadFriends();
+        } else if (tab === 'chats') {
+          friendsEl.style.display = 'none';
+          if (chatsEl) chatsEl.style.visibility = 'visible';
+          // si quieres refrescar la lista de conversaciones cuando vuelves a "Chats":
+          if (typeof loadConversations === 'function') { try { loadConversations(); } catch { } }
+        } else {
+          // Grupos (placeholder)
+          friendsEl.style.display = 'block';
+          friendsEl.innerHTML = '<div class="p-3 text-muted">Los grupos llegarán pronto ✨</div>';
+          if (chatsEl) chatsEl.style.visibility = 'hidden';
+        }
+      }
+
+      // Enlaza tabs (delegación segura)
+      drawer.addEventListener('click', (e) => {
+        const btn = e.target.closest('.tab-btn');
+        if (!btn || !btn.dataset.tab) return;
+        setActiveTab(btn.dataset.tab);
+      });
+
+      // Estado inicial: botón "Chats" activo (tu UI ya lo pinta así)
+      setActiveTab('chats');
+    })();
+  </script>
+
   {% endif %}
 
   <script>
+    // Botón de chat en perfil público (si aparece en alguna vista)
     document.addEventListener('DOMContentLoaded', () => {
       const btn = document.getElementById('btnChatPerfilPublico');
       btn?.addEventListener('click', (e) => {
         e.preventDefault();
         const u = btn.dataset.username;
         if (window.openChatWith) {
-          window.openChatWith(u);  // ← abre el cajón y salta a ese chat
+          window.openChatWith(u);
         } else {
-          document.getElementById('chatFab')?.click(); // fallback: abre el cajón
+          document.getElementById('chatFab')?.click();
         }
       });
     });
   </script>
 
 
-
   {% block extra_js %}{% endblock %}
-
-
 </body>
 
 </html>

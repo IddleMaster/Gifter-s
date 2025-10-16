@@ -99,6 +99,11 @@ urlpatterns = [
     path('wishlist/item/<int:item_id>/recibir/', views.wishlist_marcar_recibido, name='wishlist_marcar_recibido'),
 
     path('wishlist/item/<int:item_id>/desmarcar/',views.wishlist_desmarcar_recibido,name='wishlist_desmarcar_recibido'),
+    path('amistad/amigos/', views.amistad_amigos_view, name='amistad_amigos'),
+    path("chat/con-id/<str:username>/", views.conversacion_con_usuario_id, name="chat_con_usuario_id"),
+    ###para el escribiendo:::
+    path("api/chat/<int:conv_id>/typing/", views.TypingView.as_view(), name="chat_typing"),
+    path("api/chat/typing/", views.TypingSummaryView.as_view(), name="chat_typing_summary"),
 
     
 

@@ -5,7 +5,7 @@ import uuid
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.conf import settings
-from datetime import timedelta
+from datetime import timedelta, date
 
 
 
@@ -1387,6 +1387,14 @@ class Perfil(models.Model):
         db_table = 'perfil'
         verbose_name = 'Perfil'
         verbose_name_plural = 'Perfiles'
+
+    def clean(self):
+            if self.birth_date:
+                hoy = date.today()
+                if self.birth_date > hoy:
+                    raise ValidationError({'birth_date': 'La fecha de nacimiento no puede ser en el futuro.'})
+                if self.birth_date.year < 1900:
+                    raise ValidationError({'birth_date': 'La fecha de nacimiento es demasiado antigua.'}) 
 
     def __str__(self):
         # Muestra el nombre de usuario en el admin de Django para una fácil identificación

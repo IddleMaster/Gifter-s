@@ -32,11 +32,27 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def _get_user_info(self, user_id):
         try:
-            # Usamos select_related para ser más eficientes
             user = User.objects.select_related('perfil').get(id=user_id)
-            avatar_url = static('img/avatar-placeholder.png') # Valor por defecto
+            avatar_url = static('img/avatar-placeholder.png') 
+
             if hasattr(user, 'perfil') and user.perfil.profile_picture:
-                avatar_url = user.perfil.profile_picture.url
+                # --- INICIO DEL CAMBIO ---
+                
+                # 1. Obtenemos el path relativo de la imagen (ej: /media/fotos/img.png)
+                relative_path = user.perfil.profile_picture.url
+                
+                # 2. Construimos la URL base desde el scope del WebSocket
+                #    Esto nos dará algo como: http://localhost:8000
+                scheme = self.scope['scheme'].replace('ws', 'http') # Cambia wss a https, ws a http
+                host = self.scope['server'][0]
+                port = self.scope['server'][1]
+                base_url = f"{scheme}://{host}:{port}"
+
+                # 3. Unimos la base y la ruta relativa para tener una URL absoluta
+                #    Y la asignamos a la variable que se enviará
+                avatar_url = urljoin(base_url, relative_path)
+                
+                # --- FIN DEL CAMBIO ---
 
             return {
                 "id": user_id,

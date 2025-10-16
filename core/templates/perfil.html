@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block flash_messages %}{% endblock %}
 {% load static %}
 
 {% block title %}Gifter’s{% endblock %}
@@ -262,7 +263,7 @@
 
   <!-- Wishlist -->
 <section id="wishlist" class="tab-content active">
-  <h3>WishList</h3>
+  <h3>Tu WishList</h3>
 
   {# Placeholder de vacío (se oculta si hay items) #}
   <p id="empty-wishlist" class="text-muted" {% if wishlist_items %}hidden{% endif %}>
@@ -370,7 +371,7 @@
   {% language 'es' %}
   <section id="eventos" class="tab-content">
     <div class="events-header">
-      <h3>Eventos importantes de “{{ request.user.nombre_usuario }}”</h3>
+      <h3>Tus eventos</h3>
       <button id="btn-toggle-nuevo-evento" class="btn btn-primary btn-rounded-sm" type="button" aria-expanded="false"
         aria-controls="panel-nuevo-evento" title="Agregar evento">＋</button>
     </div>
@@ -473,9 +474,105 @@
 {% endblock %}
 
 {% block extra_js %}
+<style>
+  /* Corazón con pequeño "pop" */
+  .wishlist-btn i.heart-pop {
+    animation: heart-pop 380ms ease;
+  }
+  @keyframes heart-pop {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.25); }
+    100% { transform: scale(1); }
+  }
+
+  /* opcional: resaltar el botón un instante */
+  .wishlist-btn.pop-bg {
+    box-shadow: 0 0 0 0 rgba(108,99,255,.35);
+    animation: btn-glow 480ms ease;
+  }
+  @keyframes btn-glow {
+    0%   { box-shadow: 0 0 0 0 rgba(108,99,255,.35); transform: translateY(-2px); }
+    100% { box-shadow: 0 0 0 12px rgba(108,99,255,0); transform: translateY(0); }
+  }
+</style>
+
+<style>
+  /* Oculta los mensajes clásicos solo en esta página */
+  #flash-messages,
+  .messages,
+  .django-messages,
+  .alert[role="alert"][data-django-message] {
+    display: none !important;
+  }
+</style>
+<style>
+  /* --- HEART ANIMS --- */
+  .wishlist-btn .bi { transition: transform .18s ease; }
+  .wishlist-btn.heart-pop .bi { animation: heartPop .28s ease; }
+  @keyframes heartPop {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.35); }
+    100% { transform: scale(1); }
+  }
+
+  /* brillo sutil cuando queda en favorito */
+  .wishlist-btn.is-fav .bi-heart-fill {
+    filter: drop-shadow(0 0 6px rgba(220, 53, 69, .35));
+  }
+
+  /* --- CARD FADE-OUT AL QUITAR --- */
+  .card-fade-out {
+    animation: cardFadeOut .28s ease forwards;
+    transform-origin: center center;
+  }
+  @keyframes cardFadeOut {
+    to {
+      opacity: 0;
+      transform: scale(.96);
+    }
+  }
+</style>
+
+
 
 <!-- SweetAlert2 para confirmaciones -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+  // Toast listo para usar
+  const Toast = Swal.mixin({
+    toast: true,
+    position: 'top-end',
+    showConfirmButton: false,
+    timer: 1600,
+    timerProgressBar: true
+  });
+</script>
+
+{% if messages %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const Toast = Swal.mixin({
+      toast: true,
+      position: 'top-end',
+      timer: 1800,
+      timerProgressBar: true,
+      showConfirmButton: false
+    });
+
+    {% for m in messages %}
+      (function(){
+        const tag = "{{ m.tags|default:'info' }}";
+        const icon = tag.includes('success') ? 'success'
+                    : tag.includes('error') ? 'error'
+                    : tag.includes('warning') ? 'warning'
+                    : 'info';
+        Toast.fire({ icon, title: "{{ m|escapejs }}" });
+      })();
+    {% endfor %}
+  });
+</script>
+{% endif %}
+
 
 <script>
   document.addEventListener("DOMContentLoaded", function () {
@@ -676,62 +773,73 @@
 
     /* ===== Wishlist (toggle desde el perfil) ===== */
     function getCookie(name) {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop().split(";").shift();
-    }
-    const csrftoken = getCookie("csrftoken");
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+  }
+  const csrftoken = getCookie('csrftoken');
 
-    document.body.addEventListener("click", async function (e) {
-      const btn = e.target.closest(".wishlist-btn");
-      if (!btn) return;
+  document.addEventListener('click', async function (e) {
+  const btn = e.target.closest('.wishlist-btn');
+  if (!btn) return;
 
-      e.preventDefault();
+  e.preventDefault();
+  const id   = btn.getAttribute('data-product-id');
+  const icon = btn.querySelector('i');
+  const wasFav    = btn.classList.contains('is-fav');
+  const prevTitle = btn.title;
 
-      const id = btn.getAttribute("data-product-id");
-      const icon = btn.querySelector("i");
-      const wasFav = btn.classList.contains("is-fav");
-      const prevTitle = btn.title;
+  // animación corta
+  if (icon) icon.classList.add('heart-pop');
+  btn.classList.add('pop-bg');
+  setTimeout(() => { icon && icon.classList.remove('heart-pop'); btn.classList.remove('pop-bg'); }, 420);
 
-      try {
-        const url = `{% url 'favoritos_toggle' 0 %}`.replace("/0/", `/${id}/`);
-        const resp = await fetch(url, {
-          method: "POST",
-          headers: {
-            "X-CSRFToken": csrftoken,
-            "X-Requested-With": "XMLHttpRequest"
-          }
-        });
-
-        if (resp.redirected || resp.url.includes("{% url 'login' %}")) {
-          window.location.href = "{% url 'login' %}?next={{ request.get_full_path|urlencode }}";
-          return;
-        }
-
-        if (!resp.ok) throw new Error("HTTP " + resp.status);
-        const data = await resp.json();
-        const isFav = data.state === "added";
-
-        btn.classList.toggle("is-fav", isFav);
-        btn.setAttribute("aria-pressed", isFav ? "true" : "false");
-        btn.title = isFav ? "Quitar de wishlist" : "Agregar a wishlist";
-        if (icon) icon.className = isFav ? "bi bi-heart-fill text-danger" : "bi bi-heart";
-
-        if (!isFav) {
-          const card = btn.closest(".gift-card, .product-card");
-          if (card) {
-            card.remove();
-            updateEmptyStates();  // <— actualizar placeholder
-          }
-        }
-      } catch (err) {
-        console.error(err);
-        btn.classList.toggle("is-fav", wasFav);
-        btn.setAttribute("aria-pressed", wasFav ? "true" : "false");
-        btn.title = prevTitle;
-        if (icon) icon.className = wasFav ? "bi bi-heart-fill text-danger" : "bi bi-heart";
-      }
+  try {
+    const url = `{% url 'favoritos_toggle' 0 %}`.replace('/0/', `/${id}/`);
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }
     });
+
+    if (resp.redirected || resp.url.includes('{% url "login" %}')) {
+      window.location.href = "{% url 'login' %}?next={{ request.get_full_path|urlencode }}";
+      return;
+    }
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+
+    const data = await resp.json();
+    const isFav = data.state === 'added';
+
+    // 1) Actualiza icono/estado del botón
+    btn.classList.toggle('is-fav', isFav);
+    btn.setAttribute('aria-pressed', isFav ? 'true' : 'false');
+    btn.title = isFav ? 'Quitar de wishlist' : 'Agregar a wishlist';
+    if (icon) icon.className = isFav ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
+
+    // 2) Si fue REMOVED y estamos en el grid de wishlist del perfil → quitar tarjeta
+    const wlGrid = document.getElementById('wishlist-container');
+    const card   = btn.closest('.gift-card, .product-card');
+    if (!isFav && wlGrid && card && wlGrid.contains(card)) {
+      card.classList.add('card-fade-out');      // tienes la animación en tu CSS
+      setTimeout(() => {
+        card.remove();
+        updateEmptyStates();                     // ya definida arriba
+      }, 280);
+    }
+
+    // 3) Toast
+    Toast.fire({ icon: isFav ? 'success' : 'info', title: isFav ? 'Agregado a tu wishlist' : 'Quitado de tu wishlist' });
+
+  } catch (err) {
+    console.error(err);
+    // revertir UI si falla
+    btn.classList.toggle('is-fav', wasFav);
+    btn.setAttribute('aria-pressed', wasFav ? 'true' : 'false');
+    btn.title = prevTitle;
+    if (icon) icon.className = wasFav ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
+    Toast.fire({ icon: 'error', title: 'Ups, no pudimos actualizar' });
+  }
+});
 
     /* ===== Marcar como recibido ===== */
     document.body.addEventListener("click", async function (e) {

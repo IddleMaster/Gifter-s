@@ -23,6 +23,8 @@ from .models import User, Post, Like  # ajusta si necesitas más
 from core.forms import ProfileEditForm
 from .utils import get_default_wishlist
 
+from django.db.models import Prefetch, Q
+from core.models import Wishlist, ItemEnWishlist
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -55,7 +57,8 @@ from django.http import JsonResponse, HttpResponseForbidden
 
 
 from django.urls import reverse  # puedes dejarlo, pero ya no dependemos de reverse en el fallback
-
+from django.views.decorators.http import require_GET
+from django.core.cache import cache
 
 
 
@@ -70,6 +73,7 @@ def home(request):
         sugerencias = []
         recibidas = []
         enviadas = []
+        favoritos_ids = set()
 
         if request.user.is_authenticated:
             amigos = amigos_qs(request.user)
@@ -82,6 +86,13 @@ def home(request):
                         .filter(emisor=request.user, estado=SolicitudAmistad.Estado.PENDIENTE)
                         .select_related('receptor')
                         .order_by('-creada_en')[:10])
+            
+            wl = get_default_wishlist(request.user)
+            favoritos_ids = set(
+                ItemEnWishlist.objects
+                .filter(id_wishlist=wl)
+                .values_list('id_producto', flat=True)
+            )
 
         context = {
             'productos_destacados': productos_destacados,
@@ -89,7 +100,8 @@ def home(request):
             'amigos': amigos,
             'sugerencias': sugerencias,
             'solicitudes_recibidas': recibidas,   
-            'solicitudes_enviadas': enviadas,     
+            'solicitudes_enviadas': enviadas,   
+            'favoritos_ids': favoritos_ids,  
         }
         return render(request, 'index.html', context)
     except Exception:
@@ -100,6 +112,7 @@ def home(request):
             'sugerencias': [],
             'solicitudes_recibidas': [],
             'solicitudes_enviadas': [],
+            'favoritos_ids': set(),
         })
 
 def register_view(request):
@@ -1178,13 +1191,11 @@ class SmallPagination(PageNumberPagination):
     max_page_size = 100
 
 class ConversacionesList(APIView):
-    permission_classes = [IsAuthenticated]
-
     def get(self, request):
         qs = (Conversacion.objects
               .filter(participantes__usuario=request.user)
-              .select_related("ultimo_mensaje")
-              .prefetch_related("participantes__usuario")
+              .select_related("ultimo_mensaje__remitente__perfil")
+              .prefetch_related("participantes__usuario__perfil")
               .order_by("-actualizada_en")
               .distinct())
         data = ConversacionLiteSerializer(qs, many=True).data
@@ -1196,10 +1207,9 @@ class MensajesListCreate(APIView):
     pagination_class = SmallPagination
 
     def get_conv(self, request, conv_id):
-        # Asegura que el usuario pertenezca a la conversación
         try:
             conv = (Conversacion.objects
-                    .prefetch_related("participantes__usuario")
+                    .prefetch_related("participantes__usuario__perfil")  # <-- añade __perfil
                     .get(conversacion_id=conv_id, participantes__usuario=request.user))
         except Conversacion.DoesNotExist:
             return None
@@ -1212,7 +1222,7 @@ class MensajesListCreate(APIView):
 
         qs = (Mensaje.objects
               .filter(conversacion=conv)
-              .select_related("remitente")
+              .select_related("remitente__perfil")   # ⬅️ importante
               .order_by("-creado_en"))
 
         paginator = SmallPagination()
@@ -1316,6 +1326,8 @@ def chat_con_usuario(request, username):
     return redirect('chat_room', conversacion_id=conv.conversacion_id)        
 
 
+from django.db.models import Prefetch  # ya lo tienes importado arriba
+
 def perfil_publico(request, username):
     User = get_user_model()
     usuario = get_object_or_404(User, nombre_usuario=username)
@@ -1335,7 +1347,7 @@ def perfil_publico(request, username):
     if request.user.is_authenticated:
         sigo = Seguidor.objects.filter(seguidor=request.user, seguido=usuario).exists()
         me_sigue = Seguidor.objects.filter(seguidor=usuario, seguido=request.user).exists()
-        es_amigo = sigo and me_sigue
+        es_amigo = sigo and me_sigue                 # ← OJO: "and", NUNCA "&&"
         puede_chatear = es_amigo
 
         pendiente_enviada = SolicitudAmistad.objects.filter(
@@ -1357,20 +1369,33 @@ def perfil_publico(request, username):
         .order_by('-fecha_publicacion')[:6]
     )
 
-    # --- NUEVO: Wishlist pública (solo visible si son amigos) ---
-    from core.models import Wishlist, ItemEnWishlist  # import local para no tocar el encabezado del archivo
-    wishlist_items_publicos = []
+    # Wishlist pública (solo si son amigos)
     wl = Wishlist.objects.filter(usuario=usuario).first()
+    wishlist_items_publicos = []
     if wl and es_amigo:
         wishlist_items_publicos = (
             ItemEnWishlist.objects
-            .filter(id_wishlist=wl)
+            # ⇩⇩⇩ SOLO PENDIENTES (NO RECIBIDOS)
+            .filter(id_wishlist=wl, fecha_comprado__isnull=True)
+            # Si además tienes un booleano 'recibido', podrías añadir (opcional):
+            # .filter(Q(recibido=False) | Q(recibido__isnull=True))
             .select_related('id_producto', 'id_producto__id_marca')
-            .prefetch_related('id_producto__urls_tienda')  # usa la relación real (no el manager filtrado)
+            .prefetch_related('id_producto__urls_tienda')
             .order_by('-pk')
         )
 
-    return render(request, 'perfil_publico.html', {
+    # Recibidos públicos (visible para cualquiera)
+    recibidos_publicos = []
+    if wl:
+        recibidos_publicos = (
+            ItemEnWishlist.objects
+            .filter(id_wishlist=wl, fecha_comprado__isnull=False)   # clave
+            .select_related('id_producto', 'id_producto__id_marca')
+            .prefetch_related(Prefetch('id_producto__urls_tienda'))
+            .order_by('-fecha_comprado', '-pk')
+        )
+
+    context = {
         'usuario_publico': usuario,
         'perfil_publico': perfil,
         'es_mi_perfil': es_mi_perfil,
@@ -1381,7 +1406,9 @@ def perfil_publico(request, username):
         'ultimos_posts': ultimos_posts,
         'eventos_publicos': eventos_publicos,
         'wishlist_items_publicos': wishlist_items_publicos,
-    })
+        'recibidos_publicos': recibidos_publicos,
+    }
+    return render(request, 'perfil_publico.html', context)
 
 
 
@@ -1484,5 +1511,140 @@ def wishlist_desmarcar_recibido(request, item_id):
 
     return JsonResponse({'ok': True, 'item_id': item_id})
 
+@login_required
+def amistad_amigos_view(request):
+    """
+    Devuelve la lista de amigos del usuario autenticado.
+    - Si el User no tiene .amigos_qs, usa core.services_social.amigos_qs(user).
+    - Incluye nombre_usuario, nombre(s), apellido(s), nombre_completo y avatar absoluto si existe.
+    """
+    try:
+        try:
+            amigos_qs = request.user.amigos_qs
+        except AttributeError:
+            from core.services_social import amigos_qs as amigos_func
+            amigos_qs = amigos_func(request.user)
+
+        amigos_qs = amigos_qs.select_related('perfil')
+
+        data = []
+        for u in amigos_qs:
+            nombre_completo = f"{(u.nombre or '').strip()} {(u.apellido or '').strip()}".strip() or (u.nombre_usuario or "")
+            avatar_url = None
+            try:
+                if getattr(u, 'perfil', None) and getattr(u.perfil, 'profile_picture', None):
+                    # URL absoluta para que el front pueda usarla directo en <img>
+                    avatar_url = request.build_absolute_uri(u.perfil.profile_picture.url)
+            except Exception:
+                avatar_url = None
+
+            data.append({
+                "id": u.id,
+                "nombre_usuario": u.nombre_usuario or "",
+                "nombre": u.nombre or "",
+                "apellido": u.apellido or "",
+                "nombre_completo": nombre_completo,
+                "perfil": {"profile_picture_url": avatar_url},
+            })
+
+        return JsonResponse(data, safe=False, status=200)
+
+    except Exception as e:
+        # Devuelve un JSON claro para que puedas ver el motivo en red si algo falla
+        return JsonResponse({"detail": "error_listando_amigos", "error": str(e)}, status=500)
 
 
+@login_required
+@require_GET
+def conversacion_con_usuario_id(request, username):
+    User = get_user_model()
+    other = get_object_or_404(User, nombre_usuario=username)
+    conv = obtener_o_crear_conv_directa(request.user, other)
+    return JsonResponse({"conversacion_id": conv.conversacion_id})       
+
+
+
+#### para que salga el escribiendo...
+class TypingView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _conv_for(self, request, conv_id):
+        try:
+            return (Conversacion.objects
+                    .prefetch_related("participantes__usuario")
+                    .get(conversacion_id=conv_id,
+                         participantes__usuario=request.user))
+        except Conversacion.DoesNotExist:
+            return None
+
+    def post(self, request, conv_id):
+        """
+        Marca 'typing' del usuario en esta conversación.
+        Body JSON: {"typing": true/false}
+        Guarda en cache por 5s.
+        """
+        conv = self._conv_for(request, conv_id)
+        if not conv:
+            return Response({"detail": "Conversación no encontrada"}, status=404)
+
+        typing = bool(request.data.get("typing"))
+        key = f"chat:typing:{conv_id}:{request.user.id}"
+        if typing:
+            # TTL corto; mientras el cliente renueve, se mantiene
+            cache.set(key, 1, timeout=5)
+        else:
+            cache.delete(key)
+        return Response({"ok": True})
+
+    def get(self, request, conv_id):
+        """
+        Devuelve lista de usuarios (otros) que están escribiendo ahora.
+        """
+        conv = self._conv_for(request, conv_id)
+        if not conv:
+            return Response({"detail": "Conversación no encontrada"}, status=404)
+
+        typing_users = []
+        for p in conv.participantes.all():
+            u = p.usuario
+            if u.id == request.user.id:
+                continue
+            key = f"chat:typing:{conv_id}:{u.id}"
+            if cache.get(key):
+                typing_users.append({
+                    "id": u.id,
+                    "username": getattr(u, "nombre_usuario", "") or getattr(u, "username", ""),
+                    "nombre": (getattr(u, "nombre", "") or "") + " " + (getattr(u, "apellido", "") or "")
+                })
+
+        return Response({"typing": typing_users})
+class TypingSummaryView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Todas mis conversaciones
+        convs = (Conversacion.objects
+                 .filter(participantes__usuario=request.user)
+                 .prefetch_related("participantes__usuario")
+                 .distinct())
+
+        result = {}
+        for conv in convs:
+            typing_users = []
+            for p in conv.participantes.all():
+                u = p.usuario
+                if u.id == request.user.id:
+                    continue
+                key = f"chat:typing:{conv.conversacion_id}:{u.id}"
+                if cache.get(key):
+                    typing_users.append({
+                        "id": u.id,
+                        "username": getattr(u, "nombre_usuario", "") or getattr(u, "username", ""),
+                        "nombre": f"{getattr(u,'nombre','') or ''} {getattr(u,'apellido','') or ''}".strip()
+                    })
+            if typing_users:
+                result[str(conv.conversacion_id)] = typing_users
+
+        return Response({"typing": result})        
+
+        

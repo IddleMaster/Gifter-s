@@ -16,6 +16,11 @@ import os
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# ===== Meilisearch  =====
+USE_MEILI = os.getenv("USE_MEILI", "false").lower() == "true"
+MEILI_URL = os.getenv("MEILI_URL", "http://meilisearch:7700")
+MEILI_MASTER_KEY = os.getenv("MEILI_MASTER_KEY", "dev_meili_key")
+
 AUTH_USER_MODEL = "core.User"
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.1/howto/deployment/checklist/
@@ -46,7 +51,7 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.google',  
     'channels',
     'rest_framework', 
-
+    'productos_app',
     'core',
     'django_bootstrap5',
 

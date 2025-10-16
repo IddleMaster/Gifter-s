@@ -412,6 +412,9 @@
 
 {% block extra_js %}
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         // Integración con el buscador del navbar
@@ -439,59 +442,109 @@
 </script>
 
 <script>
-    // CSRF desde cookie
-    function getCookie(name) {
-        const value = `; ${document.cookie}`;
-        const parts = value.split(`; ${name}=`);
-        if (parts.length === 2) return parts.pop().split(';').shift();
-    }
-    const csrftoken = getCookie('csrftoken');
+  // CSRF desde cookie (dejalo como ya lo tienes arriba)
+  function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+  }
+  const csrftoken = getCookie('csrftoken');
 
-    document.addEventListener('click', async function (e) {
-        const btn = e.target.closest('.wishlist-btn');
-        if (!btn) return;
+  document.addEventListener('click', async function (e) {
+    const btn = e.target.closest('.wishlist-btn');
+    if (!btn) return;
 
-        e.preventDefault();
-        const id = btn.getAttribute('data-product-id');
-        const icon = btn.querySelector('i');
-        const wasFav = btn.classList.contains('is-fav');
-        const prevTitle = btn.title;
+    e.preventDefault();
+    const id   = btn.getAttribute('data-product-id');
+    const icon = btn.querySelector('i');
+    const wasFav    = btn.classList.contains('is-fav');
+    const prevTitle = btn.title;
 
-        try {
-            // Construimos la URL del toggle
-            const url = `{% url 'favoritos_toggle' 0 %}`.replace('/0/', `/${id}/`);
-            const resp = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': csrftoken,
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            });
+    // Animación rápida inmediata de feedback táctil
+    if (icon) icon.classList.add('heart-pop');
+    btn.classList.add('pop-bg');
+    setTimeout(() => {
+      icon && icon.classList.remove('heart-pop');
+      btn.classList.remove('pop-bg');
+    }, 420);
 
-            // Si no está logueado, login_required hará redirect 302 → enviamos al login
-            if (resp.redirected || resp.url.includes('{% url "login" %}')) {
-                window.location.href = "{% url 'login' %}?next={{ request.get_full_path|urlencode }}";
-                return;
-            }
-
-            if (!resp.ok) throw new Error('HTTP ' + resp.status);
-
-            const data = await resp.json();
-            const isFav = data.state === 'added';
-
-            btn.classList.toggle('is-fav', isFav);
-            btn.setAttribute('aria-pressed', isFav ? 'true' : 'false');
-            btn.title = isFav ? 'Quitar de wishlist' : 'Agregar a wishlist';
-            if (icon) icon.className = isFav ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
-        } catch (err) {
-            console.error(err);
-            // revertir UI si falló
-            btn.classList.toggle('is-fav', wasFav);
-            btn.setAttribute('aria-pressed', wasFav ? 'true' : 'false');
-            btn.title = prevTitle;
-            if (icon) icon.className = wasFav ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
+    try {
+      const url = `{% url 'favoritos_toggle' 0 %}`.replace('/0/', `/${id}/`);
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': csrftoken,
+          'X-Requested-With': 'XMLHttpRequest'
         }
-    });
+      });
+
+      // Si no está logueado → redirige a login
+      if (resp.redirected || resp.url.includes('{% url "login" %}')) {
+        window.location.href = "{% url 'login' %}?next={{ request.get_full_path|urlencode }}";
+        return;
+      }
+
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+
+      const data = await resp.json();
+      const isFav = data.state === 'added';
+
+      // Actualiza UI
+      btn.classList.toggle('is-fav', isFav);
+      btn.setAttribute('aria-pressed', isFav ? 'true' : 'false');
+      btn.title = isFav ? 'Quitar de wishlist' : 'Agregar a wishlist';
+      if (icon) icon.className = isFav ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
+
+      // Toast: agregado / quitado
+      Toast.fire({
+        icon: isFav ? 'success' : 'info',
+        title: isFav ? 'Agregado a tu wishlist' : 'Quitado de tu wishlist'
+      });
+
+    } catch (err) {
+      console.error(err);
+      // Revertir UI si falló
+      btn.classList.toggle('is-fav', wasFav);
+      btn.setAttribute('aria-pressed', wasFav ? 'true' : 'false');
+      btn.title = prevTitle;
+      if (icon) icon.className = wasFav ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
+
+      Toast.fire({ icon: 'error', title: 'Ups, no pudimos actualizar' });
+    }
+  });
 </script>
+<style>
+  /* Corazón con pequeño "pop" */
+  .wishlist-btn i.heart-pop {
+    animation: heart-pop 380ms ease;
+  }
+  @keyframes heart-pop {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.25); }
+    100% { transform: scale(1); }
+  }
+
+  /* opcional: resaltar el botón un instante */
+  .wishlist-btn.pop-bg {
+    box-shadow: 0 0 0 0 rgba(108,99,255,.35);
+    animation: btn-glow 480ms ease;
+  }
+  @keyframes btn-glow {
+    0%   { box-shadow: 0 0 0 0 rgba(108,99,255,.35); transform: translateY(-2px); }
+    100% { box-shadow: 0 0 0 12px rgba(108,99,255,0); transform: translateY(0); }
+  }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+  // Toast listo para usar
+  const Toast = Swal.mixin({
+    toast: true,
+    position: 'top-end',
+    showConfirmButton: false,
+    timer: 1600,
+    timerProgressBar: true
+  });
+</script>
+
 
 {% endblock %}

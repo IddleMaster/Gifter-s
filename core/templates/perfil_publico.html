@@ -61,28 +61,22 @@
 
   </div>
 
-  <nav class="profile-nav">
-    <ul>
-      <li>
-        <a href="#" data-tab="wishlist">Wishlist</a>
-      </li>
-      <li>
-        <a href="#" data-tab="actividad" class="{% if ultimos_posts %}active{% endif %}">Actividad pública</a>
-      </li>
-      <li>
-        <a href="#" data-tab="eventos" class="{% if not ultimos_posts and eventos_publicos %}active{% endif %}">
-          Eventos importantes
-        </a>
-      </li>
-    </ul>
-  </nav>
+<nav class="profile-nav">
+  <ul>
+    <li><a href="#" data-tab="wishlist" class="active">Wishlist</a></li>
+    <li><a href="#" data-tab="recibidos">Regalos recibidos</a></li>
+    <li><a href="#" data-tab="actividad">Actividad pública</a></li>
+    <li><a href="#" data-tab="eventos">Eventos importantes</a></li>
+  </ul>
+</nav>
+
 
 </div>
 
 <div class="profile-content">
 
   <!-- Actividad pública -->
-  <section id="actividad" class="tab-content active">
+  <section id="actividad" class="tab-content">
     <h3>Actividad pública de “{{ usuario_publico.nombre_usuario }}”</h3>
 
     {% if ultimos_posts %}
@@ -112,7 +106,7 @@
   </section>
 
   {% load i18n %}
-  <section id="eventos" class="tab-content {% if not ultimos_posts and eventos_publicos %}active{% endif %}">
+  <section id="eventos" class="tab-content {% if not ultimos_posts and eventos_publicos %}{% endif %}">
     <div class="events-header">
       <h3>Eventos importantes de “{{ usuario_publico.nombre_usuario }}”</h3>
     </div>
@@ -143,7 +137,7 @@
     </div>
   </section>
   <!-- Wishlist pública -->
-  <section id="wishlist" class="tab-content">
+  <section id="wishlist" class="tab-content active">
     <h3>Wishlist de “{{ usuario_publico.nombre_usuario }}”</h3>
 
     {% if not es_amigo %}
@@ -183,12 +177,91 @@
     {% endif %}
     {% endif %}
   </section>
+  <!-- pegar esto junto a las otras secciones dentro de .profile-content -->
+
+<section id="recibidos" class="tab-content">
+  <h3>Regalos recibidos de “{{ usuario_publico.nombre_usuario }}”</h3>
+
+  {# Muestra un aviso si no hay datos #}
+  {% if not recibidos_publicos %}
+    <p class="text-muted">Aún no registra regalos recibidos (o no son visibles).</p>
+  {% else %}
+    <div class="gift-grid">
+      {% for it in recibidos_publicos %}
+        {% with p=it.id_producto %}
+        <div class="gift-card" id="recibido-{{ it.id_item }}" data-product-id="{{ p.id_producto }}">
+          <img
+            src="{% if p.imagen and p.imagen.url %}{{ p.imagen.url }}{% else %}{% static 'img/Gifters/favicongift.png' %}{% endif %}"
+            alt="{{ p.nombre_producto }}">
+
+          <div class="gift-info">
+            <h4>{{ p.nombre_producto }}</h4>
+            <p>{{ p.id_marca.nombre_marca }}</p>
+            {% if p.precio %}
+              <div class="price">${{ p.precio }}</div>
+            {% endif %}
+            {% if it.fecha_comprado %}
+              <div class="text-muted" style="font-size:.85rem">
+                Recibido el {{ it.fecha_comprado|date:"d/m/Y H:i" }}
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="gift-actions">
+            <a class="btn btn-sm btn-outline-primary"
+               href="{% url 'producto_detalle' p.id_producto %}"
+               title="Ver detalle">Ver</a>
+
+            {% with url_tienda=p.urls_tienda.first %}
+              {% if url_tienda %}
+                <a class="btn btn-sm btn-outline-secondary"
+                   href="{{ url_tienda.url }}" target="_blank" rel="noopener"
+                   title="Ver en tienda">Tienda</a>
+              {% endif %}
+            {% endwith %}
+          </div>
+        </div>
+        {% endwith %}
+      {% endfor %}
+    </div>
+  {% endif %}
+</section>
+
 
 
 </div>
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const tabs = document.querySelectorAll(".profile-nav a");
+    const sections = document.querySelectorAll(".tab-content");
+
+    // --- inicial: muestra la sección de la pestaña que ya tenga .active (Wishlist)
+    const initial = document.querySelector(".profile-nav a.active")
+                  || document.querySelector('.profile-nav a[data-tab="wishlist"]');
+    if (initial) {
+      sections.forEach(s => s.classList.remove("active"));
+      const target = document.getElementById(initial.getAttribute("data-tab"));
+      if (target) target.classList.add("active");
+    }
+
+    tabs.forEach(tab => {
+      tab.addEventListener("click", e => {
+        e.preventDefault();
+        tabs.forEach(t => t.classList.remove("active"));
+        sections.forEach(s => s.classList.remove("active"));
+        tab.classList.add("active");
+        const target = document.getElementById(tab.getAttribute("data-tab"));
+        if (target) target.classList.add("active");
+      });
+    });
+  });
+</script>
+
+
 <script>
   document.addEventListener("DOMContentLoaded", function () {
     const tabs = document.querySelectorAll(".profile-nav a");

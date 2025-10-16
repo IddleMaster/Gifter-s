@@ -9,26 +9,38 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      - mysql_data:/var/lib/mysql |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| 
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   web:
     build: .
-    command: python manage.py runserver 0.0.0.0:8000   # <-- autoreload en dev
+    command: python manage.py runserver 0.0.0.0:8000
     ports:
       - "8000:8000"
     volumes:
-      - .:/app
-      - media_volume:/app/media
+      - .:/app  # Mapea todo tu proyecto, incluyendo la carpeta 'media'
     depends_on:
-      - redis
-      - db
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      meilisearch:
+        condition: service_started 
     environment:
       DJANGO_DB_HOST: db
       DJANGO_DB_NAME: gifters
       DJANGO_DB_USER: gifters_user
       DJANGO_DB_PASSWORD: gifters_pass
-      DEBUG: "1"                                # <-- importante en dev
-      REDIS_URL: "redis://redis:6379/0"         # <-- Channels/Redis
+      DEBUG: "1"
+      REDIS_URL: "redis://redis:6379/0"
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}   
+      MEILI_URL: ${MEILI_URL}                 
+      USE_MEILI: ${USE_MEILI} 
+
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
     ports:
@@ -37,14 +49,32 @@ services:
       PMA_HOST: db
       MYSQL_ROOT_PASSWORD: rootpass
     depends_on:
-      - db
+      db:
+        condition: service_healthy # También espera a que la BD esté saludable
 
-  redis:                  # <-- NUEVO SERVICIO
+  redis:
     image: redis:7-alpine
     restart: unless-stopped
     ports:
-      - "6379:6379"     
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      
+  meilisearch:
+    image: getmeili/meilisearch:v1.7
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
+    ports:
+      - "7700:7700"        # Para probar desde tu navegador/host
+    volumes:
+      - meili_data:/meili_data
+    restart: unless-stopped
+
 
 volumes:
   mysql_data:
-  media_volume:
+  meili_data:
+

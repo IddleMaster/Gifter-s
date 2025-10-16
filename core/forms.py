@@ -167,7 +167,8 @@ class PerfilForm(forms.ModelForm):
             }),
             'birth_date': forms.DateInput(attrs={
                 'type': 'date',
-                'class': 'form-control'
+                'class': 'form-control',
+                'max': date.today().isoformat()  # ← evita elegir fechas futuras en el navegador
             }),
         }
         labels = {
@@ -175,6 +176,17 @@ class PerfilForm(forms.ModelForm):
             'profile_picture': 'Foto de perfil',
             'birth_date': 'Fecha de nacimiento',
         }
+        error_messages = {
+            'birth_date': {
+                'invalid': 'Introduce una fecha válida (formato: AAAA-MM-DD).',
+            },
+        }
+
+    def clean_birth_date(self):
+        d = self.cleaned_data.get('birth_date')
+        if d and d > date.today():
+            raise ValidationError('')
+        return d
 
 class ProfileEditForm(forms.ModelForm):
     class Meta:
