@@ -1,6 +1,10 @@
 from rest_framework import serializers
 from core.models import User, SolicitudAmistad, Conversacion, Mensaje, ParticipanteConversacion
 
+
+
+
+
 # ---- Usuarios ----
 class UsuarioLiteSerializer(serializers.ModelSerializer):
     class Meta:
@@ -30,6 +34,8 @@ class SolicitudAmistadSerializer(serializers.ModelSerializer):
         fields = ("id_solicitud", "emisor", "receptor", "estado", "mensaje", "creada_en", "respondida_en")
 
 
+
+
 # ---- Conversaciones (completa) ----
 class ConversacionSerializer(serializers.ModelSerializer):
     participantes = serializers.SerializerMethodField()
@@ -57,12 +63,34 @@ class ConversacionSerializer(serializers.ModelSerializer):
         }
 
 
+class MensajeSerializer(serializers.ModelSerializer):
+    remitente = UsuarioLiteWithAvatarSerializer(read_only=True)
+    archivo_url = serializers.SerializerMethodField()  # <-- NUEVO
+
+    class Meta:
+        model = Mensaje
+        fields = (
+            "mensaje_id", "tipo", "contenido", "archivo_url",  # <-- añadido archivo_url
+            "remitente", "creado_en", "editado_en", "eliminado"
+        )
+
+    def get_archivo_url(self, obj):
+        md = obj.metadatos or {}
+        return md.get("archivo_url")
+
 # ---- Mensajes ----
 class MensajeSerializer(serializers.ModelSerializer):
     remitente = UsuarioLiteWithAvatarSerializer(read_only=True)
+    archivo_url = serializers.SerializerMethodField()
+
     class Meta:
         model = Mensaje
-        fields = ("mensaje_id", "tipo", "contenido", "remitente", "creado_en", "editado_en", "eliminado")
+        fields = ("mensaje_id","tipo","contenido","archivo_url",
+                  "remitente","creado_en","editado_en","eliminado")
+
+    def get_archivo_url(self, obj):
+        md = obj.metadatos or {}
+        return md.get("archivo_url")
 
 
 # ---- Conversaciones (lite para la lista del drawer) ----
@@ -91,3 +119,6 @@ class ConversacionLiteSerializer(serializers.ModelSerializer):
     def get_participantes(self, obj):
         users = [p.usuario for p in obj.participantes.all()]
         return UsuarioLiteWithAvatarSerializer(users, many=True).data
+    
+
+   

@@ -22,7 +22,7 @@ from django.shortcuts import get_object_or_404
 from .models import User, Post, Like  # ajusta si necesitas más
 from core.forms import ProfileEditForm
 from .utils import get_default_wishlist
-
+from django.db.models import Q, Avg, Case, When
 from django.db.models import Prefetch, Q
 from core.models import Wishlist, ItemEnWishlist
 from rest_framework import generics, permissions, status
@@ -32,7 +32,8 @@ from core.models import User, SolicitudAmistad, Seguidor, Evento
 from .serializers import SolicitudAmistadSerializer, UsuarioLiteSerializer
 from .models import Conversacion, Mensaje, ParticipanteConversacion, EntregaMensaje
 from .serializers import ConversacionSerializer, MensajeSerializer
-
+from core.models import Producto, Categoria, Marca
+from core.search import meili
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404, redirect, render
 # ajusta imports según tu app
@@ -60,8 +61,19 @@ from django.urls import reverse  # puedes dejarlo, pero ya no dependemos de reve
 from django.views.decorators.http import require_GET
 from django.core.cache import cache
 
+# Para Reseña
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.db import IntegrityError
+from django.db.models import Avg, Count
+from .models import Resena
+from .forms import ResenaForm
+from django.core.files.storage import default_storage
+from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 
-
+from django.utils.text import get_valid_filename
+import os, uuid
 
 
 def home(request):
@@ -256,29 +268,39 @@ def toggle_favorito(request, product_id):
     return JsonResponse({"status": "ok", "state": state, "product_id": product_id})
 
     
+from django.db.models import Q
+from django.core.paginator import Paginator
+
 def productos_list(request):
-    """Vista para listar todos los productos activos"""
-    query = request.GET.get('q', '')
-    categoria_id = request.GET.get('categoria', '')
-    marca_id = request.GET.get('marca', '')
+    """Lista de productos activos con filtros (sin dependencia de 'resenas')."""
+    query = (request.GET.get('q') or '').strip()
+    categoria_id = (request.GET.get('categoria') or '').strip()
+    marca_id = (request.GET.get('marca') or '').strip()
+    orden = request.GET.get('orden', 'recientes')  # recientes | precio_asc | precio_desc | nombre
 
     productos = Producto.objects.filter(activo=True)
 
+    # Filtros
     if query:
         productos = productos.filter(
             Q(nombre_producto__icontains=query) |
             Q(descripcion__icontains=query) |
             Q(id_marca__nombre_marca__icontains=query)
         )
-
     if categoria_id:
         productos = productos.filter(id_categoria_id=categoria_id)
-
     if marca_id:
         productos = productos.filter(id_marca_id=marca_id)
 
-    # Ordenar por rating promedio
-    productos = productos.annotate(avg_rating=Avg('resenas__calificacion')).order_by('-avg_rating')
+    # Orden (sin 'resenas')
+    if orden == 'precio_asc':
+        productos = productos.order_by('precio')
+    elif orden == 'precio_desc':
+        productos = productos.order_by('-precio')
+    elif orden == 'nombre':
+        productos = productos.order_by('nombre_producto')
+    else:  # recientes
+        productos = productos.order_by('-fecha_creacion', '-id_producto')
 
     # Paginación
     paginator = Paginator(productos, 12)
@@ -288,7 +310,7 @@ def productos_list(request):
     categorias = Categoria.objects.all()
     marcas = Marca.objects.all()
 
-    # === NUEVO: ids de productos favoritos del usuario ===
+    # Favoritos del usuario (si está logueado)
     favoritos_ids = set()
     if request.user.is_authenticated:
         wl = get_default_wishlist(request.user)
@@ -305,28 +327,29 @@ def productos_list(request):
         'query': query,
         'selected_categoria': categoria_id,
         'selected_marca': marca_id,
-        'favoritos_ids': favoritos_ids,  # <--- NUEVO
+        'favoritos_ids': favoritos_ids,
+        'orden': orden,
     }
     return render(request, 'productos_list.html', context)
 
 
+
 def producto_detalle(request, producto_id):
-    """Vista para detalle de producto"""
     producto = get_object_or_404(Producto, id_producto=producto_id, activo=True)
-    reseñas = producto.resenas.select_related('id_usuario').order_by('-fecha_resena')[:5]
-    
-    # Productos similares (misma categoría)
-    productos_similares = Producto.objects.filter(
-        id_categoria=producto.id_categoria,
-        activo=True
-    ).exclude(id_producto=producto_id)[:4]
-    
-    context = {
+    reseñas = []
+    if hasattr(producto, 'resenas'):
+        reseñas = producto.resenas.select_related('id_usuario').order_by('-fecha_resena')[:5]
+
+    productos_similares = (Producto.objects
+                           .filter(id_categoria=producto.id_categoria, activo=True)
+                           .exclude(id_producto=producto_id)[:4])
+
+    return render(request, 'productos/detalle.html', {
         'producto': producto,
         'reseñas': reseñas,
         'productos_similares': productos_similares,
-    }
-    return render(request, 'productos/detalle.html', context)
+    })
+
 
 # Protege la página para que solo usuarios logueados puedan verla
 ##TODo LO QUE TENGA QUE VER CON EL FEED AQUI
@@ -682,134 +705,363 @@ def url_tienda_toggle_activo(request, url_id):
 # VISTAS PARA BÚSQUEDA AVANZADA
 
 def buscar_productos(request):
-    """Búsqueda avanzada de productos"""
-    query = request.GET.get('q', '')
-    categoria_id = request.GET.get('categoria', '')
-    marca_id = request.GET.get('marca', '')
-    precio_min = request.GET.get('precio_min', '')
-    precio_max = request.GET.get('precio_max', '')
-    rating_min = request.GET.get('rating_min', '')
-    
-    productos = Producto.objects.filter(activo=True)
-    
-    # Filtros
-    if query:
-        productos = productos.filter(
-            Q(nombre_producto__icontains=query) |
-            Q(descripcion__icontains=query)
-        )
-    
-    if categoria_id:
-        productos = productos.filter(id_categoria_id=categoria_id)
-    
-    if marca_id:
-        productos = productos.filter(id_marca_id=marca_id)
-    
-    if precio_min:
-        productos = productos.filter(precio__gte=precio_min)
-    
-    if precio_max:
-        productos = productos.filter(precio__lte=precio_max)
-    
-    # Filtrar por rating (necesita annotate)
-    if rating_min:
-        productos = productos.annotate(avg_rating=Avg('resenas__calificacion')).filter(
-            avg_rating__gte=rating_min
-        )
-    
-    # Ordenamiento
+    """Búsqueda avanzada de productos (Meilisearch + fallback DB robusto, sin reseñas)"""
+    # --- Params ---
+    query = (request.GET.get('q') or '').strip()
+    categoria_id = (request.GET.get('categoria') or '').strip()
+    marca_id = (request.GET.get('marca') or '').strip()
+    precio_min = (request.GET.get('precio_min') or '').strip()
+    precio_max = (request.GET.get('precio_max') or '').strip()
+    rating_min = (request.GET.get('rating_min') or '').strip()  # <- por ahora se ignora
     orden = request.GET.get('orden', 'rating')
+    per_page = 12
+    try:
+        page_number = int(request.GET.get('page') or 1)
+        page_number = page_number if page_number > 0 else 1
+    except ValueError:
+        page_number = 1
+
+    def _ordenar_sin_rating(qs):
+        """Ordenamiento cuando no hay relación de reseñas disponible."""
+        if orden == 'precio_asc':
+            return qs.order_by('precio')
+        elif orden == 'precio_desc':
+            return qs.order_by('-precio')
+        elif orden == 'nombre':
+            return qs.order_by('nombre_producto')
+        else:
+            # 'rating' o default -> usamos más recientes como aproximación
+            return qs.order_by('-fecha_creacion', '-id_producto')
+
+    def _filtrar_db_base(qs):
+        """Filtros comunes en DB (sin rating)."""
+        if query:
+            qs = qs.filter(
+                Q(nombre_producto__icontains=query) |
+                Q(descripcion__icontains=query)
+            )
+        if categoria_id:
+            qs = qs.filter(id_categoria_id=categoria_id)
+        if marca_id:
+            qs = qs.filter(id_marca_id=marca_id)
+        if precio_min:
+            try:
+                qs = qs.filter(precio__gte=float(precio_min))
+            except ValueError:
+                pass
+        if precio_max:
+            try:
+                qs = qs.filter(precio__lte=float(precio_max))
+            except ValueError:
+                pass
+        # NOTE: rating_min se ignora hasta que exista relación de reseñas
+        return qs
+
+    def _render_db(productos_qs):
+        productos_qs = _filtrar_db_base(productos_qs)
+        productos_qs = _ordenar_sin_rating(productos_qs)
+
+        paginator = Paginator(productos_qs, per_page)
+        page_obj = paginator.get_page(page_number)
+
+        categorias = Categoria.objects.all()
+        marcas = Marca.objects.all()
+        context = {
+            'productos': page_obj,
+            'categorias': categorias,
+            'marcas': marcas,
+            'query': query,
+            'selected_categoria': categoria_id,
+            'selected_marca': marca_id,
+            'precio_min': precio_min,
+            'precio_max': precio_max,
+            'rating_min': rating_min,
+            'orden': orden,
+        }
+        return render(request, 'productos/buscar.html', context)
+
+    # ========== Fallback DB forzado ==========
+    if not getattr(settings, "USE_MEILI", False):
+        return _render_db(Producto.objects.filter(activo=True))
+
+    # ========== Modo Meilisearch con try/except ==========
+    # 1) Filtros Meili
+    meili_filters = ["activo = true"]
+    try:
+        if categoria_id:
+            meili_filters.append(f"id_categoria_id = {int(categoria_id)}")
+        if marca_id:
+            meili_filters.append(f"id_marca_id = {int(marca_id)}")
+        if precio_min:
+            meili_filters.append(f"precio >= {float(precio_min)}")
+        if precio_max:
+            meili_filters.append(f"precio <= {float(precio_max)}")
+    except ValueError:
+        pass
+    filter_str = " AND ".join(meili_filters) if meili_filters else None
+
+    # 2) Paginación/sort en Meili (precio adentro, otros afuera)
+    offset = (page_number - 1) * per_page
+    params = {"filter": filter_str, "offset": offset, "limit": per_page}
     if orden == 'precio_asc':
-        productos = productos.order_by('precio')
+        params["sort"] = ["precio:asc"]
     elif orden == 'precio_desc':
-        productos = productos.order_by('-precio')
-    elif orden == 'nombre':
-        productos = productos.order_by('nombre_producto')
-    else:  # rating por defecto
-        productos = productos.annotate(avg_rating=Avg('resenas__calificacion')).order_by('-avg_rating')
-    
-    # Paginación
-    paginator = Paginator(productos, 12)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    
-    categorias = Categoria.objects.all()
-    marcas = Marca.objects.all()
-    
-    context = {
-        'productos': page_obj,
-        'categorias': categorias,
-        'marcas': marcas,
-        'query': query,
-        'selected_categoria': categoria_id,
-        'selected_marca': marca_id,
-        'precio_min': precio_min,
-        'precio_max': precio_max,
-        'rating_min': rating_min,
-        'orden': orden,
-    }
-    return render(request, 'productos/buscar.html', context)
+        params["sort"] = ["precio:desc"]
+
+    try:
+        # 3) Buscar en Meili
+        resp = meili().index("products").search(query or "", params)
+        hits = resp.get("hits", [])
+        total_hits = resp.get("estimatedTotalHits", resp.get("totalHits", 0))
+        ids = [h.get("id") for h in hits if "id" in h]  # id_producto
+
+        # 4) Traer desde DB y ordenar
+        productos_qs = Producto.objects.filter(pk__in=ids)
+        productos_qs = _filtrar_db_base(productos_qs)
+
+        if orden in ('precio_asc', 'precio_desc', 'nombre'):
+            productos_qs = _ordenar_sin_rating(productos_qs)
+            productos_ordenados = list(productos_qs)
+        elif orden == 'rating':
+            # Sin reseñas: aproximamos con recientes
+            productos_qs = productos_qs.order_by('-fecha_creacion', '-id_producto')
+            productos_ordenados = list(productos_qs)
+        else:
+            # Mantener el orden de Meili (relevancia o precio ya aplicado)
+            productos_map = {p.pk: p for p in productos_qs}
+            productos_ordenados = [productos_map[i] for i in ids if i in productos_map]
+
+        # 5) Page-like
+        class _PageLike(list):
+            def __init__(self, items, number, per_page, total):
+                super().__init__(items)
+                self.number = number
+                self.paginator = type("P", (), {
+                    "num_pages": (total + per_page - 1) // per_page,
+                    "count": total,
+                    "per_page": per_page
+                })()
+
+        page_obj = _PageLike(productos_ordenados, page_number, per_page, total_hits)
+
+        categorias = Categoria.objects.all()
+        marcas = Marca.objects.all()
+        context = {
+            'productos': page_obj,
+            'categorias': categorias,
+            'marcas': marcas,
+            'query': query,
+            'selected_categoria': categoria_id,
+            'selected_marca': marca_id,
+            'precio_min': precio_min,
+            'precio_max': precio_max,
+            'rating_min': rating_min,  # hoy se ignora
+            'orden': orden,
+        }
+        return render(request, 'productos/buscar.html', context)
+
+    except Exception:
+        # Cualquier problema con Meili → fallback DB
+        return _render_db(Producto.objects.filter(activo=True))
+
+    # ========== Fallback DB forzado ==========
+    if not getattr(settings, "USE_MEILI", False):
+        return _render_db(Producto.objects.filter(activo=True))
+
+    # ========== Modo Meilisearch con try/except ==========
+    # 1) Filtros Meili
+    meili_filters = ["activo = true"]
+    try:
+        if categoria_id:
+            meili_filters.append(f"id_categoria_id = {int(categoria_id)}")
+        if marca_id:
+            meili_filters.append(f"id_marca_id = {int(marca_id)}")
+        if precio_min:
+            meili_filters.append(f"precio >= {float(precio_min)}")
+        if precio_max:
+            meili_filters.append(f"precio <= {float(precio_max)}")
+    except ValueError:
+        # Ignora parámetros no numéricos
+        pass
+    filter_str = " AND ".join(meili_filters) if meili_filters else None
+
+    # 2) Paginación/sort en Meili (precio adentro, nombre/rating afuera)
+    offset = (page_number - 1) * per_page
+    params = {"filter": filter_str, "offset": offset, "limit": per_page}
+    if orden == 'precio_asc':
+        params["sort"] = ["precio:asc"]
+    elif orden == 'precio_desc':
+        params["sort"] = ["precio:desc"]
+
+    try:
+        # 3) Buscar en Meili
+        resp = meili().index("products").search(query or "", params)
+        hits = resp.get("hits", [])
+        total_hits = resp.get("estimatedTotalHits", resp.get("totalHits", 0))
+        ids = [h.get("id") for h in hits if "id" in h]  # id_producto
+
+        # 4) Traer desde DB y ordenar / filtrar rating si aplica
+        productos_qs = Producto.objects.filter(pk__in=ids)
+
+        # rating_min también en modo Meili
+        if rating_min:
+            try:
+                productos_qs = productos_qs.annotate(avg_rating=Avg('resenas__calificacion')) \
+                                           .filter(avg_rating__gte=float(rating_min))
+            except ValueError:
+                productos_qs = productos_qs.annotate(avg_rating=Avg('resenas__calificacion'))
+
+        if orden == 'nombre':
+            productos_qs = productos_qs.order_by('nombre_producto')
+            productos_ordenados = list(productos_qs)
+        elif orden == 'rating':
+            productos_qs = productos_qs.annotate(avg_rating=Avg('resenas__calificacion')) \
+                                       .order_by('-avg_rating')
+            productos_ordenados = list(productos_qs)
+        else:
+            # Mantener orden de Meili (relevancia o precio si fue seteado)
+            productos_map = {p.pk: p for p in productos_qs}
+            productos_ordenados = [productos_map[i] for i in ids if i in productos_map]
+
+        # 5) Page-like
+        class _PageLike(list):
+            def __init__(self, items, number, per_page, total):
+                super().__init__(items)
+                self.number = number
+                self.paginator = type("P", (), {
+                    "num_pages": (total + per_page - 1) // per_page,
+                    "count": total,
+                    "per_page": per_page
+                })()
+
+        # Si aplicamos rating_min en DB, puede bajar la cuenta real de esta página;
+        # mantenemos total_hits para no romper la UX de paginación.
+        page_obj = _PageLike(productos_ordenados, page_number, per_page, total_hits)
+
+        categorias = Categoria.objects.all()
+        marcas = Marca.objects.all()
+        context = {
+            'productos': page_obj,
+            'categorias': categorias,
+            'marcas': marcas,
+            'query': query,
+            'selected_categoria': categoria_id,
+            'selected_marca': marca_id,
+            'precio_min': precio_min,
+            'precio_max': precio_max,
+            'rating_min': rating_min,
+            'orden': orden,
+        }
+        return render(request, 'productos/buscar.html', context)
+
+    except Exception:
+       
+        return _render_db(Producto.objects.filter(activo=True))
+
+from django.http import JsonResponse
+from django.conf import settings
+from django.db.models import Q
+from core.search import meili  # asegúrate de tenerlo importado
 
 def buscar_sugerencias(request):
-    """Vista para obtener sugerencias de búsqueda en tiempo real"""
-    query = request.GET.get('q', '').strip()
-    print(f"🔍 Búsqueda recibida: '{query}'")  # Para debug
-    
+    """Sugerencias de búsqueda en tiempo real (Meilisearch + fallback DB)."""
+    query = (request.GET.get('q') or '').strip()
+    print(f"🔍 Búsqueda recibida: '{query}'")
+
     if len(query) < 2:
         return JsonResponse({'sugerencias': []})
-    
+
     sugerencias = []
-    
+
+    # ========== Modo Meilisearch ==========
+    if getattr(settings, "USE_MEILI", False):
+        try:
+            print("⚡ Usando Meilisearch para sugerencias")
+            resp = meili().index("products").search(query, {
+                "limit": 8,
+                "attributesToRetrieve": ["id", "nombre_producto", "id_categoria_id", "id_marca_id"]
+            })
+
+            hits = resp.get("hits", [])
+            ids = [h.get("id") for h in hits if "id" in h]
+            productos = (Producto.objects
+                         .filter(pk__in=ids, activo=True)
+                         .select_related("id_categoria", "id_marca"))
+            productos_map = {p.pk: p for p in productos}
+
+            for h in hits:
+                p = productos_map.get(h.get("id"))
+                if not p:
+                    continue
+                sugerencias.append({
+                    "tipo": "producto",
+                    "texto": p.nombre_producto,
+                    "marca": p.id_marca.nombre_marca if p.id_marca else "",
+                    "categoria": p.id_categoria.nombre_categoria if p.id_categoria else "",
+                    "url": f"/producto/{p.id_producto}/"
+                })
+
+            # Añadir categorías y marcas (desde DB)
+            for c in Categoria.objects.filter(nombre_categoria__icontains=query)[:3]:
+                sugerencias.append({
+                    "tipo": "categoría",
+                    "texto": c.nombre_categoria,
+                    "descripcion": c.descripcion,
+                    "url": f"/productos/?categoria={c.id_categoria}"
+                })
+            for m in Marca.objects.filter(nombre_marca__icontains=query)[:2]:
+                sugerencias.append({
+                    "tipo": "marca",
+                    "texto": m.nombre_marca,
+                    "url": f"/productos/?marca={m.id_marca}"
+                })
+
+            print(f"✅ Sugerencias enviadas desde Meili: {len(sugerencias)}")
+            return JsonResponse({'sugerencias': sugerencias})
+
+        except Exception as e:
+            print(f"⚠️ Meilisearch falló, usando fallback DB: {e}")
+
+    # ========== Fallback a DB ==========
     try:
-        # Buscar productos por nombre, descripción o marca
+        print("🗄️ Usando fallback DB para sugerencias")
         productos = Producto.objects.filter(
             Q(nombre_producto__icontains=query) |
             Q(descripcion__icontains=query) |
             Q(id_marca__nombre_marca__icontains=query),
             activo=True
-        ).select_related('id_categoria', 'id_marca')[:6]
-        
-        print(f"📦 Productos encontrados: {productos.count()}")  # Para debug
-        
+        ).select_related("id_categoria", "id_marca")[:6]
+
         for producto in productos:
             sugerencias.append({
-                'tipo': 'producto',
-                'texto': producto.nombre_producto,
-                'marca': producto.id_marca.nombre_marca if producto.id_marca else '',
-                'categoria': producto.id_categoria.nombre_categoria if producto.id_categoria else '',
-                'url': f"/producto/{producto.id_producto}/"
+                "tipo": "producto",
+                "texto": producto.nombre_producto,
+                "marca": producto.id_marca.nombre_marca if producto.id_marca else "",
+                "categoria": producto.id_categoria.nombre_categoria if producto.id_categoria else "",
+                "url": f"/producto/{producto.id_producto}/"
             })
-        
-        # Buscar categorías
-        categorias = Categoria.objects.filter(
-            nombre_categoria__icontains=query
-        )[:3]
-        
-        for categoria in categorias:
+
+        for c in Categoria.objects.filter(nombre_categoria__icontains=query)[:3]:
             sugerencias.append({
-                'tipo': 'categoría',
-                'texto': categoria.nombre_categoria,
-                'descripcion': categoria.descripcion,
-                'url': f"/productos/?categoria={categoria.id_categoria}"
+                "tipo": "categoría",
+                "texto": c.nombre_categoria,
+                "descripcion": c.descripcion,
+                "url": f"/productos/?categoria={c.id_categoria}"
             })
-        
-        # Buscar marcas
-        marcas = Marca.objects.filter(
-            nombre_marca__icontains=query
-        )[:2]
-        
-        for marca in marcas:
+
+        for m in Marca.objects.filter(nombre_marca__icontains=query)[:2]:
             sugerencias.append({
-                'tipo': 'marca', 
-                'texto': marca.nombre_marca,
-                'url': f"/productos/?marca={marca.id_marca}"
+                "tipo": "marca",
+                "texto": m.nombre_marca,
+                "url": f"/productos/?marca={m.id_marca}"
             })
-            
+
     except Exception as e:
-        print(f"❌ Error en búsqueda de sugerencias: {e}")
-    
-    print(f"🎯 Total sugerencias a enviar: {len(sugerencias)}")  # Para debug
+        print(f"❌ Error en fallback DB: {e}")
+
+    print(f"🎯 Total sugerencias enviadas: {len(sugerencias)}")
     return JsonResponse({'sugerencias': sugerencias})
+
 
 def login_view(request):
     """
@@ -1201,19 +1453,18 @@ class ConversacionesList(APIView):
         data = ConversacionLiteSerializer(qs, many=True).data
         return Response(data)
 
-
 class MensajesListCreate(APIView):
     permission_classes = [IsAuthenticated]
     pagination_class = SmallPagination
+    parser_classes = [JSONParser, MultiPartParser, FormParser]   # <-- importante
 
     def get_conv(self, request, conv_id):
         try:
-            conv = (Conversacion.objects
-                    .prefetch_related("participantes__usuario__perfil")  # <-- añade __perfil
+            return (Conversacion.objects
+                    .prefetch_related("participantes__usuario__perfil")
                     .get(conversacion_id=conv_id, participantes__usuario=request.user))
         except Conversacion.DoesNotExist:
             return None
-        return conv
 
     def get(self, request, conv_id):
         conv = self.get_conv(request, conv_id)
@@ -1222,7 +1473,7 @@ class MensajesListCreate(APIView):
 
         qs = (Mensaje.objects
               .filter(conversacion=conv)
-              .select_related("remitente__perfil")   # ⬅️ importante
+              .select_related("remitente__perfil")
               .order_by("-creado_en"))
 
         paginator = SmallPagination()
@@ -1235,33 +1486,45 @@ class MensajesListCreate(APIView):
         if not conv:
             return Response({"detail": "Conversación no encontrada"}, status=404)
 
+        tipo = (request.data.get("tipo") or "texto").strip()
         contenido = (request.data.get("contenido") or "").strip()
-        if not contenido:
-            return Response({"detail": "contenido es requerido"}, status=400)
 
-        msg = Mensaje.objects.create(
-            conversacion=conv,
-            remitente=request.user,
-            contenido=contenido,
-            tipo=Mensaje.Tipo.TEXTO,
-        )
-        # actualiza puntero y timestamp de conversación
+        # MENSAJE DE IMAGEN
+        if tipo == Mensaje.Tipo.IMAGEN:
+            up = request.FILES.get("archivo")
+            if not up:
+                return Response({"detail": "archivo es requerido"}, status=400)
+
+            # guarda en /media/chat/
+            orig = get_valid_filename(up.name or "image")
+            ext = os.path.splitext(orig)[1].lower() or ".jpg"
+            name = f"chat/{uuid.uuid4().hex}{ext}"
+            path = default_storage.save(name, up)
+            url = default_storage.url(path)
+
+            msg = Mensaje.objects.create(
+                conversacion=conv,
+                remitente=request.user,
+                tipo=Mensaje.Tipo.IMAGEN,
+                contenido=contenido,                # pie de foto opcional
+                metadatos={"archivo_url": url},
+            )
+        else:
+            # TEXTO (default)
+            if not contenido:
+                return Response({"detail": "contenido es requerido"}, status=400)
+            msg = Mensaje.objects.create(
+                conversacion=conv,
+                remitente=request.user,
+                tipo=Mensaje.Tipo.TEXTO,
+                contenido=contenido,
+            )
+
+        # actualizar puntero de la conversación
         conv.ultimo_mensaje = msg
         conv.save(update_fields=["ultimo_mensaje", "actualizada_en"])
 
-        # (Opcional) emitir por WebSocket al grupo de la sala
-        try:
-            channel_layer = get_channel_layer()
-            async_to_sync(channel_layer.group_send)(
-                f"chat_{conv.conversacion_id}",
-                {"type": "chat.message", "message": contenido,
-                 "user": getattr(request.user, "nombre_usuario", "usuario")}
-            )
-        except Exception:
-            pass
-
-        return Response(MensajeSerializer(msg).data, status=201)                
-
+        return Response(MensajeSerializer(msg).data, status=201)
 
 
 ##nuevas funciones hoy 1 del 10 (abajo):
@@ -1427,20 +1690,25 @@ def _next_url(request, default='/feed/'):
 @login_required
 @require_POST
 def post_crear(request):
-    contenido = (request.POST.get('contenido') or '').strip()
-    if not contenido:
-        return redirect(_next_url(request))  # vuelve a donde estabas
+    form = PostForm(request.POST, request.FILES)
+    if form.is_valid():
+        post = form.save(commit=False)
+        post.id_usuario = request.user
+        
+        # Asignar el tipo de post
+        if form.cleaned_data.get('imagen'):
+            post.tipo_post = Post.TipoPost.IMAGEN
+        else:
+            post.tipo_post = Post.TipoPost.TEXTO
+            
+        post.save()
+        messages.success(request, "¡Publicación creada con éxito!")
+    else:
+        # Si el formulario no es válido, muestra un error
+        # (puedes manejarlo de una forma más elegante si quieres)
+        messages.error(request, "No se pudo crear la publicación. Revisa los datos.")
 
-    post = Post.objects.create(
-        id_usuario=request.user,   # ajusta si tu FK se llama distinto
-        contenido=contenido
-    )
-
-    # Base a donde volver (form.next o referer o 'feed')
-    base = _next_url(request)
-    # quita cualquier ancla previa y agrega la del post nuevo
-    base = base.split('#', 1)[0]
-    return redirect(f'{base}#post-{post.id_post}')
+    return redirect(_next_url(request))
     
 @login_required
 def feed(request):
@@ -1647,4 +1915,61 @@ class TypingSummaryView(APIView):
 
         return Response({"typing": result})        
 
-        
+
+#####################################################################
+#####################################################################
+#####################################################################
+
+def resenas_home(request):
+    """
+    Muestra las reseñas globales de la página (para el home o sección 'Opiniones').
+    """
+    resenas = Resena.objects.select_related('id_usuario').order_by('-fecha_resena')[:12]
+    stats = Resena.objects.aggregate(
+        promedio=Avg('calificacion'),
+        total=Count('id_resena')
+    )
+
+    context = {
+        'resenas': resenas,
+        'promedio': round(stats['promedio'] or 0, 2),
+        'total': stats['total'] or 0,
+        'form': None,
+        'show_form': False,
+    }
+    return render(request, 'resenas/section.html', context)
+
+
+@login_required
+def crear_resena(request):
+    """
+    Permite al usuario autenticado dejar UNA reseña global de la página.
+    Si ya tiene una, no se le permite crear otra.
+    """
+    if request.method == 'POST':
+        form = ResenaForm(request.POST)
+        if form.is_valid():
+            resena = form.save(commit=False)
+            resena.id_usuario = request.user
+            try:
+                resena.save()  # controla el UniqueConstraint (una reseña por usuario)
+            except IntegrityError:
+                messages.warning(request, 'Ya dejaste tu reseña anteriormente. ¡Gracias!')
+            else:
+                messages.success(request, '¡Gracias por compartir tu experiencia!')
+            return redirect('resenas:home')
+    else:
+        form = ResenaForm()
+
+    # Mostrar reseñas existentes junto al formulario
+    resenas = Resena.objects.select_related('id_usuario').order_by('-fecha_resena')
+    stats = Resena.objects.aggregate(promedio=Avg('calificacion'), total=Count('id_resena'))
+
+    context = {
+        'resenas': resenas,
+        'promedio': round(stats['promedio'] or 0, 2),
+        'total': stats['total'] or 0,
+        'form': form,
+        'show_form': True,
+    }
+    return render(request, 'resenas/section.html', context)

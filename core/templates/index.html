@@ -77,9 +77,9 @@
 
 <br><br>
 
-    <div class="container section-title" data-aos="fade-up">
+<div class="container section-title" data-aos="fade-up">
   <h2>Bienvenido</h2>
-  <p><span>&nbsp;</span> <span class="brand">Comienza a buscar regalos</span><span class="description-title"> {{ user.nombre }}!</span></p>
+  <p><span>&nbsp;</span> <span class="brand">Comienza a buscar regalos</span><span class="description-title">!</span></p>
 </div>
 
 <!-- Clients Section - CATEGORÍAS DINÁMICAS CON FLECHAS -->
@@ -245,7 +245,7 @@
         {% endfor %}
       </div>
     </div>
-    
+
 
     <!-- Botón para ver más productos -->
     {% if productos_destacados %}
@@ -302,9 +302,10 @@
     </div>
     {% endif %}
     <p><span>Personas que quizás conozcas
-</span> <span class="description-title"></span></p>
+      </span> <span class="description-title"></span></p>
   </div>
 
+  
   <div class="container">
     {% if request.user.is_authenticated %}
     {% if amigos %}
@@ -334,7 +335,7 @@
           </div>
         </div>
       </div>
-      
+
 
       {% endfor %}
     </div>
@@ -554,8 +555,9 @@
   .wishlist-badge.heart-pop .bi {
     animation: heartPop .28s ease;
   }
+
   /* Texto azul para los nombres de categorías */
-  .categorias-carousel .cat-name { 
+  .categorias-carousel .cat-name {
     color: #4D6BFF;
     font-weight: 700;
   }
@@ -565,6 +567,7 @@
     color: #4D6BFF !important;
     text-decoration: none;
   }
+
   .categorias-carousel .swiper-slide a:hover,
   .categorias-carousel .swiper-slide a:focus {
     color: #4D6BFF !important;

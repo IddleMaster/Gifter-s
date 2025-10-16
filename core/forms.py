@@ -1,7 +1,7 @@
 from django import forms
 from django.core.exceptions import ValidationError
 from django.core.validators import MinLengthValidator
-from .models import User, Perfil, PreferenciasUsuario, Evento
+from .models import User, Perfil, PreferenciasUsuario, Evento, Resena
 from .models import Post
 from datetime import date
 import re
@@ -141,19 +141,38 @@ def clean_nombre_usuario(self):
     return normalized
     
     #formulario de feed
+# Modifica tu PostForm de esta manera:
 class PostForm(forms.ModelForm):
     contenido = forms.CharField(
         widget=forms.Textarea(attrs={
             'placeholder': '¿Qué estás pensando?',
-            'class': 'form-control', # Puedes añadir clases para el estilo
+            'class': 'form-control',
             'rows': 3
         }),
-        label="" # Ocultamos la etiqueta por defecto
+        label="",
+        required=False  # El contenido ya no es siempre obligatorio
+    )
+    
+    imagen = forms.ImageField(
+        required=False,
+        widget=forms.ClearableFileInput(attrs={
+            'class': 'form-control'
+        })
     )
 
     class Meta:
         model = Post
-        fields = ['contenido'] # Por ahora, solo permitimos posts de texto
+        fields = ['contenido', 'imagen']
+
+    def clean(self):
+        cleaned_data = super().clean()
+        contenido = cleaned_data.get('contenido')
+        imagen = cleaned_data.get('imagen')
+
+        if not contenido and not imagen:
+            raise ValidationError("Debes proporcionar un texto o una imagen para publicar.")
+        
+        return cleaned_data
 
 class PerfilForm(forms.ModelForm):
     class Meta:
@@ -246,3 +265,43 @@ class EventoForm(forms.ModelForm):
             "fecha_evento": forms.DateInput(attrs={"type":"date", "class":"form-control"}),
             "descripcion": forms.Textarea(attrs={"class":"form-control", "rows":2, "placeholder":"(opcional)"}),
         }
+
+
+
+################################################################
+################################################################
+################################################################
+
+class ResenaForm(forms.ModelForm):
+    class Meta:
+        model = Resena
+        fields = ('calificacion', 'titulo', 'comentario')
+        labels = {
+            'calificacion': 'Calificación (1–5)',
+            'titulo': 'Título',
+            'comentario': 'Comentario',
+        }
+        widgets = {
+            'calificacion': forms.NumberInput(attrs={
+            'class': 'form-control',
+            'min': 1,
+            'max': 5,
+            'step': 1,             # evita decimales
+            'inputmode': 'numeric' # mejor teclado en mobile
+            }),
+            'titulo': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Escribe un título corto'
+            }),
+            'comentario': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 4,
+                'placeholder': 'Cuéntanos tu experiencia en la página'
+            }),
+        }
+
+def clean_calificacion(self):
+    calificacion = self.cleaned_data.get('calificacion')
+    if calificacion is None or not (1 <= calificacion <= 5):
+        raise forms.ValidationError('La calificación debe estar entre 1 y 5.')
+    return calificacion

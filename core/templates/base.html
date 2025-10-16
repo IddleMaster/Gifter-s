@@ -462,6 +462,63 @@
       margin-top: 0;
       margin-bottom: 6px;
     }
+
+    .bubble img.msg-image {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 10px;
+    }
+
+    .sugerencias-container {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      z-index: 1050;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .08);
+      margin-top: 6px;
+      display: none;
+      overflow: hidden;
+      max-height: 360px;
+      overflow-y: auto;
+      z-index: 2000;
+    }
+
+    .sug-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      cursor: pointer;
+    }
+
+    .sug-item:hover,
+    .sug-item.active {
+      background: #f5f7ff;
+    }
+
+    .sug-type {
+      font-size: .75rem;
+      font-weight: 700;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+    }
+
+    .sug-text {
+      font-weight: 600;
+    }
+
+    .sug-meta {
+      font-size: .85rem;
+      color: #6b7280;
+      margin-left: auto;
+    }
+    .branding, .brand-left, .search-pill { overflow: visible !important; }
   </style>
 
 
@@ -733,6 +790,11 @@
           <em class="who"></em> está escribiendo…
         </div>
         <form id="chatForm" class="chat-input" hidden>
+          <input id="chatImage" type="file" accept="image/*" hidden>
+          <button type="button" id="btnAttach" class="btn btn-outline-secondary" title="Adjuntar imagen"
+            style="border-radius:12px;">
+            <i class="bi bi-image"></i>
+          </button>
           {% csrf_token %}
           <textarea id="chatText" rows="1" placeholder="Escribe un mensaje…"></textarea>
           <button type="submit">Enviar</button>
@@ -748,7 +810,7 @@
       mensajesBase: "{% url 'mensajes_list_create' 0 %}", // luego se reemplaza el /0/
       convConUsuarioId: "{% url 'chat_con_usuario_id' '__USER__' %}",
       typing: "{% url 'chat_typing' 0 %}",  // ← nuevo (placeholder /0/) // placeholder literal
-      typingSummary: "{% url 'chat_typing_summary' %}"   <!-- NUEVO -->
+      typingSummary: "{% url 'chat_typing_summary' %}"
     };
   </script>
   {% if user.is_authenticated %}
@@ -763,12 +825,49 @@
       const emptyEl = document.getElementById('chatEmpty');
       const formEl = document.getElementById('chatForm');
       const textEl = document.getElementById('chatText');
+      const fileEl = document.getElementById('chatImage');
+      const attachBtn = document.getElementById('btnAttach');
 
       // Usuario actual
       const ME = {
         id: Number('{{ user.id|default:"0"|escapejs }}'),
         username: ("{{ user.nombre_usuario|default:''|escapejs }}").trim()
       };
+      // Cache liviana del preview por conversación
+      const previewCache = new Map(); // convId -> {text, time}
+      function setPreview(convId, text, timeISO) {
+        previewCache.set(String(convId), { text: text || '', time: timeISO || null });
+      }
+      function getPreview(convId) {
+        return previewCache.get(String(convId)) || { text: '', time: null };
+      }
+      function slicePreview(t) { return (t || '').toString().slice(0, 72); }
+      // === Typing: estado previo por conversación (para detectar flanco "dejó de escribir")
+      const wasTypingMap = new Map(); // convId -> boolean
+
+      // Actualiza visualmente una fila de la lista usando lo que tengamos en cache
+      function patchRow(convId) {
+        const row = Array.from(listEl.children).find(x => String(x.dataset.convId) === String(convId));
+        if (!row) return;
+        const prev = getPreview(convId);
+        const l2 = row.querySelector('.line2');
+        if (l2) { l2.textContent = prev.text || ''; l2.classList.remove('text-primary'); }
+        const t = row.querySelector('.chat-time');
+        if (t && prev.time) t.textContent = formatTime(prev.time);
+      }
+
+      // Pide sólo el último mensaje del hilo, hidrata cache y parcha la fila
+      async function hydratePreview(convId) {
+        const url = "{% url 'mensajes_list_create' 0 %}".replace('/0/', `/${convId}/`);
+        const r = await fetch(url + "?limit=1", { credentials: 'same-origin' });
+        if (!r.ok) return;
+        const j = await r.json();
+        const arr = Array.isArray(j) ? j : (j.results || []);
+        if (!arr.length) return;
+        const m = arr[0];
+        setPreview(convId, slicePreview(m.contenido), m.creado_en);
+        patchRow(convId);
+      }
 
       let currentConvId = null;
       let pollTimer = null;
@@ -793,27 +892,69 @@
         fab.style.display = '';
         stopPolling();
       }
+      const __openDrawer = openDrawer;
+      openDrawer = function () {
+        __openDrawer();
+        startTypingSummaryPoll();
+      };
+
+      const __closeDrawer = closeDrawer;
+      closeDrawer = function () {
+        __closeDrawer();
+        stopTypingSummaryPoll();
+      };
       fab?.addEventListener('click', openDrawer);
       closeBtn?.addEventListener('click', closeDrawer);
+      async function fetchTypingSummary() {
+        try {
+          const r = await fetch(window.URLS.typingSummary, { credentials: 'same-origin' });
+          if (!r.ok) return {};
+          const j = await r.json();
+          return (j && j.typing) || {};
+        } catch {
+          return {};
+        }
+      }
+
+      function prettyTyping(users) {
+        if (!users || !users.length) return "";
+        const first = users[0];
+        const nombre = (first.nombre || first.username || "Alguien").trim();
+        return users.length === 1 ? `está escribiendo…` : `Varios están escribiendo…`;
+      }
 
       async function loadConversations() {
         listEl.innerHTML = '<div class="p-3 text-muted">Cargando…</div>';
-        const apiURL = "{% url 'conversaciones_list' %}";
+        const apiURL = window.URLS.conversaciones;
 
         try {
-          const res = await fetch(apiURL, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
+          // Pedimos en paralelo: conversaciones + resumen de "escribiendo"
+          const [res, typingMap] = await Promise.all([
+            fetch(apiURL, {
+              credentials: 'same-origin',
+              headers: { 'Accept': 'application/json' }
+            }),
+            fetchTypingSummary()
+          ]);
+
           if (!res.ok) throw new Error('HTTP ' + res.status);
-
-          const ctype = res.headers.get('content-type') || '';
-          if (!ctype.includes('application/json')) throw new Error('Respuesta no-JSON');
-
           const data = await res.json();
-          renderConversationList(data);
+
+          // NEW: llenar/actualizar cache con el último mensaje de cada conversación
+          (data || []).forEach(c => {
+            const last = c.ultimo_mensaje || {};
+            const prevText = (last.tipo === 'imagen') ? '📷 Imagen' : slicePreview(last.contenido);
+            setPreview(c.conversacion_id, prevText, last.creado_en);
+          });
+
+          renderConversationList(data, typingMap);  // ← pasamos typingMap al renderer
         } catch (e) {
           listEl.innerHTML = '<div class="p-3 text-danger">No se pudieron cargar tus chats.</div>';
           console.error('[chats] Error cargando conversaciones:', e);
         }
       }
+      // Rellena/actualiza cache con el último mensaje de cada conversación
+
 
       const AVATAR_FALLBACK = "{% static 'img/Gifters/favicongift.png' %}";
 
@@ -862,15 +1003,15 @@
         return { name: fullName, username, avatar };
       }
 
-      function renderConversationList(items) {
+      function renderConversationList(items, typingMap = {}) {
         if (!Array.isArray(items) || !items.length) {
           listEl.innerHTML = '<div class="p-3 text-muted">Aún no tienes conversaciones.</div>';
           return;
         }
 
         const filtered = items.filter(conv => {
-          if (Number(conv.conversacion_id) === Number(currentConvId)) return true; // conserva la abierta
-          return !!conv.ultimo_mensaje; // solo chats con mensajes
+          if (Number(conv.conversacion_id) === Number(currentConvId)) return true;
+          return !!conv.ultimo_mensaje;
         });
 
         if (!filtered.length) {
@@ -882,16 +1023,23 @@
         filtered.forEach(conv => {
           const p = partnerFrom(conv);
           const last = conv.ultimo_mensaje || {};
+          setPreview(conv.conversacion_id, last.contenido ? slicePreview(last.contenido) : '', last.creado_en);
           const row = document.createElement('div');
           row.className = 'chat-list-item' + (conv.conversacion_id === currentConvId ? ' active' : '');
           row.dataset.convId = conv.conversacion_id;
+
+          // ¿Hay alguien escribiendo en esta conversación?
+          const tUsers = typingMap[String(conv.conversacion_id)] || [];
+          const line2 = tUsers.length
+            ? prettyTyping(tUsers)
+            : (last.contenido ? String(last.contenido).slice(0, 72) : '');
 
           row.innerHTML = `
       <img class="chat-avatar" src="${p.avatar}" alt=""
            onerror="this.onerror=null;this.src='{{ STATIC_URL }}img/Gifters/favicongift.png'">
       <div class="chat-names">
         <div class="line1">${p.name}</div>
-        <div class="line2">${last.contenido ? String(last.contenido).slice(0, 72) : ''}</div>
+        <div class="line2">${line2}</div>
       </div>
       <div class="chat-time">${last.creado_en ? formatTime(last.creado_en) : ''}</div>
     `;
@@ -902,6 +1050,47 @@
       function formatTime(ts) {
         try { return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
         catch { return ''; }
+      }
+      let typingSummaryTimer = null;
+
+      function startTypingSummaryPoll() {
+        stopTypingSummaryPoll();
+        typingSummaryTimer = setInterval(async () => {
+          try {
+            const typingMap = await fetchTypingSummary();
+
+            Array.from(listEl.children).forEach(row => {
+              const convId = row.dataset.convId;
+              const tUsers = typingMap[String(convId)] || [];
+              const line2El = row.querySelector('.line2');
+              if (!line2El) return;
+
+              const isTyping = tUsers.length > 0;
+              const wasTyping = wasTypingMap.get(convId) === true;
+              wasTypingMap.set(convId, isTyping);
+
+              if (isTyping) {
+                // Mostrar "está escribiendo…"
+                line2El.textContent = prettyTyping(tUsers);
+                line2El.classList.add('text-primary');
+              } else {
+                if (wasTyping) {
+                  // ⚡ Flanco: antes estaba escribiendo y ahora no → probablemente envió mensaje
+                  hydratePreview(convId).catch(() => { });
+                } else {
+                  // Restaurar desde cache sin pegar a red
+                  const prev = getPreview(convId);
+                  line2El.textContent = prev.text || '';
+                  line2El.classList.remove('text-primary');
+                }
+              }
+            });
+          } catch { /* noop */ }
+        }, 1500);
+      }
+
+      function stopTypingSummaryPoll() {
+        if (typingSummaryTimer) { clearInterval(typingSummaryTimer); typingSummaryTimer = null; }
       }
 
       async function openConversation(convId) {
@@ -928,7 +1117,23 @@
           const res = await fetch(url, { credentials: 'same-origin' });
           if (!res.ok) throw new Error('Error cargando mensajes');
           const data = await res.json();
-          renderMessages(Array.isArray(data) ? data : (data.results || []));
+          const arr = Array.isArray(data) ? data : (data.results || []);
+          renderMessages(arr);
+
+          // El más reciente suele estar en arr[0]
+          if (arr.length) {
+            const newest = arr[0];
+            const prevText = (newest.tipo === 'imagen') ? '📷 Imagen' : slicePreview(newest.contenido);
+            setPreview(currentConvId, prevText, newest.creado_en);
+            // Parchea la fila visible sin reconstruir toda la lista
+            const row = Array.from(listEl.children).find(x => String(x.dataset.convId) === String(currentConvId));
+            if (row) {
+              const l2 = row.querySelector('.line2'); if (l2) l2.textContent = getPreview(currentConvId).text;
+              const t = row.querySelector('.chat-time'); if (t) t.textContent = formatTime(getPreview(currentConvId).time);
+            }
+          }
+
+
         } catch (e) {
           msgsEl.innerHTML = '<div class="p-2 text-danger">No se pudieron cargar los mensajes.</div>';
           console.error(e);
@@ -944,7 +1149,7 @@
 
         let prevAuthorId = null;
         let prevWhenMs = 0;
-        let prevDayKey = null;   // <-- para detectar cambio de día
+        let prevDayKey = null;
 
         const GAP_MS = 5 * 60 * 1000; // 5 minutos
 
@@ -993,19 +1198,29 @@
             toAbsoluteMedia((m.remitente && (m.remitente.avatar || m.remitente.avatar_url)) || null) ||
             "{% static 'img/Gifters/favicongift.png' %}";
 
-          const body = String(m.contenido || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-          const when = m.creado_en ? formatTime(m.creado_en) : '';
+          const when = m.creado_en ? new Date(m.creado_en).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+          const isImage = (m.tipo === 'imagen') || !!m.archivo_url || !!(m.metadatos && m.metadatos.archivo_url);
+          const safeText = String(m.contenido || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          const bodyHTML = isImage
+            ? (() => {
+              const imgUrl = toAbsoluteMedia(m.archivo_url || (m.metadatos && m.metadatos.archivo_url));
+              return `<a href="${imgUrl}" target="_blank" rel="noopener">
+                      <img class="msg-image" src="${imgUrl}" alt="imagen">
+                    </a>${safeText ? `<div style="margin-top:6px;">${safeText}</div>` : ''}`;
+            })()
+            : safeText;
 
           row.innerHTML = `
-      ${showAvatar ? `
-        <img class="msg-avatar" src="${avatarUrl}" alt=""
-             onerror="this.onerror=null;this.src='{% static 'img/Gifters/favicongift.png' %}'">
-      ` : ''}
-      <div class="bubble">
-        <div class="body">${body}</div>
-        <div class="meta">${when}</div>
-      </div>
-    `;
+        ${showAvatar ? `
+          <img class="msg-avatar" src="${avatarUrl}" alt=""
+               onerror="this.onerror=null;this.src='{% static 'img/Gifters/favicongift.png' %}'">` : ''
+            }
+        <div class="bubble">
+          <div class="body">${bodyHTML}</div>
+          <div class="meta">${when}</div>
+        </div>
+      `;
 
           msgsEl.appendChild(row);
 
@@ -1035,6 +1250,13 @@
           textEl.value = '';
           await loadMessagesOnce();
           scrollToBottom();
+          // Pre-actualiza preview del hilo actual
+          setPreview(currentConvId, slicePreview(text), new Date().toISOString());
+          const row = Array.from(listEl.children).find(x => String(x.dataset.convId) === String(currentConvId));
+          if (row) {
+            const l2 = row.querySelector('.line2'); if (l2) l2.textContent = getPreview(currentConvId).text;
+            const t = row.querySelector('.chat-time'); if (t) t.textContent = formatTime(getPreview(currentConvId).time);
+          }
           loadConversations(); // refresca preview del último mensaje
         } catch (e) {
           console.error(e);
@@ -1055,6 +1277,57 @@
         }
       });
       textEl.setAttribute('title', 'Enter: enviar • Shift+Enter: salto de línea');
+      attachBtn?.addEventListener('click', () => fileEl?.click());
+
+      fileEl?.addEventListener('change', async () => {
+        if (!fileEl.files || !fileEl.files.length || !currentConvId) return;
+        const file = fileEl.files[0];
+
+        // Validaciones rápidas
+        if (!/^image\//i.test(file.type)) {
+          alert('Solo imágenes, por favor.');
+          fileEl.value = '';
+          return;
+        }
+        if (file.size > 8 * 1024 * 1024) { // 8 MB
+          alert('Imagen demasiado grande (máx 8MB).');
+          fileEl.value = '';
+          return;
+        }
+
+        try {
+          const url = "{% url 'mensajes_list_create' 0 %}".replace('/0/', `/${currentConvId}/`);
+          const fd = new FormData();
+          fd.append('tipo', 'imagen');
+          fd.append('archivo', file);
+          // opcional: un pie de foto
+          // fd.append('contenido', '');
+
+          const res = await fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'X-CSRFToken': CSRFTOKEN }, // ¡no pongas Content-Type aquí!
+            body: fd
+          });
+          if (!res.ok) throw new Error('Upload failed');
+
+          // refresca mensajes y preview
+          await loadMessagesOnce();
+          scrollToBottom();
+          setPreview(currentConvId, '📷 Imagen', new Date().toISOString());
+          const row = Array.from(listEl.children).find(x => String(x.dataset.convId) === String(currentConvId));
+          if (row) {
+            const l2 = row.querySelector('.line2'); if (l2) l2.textContent = getPreview(currentConvId).text;
+            const t = row.querySelector('.chat-time'); if (t) t.textContent = formatTime(getPreview(currentConvId).time);
+          }
+          loadConversations();
+        } catch (e) {
+          console.error(e);
+          alert('No se pudo enviar la imagen.');
+        } finally {
+          fileEl.value = '';
+        }
+      });
 
       function startPolling() { stopPolling(); pollTimer = setInterval(loadMessagesOnce, 3000); }
       function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
@@ -1189,6 +1462,7 @@
       const _openConversationOriginal = openConversation;
       openConversation = async function (convId) {
         await _openConversationOriginal(convId);
+        wasTypingMap.set(String(convId), false); // limpia estado para esa fila
         pollTyping(); // primer fetch inmediato
       };
     })();
@@ -1335,6 +1609,84 @@
         }
       });
     });
+  </script>
+
+
+
+  <script>
+    (function () {
+      const input = document.getElementById('searchInputDesktop');
+      const box = document.getElementById('sugerenciasDesktop');
+      if (!input || !box) return;
+
+      const ENDPOINT = "{% url 'buscar_sugerencias' %}";
+      let aborter = null;
+      let idx = -1;
+
+      function hide() { box.style.display = 'none'; box.innerHTML = ''; idx = -1; }
+      function show() { box.style.display = 'block'; }
+
+      function render(list) {
+        if (!list || !list.length) { hide(); return; }
+        box.innerHTML = list.map((s, i) => `
+      <div class="sug-item" data-url="${s.url || '#'}" data-i="${i}">
+        <span class="sug-type">${s.tipo || ''}</span>
+        <span class="sug-text">${(s.texto || '').replace(/</g, '&lt;')}</span>
+        ${s.marca || s.categoria ? `<span class="sug-meta">${[s.marca, s.categoria].filter(Boolean).join(' • ')}</span>` : ''}
+      </div>
+    `).join('');
+        show();
+      }
+
+      function move(delta) {
+        const items = box.querySelectorAll('.sug-item');
+        if (!items.length) return;
+        idx = (idx + delta + items.length) % items.length;
+        items.forEach(el => el.classList.remove('active'));
+        const target = items[idx];
+        if (target) { target.classList.add('active'); target.scrollIntoView({ block: 'nearest' }); }
+      }
+
+      function pickCurrent() {
+        const active = box.querySelector('.sug-item.active') || box.querySelector('.sug-item');
+        if (!active) return;
+        window.location.href = active.dataset.url || '#';
+      }
+
+      const debounce = (fn, ms = 220) => {
+        let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+      };
+
+      const fetchSugs = debounce(async (q) => {
+        if (!q || q.trim().length < 2) { hide(); return; }
+        try {
+          if (aborter) aborter.abort();
+          aborter = new AbortController();
+          const r = await fetch(`${ENDPOINT}?q=${encodeURIComponent(q)}`, { signal: aborter.signal, credentials: 'same-origin' });
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          const j = await r.json();
+          render(j.sugerencias || []);
+        } catch (e) { /* silencio si cancela */ }
+      }, 220);
+
+      input.addEventListener('input', e => fetchSugs(e.target.value));
+      input.addEventListener('keydown', e => {
+        if (box.style.display !== 'block') return;
+        if (e.key === 'ArrowDown') { e.preventDefault(); move(+1); }
+        if (e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
+        if (e.key === 'Enter') { if (idx >= 0) { e.preventDefault(); pickCurrent(); } }
+        if (e.key === 'Escape') { hide(); }
+      });
+
+      box.addEventListener('mousedown', e => {
+        const item = e.target.closest('.sug-item'); if (!item) return;
+        e.preventDefault(); window.location.href = item.dataset.url || '#';
+      });
+
+      document.addEventListener('click', e => {
+        if (!box.contains(e.target) && e.target !== input) hide();
+      });
+    })();
   </script>
 
 

@@ -13,6 +13,11 @@ from core.views import (
     ConversacionesList, MensajesListCreate,toggle_like_post_view, get_comments_view,
 )
 
+#from resenas import views as resenas_views
+
+
+
+
 urlpatterns = [
     # Admin / auth
     path('admin/', admin.site.urls),
@@ -40,7 +45,7 @@ urlpatterns = [
     # Productos (una sola ruta para listado, sin duplicados)
     path('productos/', views.productos_list, name='productos_list'),
     path('producto/<int:producto_id>/', views.producto_detalle, name='producto_detalle'),
-    path('buscar/', views.buscar_productos, name='buscar_productos'),
+    path('productos/buscar/', views.buscar_productos, name='buscar_productos'),
     path('buscar-sugerencias/', views.buscar_sugerencias, name='buscar_sugerencias'),
 
     # Gestión de productos (admin)
@@ -60,6 +65,7 @@ urlpatterns = [
     path('post/<int:pk>/eliminar/', views.post_eliminar, name='post_eliminar'), 
     path('comentarios/crear/', views.comentario_crear, name='comentario_crear'),
     path('comentarios/<int:pk>/eliminar/', views.comentario_eliminar, name='comentario_eliminar'),
+    
 
     # Chat HTML
     path('chat/room/<int:conversacion_id>/', views.chat_room, name='chat_room'),
@@ -105,7 +111,9 @@ urlpatterns = [
     path("api/chat/<int:conv_id>/typing/", views.TypingView.as_view(), name="chat_typing"),
     path("api/chat/typing/", views.TypingSummaryView.as_view(), name="chat_typing_summary"),
 
-    
+    ## Reseñas
+    #path('resenas/', resenas_views.resenas_home, name='resenas_home'),
+    #path('resenas/nueva/', resenas_views.crear_resena, name='resenas_nueva'),
 
 
     
@@ -119,3 +127,6 @@ if settings.DEBUG:
 
 # Archivos estáticos (de la app)
 urlpatterns += staticfiles_urlpatterns()
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

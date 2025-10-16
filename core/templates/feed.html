@@ -15,7 +15,7 @@
 
             <!-- Formulario para crear un nuevo post -->
             <div class="post-card create-post-card">
-                <form method="POST" action="{% url 'post_crear' %}">
+                <form method="POST" action="{% url 'post_crear' %}" enctype="multipart/form-data">
                     {% csrf_token %}
                     <div class="post-header">
                         {% if user.perfil.profile_picture %}
@@ -24,9 +24,13 @@
                         <img src="{% static 'img/Gifters/favicongift.png' %}" alt="Sin foto" class="profile-pic">
                         {% endif %}
                         <textarea name="contenido" class="create-post-input" rows="2"
-                            placeholder="¿Qué quieres compartir?" required></textarea>
+                            placeholder="¿Qué quieres compartir?"></textarea>
                     </div>
                     <div class="create-post-actions">
+                        <div class="mb-3">
+                            <label for="id_imagen" class="form-label">Añadir imagen (opcional)</label>
+                            <input type="file" name="imagen" class="form-control" id="id_imagen" accept="image/*">
+                        </div>
                         <button type="submit" class="btn-create-post">Publicar</button>
                     </div>
                 </form>
@@ -69,8 +73,8 @@
 
                 <div class="post-content">
                     <p>{{ post.contenido }}</p>
-                    {% if post.url_media %}
-                    <img src="{{ post.url_media }}" alt="Imagen del post" class="post-image">
+                    {% if post.imagen %}
+                    <img src="{{ post.imagen.url }}" alt="Imagen del post" class="post-image">
                     {% endif %}
                 </div>
 

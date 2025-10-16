@@ -1,15 +1,11 @@
 from django.db import models
-from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin, User
 from django.core.validators import MinLengthValidator, MaxValueValidator, MinValueValidator, MinValueValidator
 import uuid
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.conf import settings
 from datetime import timedelta, date
-
-
-
-from django.contrib.auth.models import BaseUserManager
 
 class genero(models.TextChoices):
     MASCULINO = 'M', 'Masculino'
@@ -449,12 +445,12 @@ class Post(models.Model):
         verbose_name='Tipo de post'
     )
     
-    # URL de media (opcional)
-    url_media = models.URLField(
-        max_length=500,
+    # REEMPLAZA el campo url_media por este:
+    imagen = models.ImageField(
+        upload_to='posts/',  # Directorio donde se guardarán las imágenes
         blank=True,
         null=True,
-        verbose_name='URL de media'
+        verbose_name='Imagen'
     )
     
     # Visibilidad
@@ -492,8 +488,8 @@ class Post(models.Model):
     def clean(self):
         """Validaciones personalizadas"""
         # Si es tipo imagen/video/enlace, debería tener url_media
-        if self.tipo_post in [self.TipoPost.IMAGEN, self.TipoPost.VIDEO, self.TipoPost.ENLACE] and not self.url_media:
-            raise ValidationError(f"Los posts de tipo {self.tipo_post} deben tener una URL de media")
+        if self.tipo_post in [self.TipoPost.IMAGEN] and not self.imagen:
+            raise ValidationError(f"Los posts de tipo {self.tipo_post} deben tener una imagen")
         
         # Si es tipo texto, el contenido no debe estar vacío
         if self.tipo_post == self.TipoPost.TEXTO and not self.contenido:
@@ -1293,6 +1289,11 @@ class Tag(models.Model):
     def __str__(self):
         return f"{self.nombre_etiqueta} ({self.color or 'sin color'})"
 
+
+
+##################################################################
+##################################################################
+##################################################################
 class Resena(models.Model):
     id_resena = models.AutoField(primary_key=True, verbose_name='ID Reseña')
 
@@ -1302,14 +1303,6 @@ class Resena(models.Model):
         db_column='id_usuario',
         related_name='resenas',
         verbose_name='Usuario'
-    )
-
-    id_producto = models.ForeignKey(
-        'Producto',
-        on_delete=models.CASCADE,
-        db_column='id_producto',
-        related_name='resenas',
-        verbose_name='Producto'
     )
 
     calificacion = models.IntegerField(
@@ -1323,28 +1316,25 @@ class Resena(models.Model):
     fecha_resena = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de reseña')
 
     class Meta:
-        db_table = 'resena'  # evita ñ en el nombre físico
+        db_table = 'resena'
         verbose_name = 'Reseña'
         verbose_name_plural = 'Reseñas'
         ordering = ['-fecha_resena']
         constraints = [
-            # Un usuario solo puede reseñar una vez cada producto
-            models.UniqueConstraint(fields=['id_usuario', 'id_producto'], name='uq_resena_usuario_producto'),
-            # (opcional) seguridad extra: rango válido de calificación a nivel BD en motores que lo soporten
-            # models.CheckConstraint(check=models.Q(calificacion__gte=1, calificacion__lte=5), name='ck_resena_calif_1_5'),
+            # Un usuario solo puede dejar una reseña global
+            models.UniqueConstraint(fields=['id_usuario'], name='uq_resena_usuario_unica'),
         ]
         indexes = [
-            models.Index(fields=['id_producto'], name='idx_resena_producto'),
             models.Index(fields=['id_usuario'], name='idx_resena_usuario'),
             models.Index(fields=['calificacion'], name='idx_resena_calificacion'),
         ]
 
     def __str__(self):
-        return f"{self.id_usuario.nombre_usuario} → {self.id_producto.nombre_producto} [{self.calificacion}/5]"
-        # --- Conversación ---
+        return f"{self.id_usuario.username} [{self.calificacion}/5] - {self.titulo}"
 
-
-    
+##################################################################
+##################################################################
+##################################################################    
     
     
 #MatiasD
