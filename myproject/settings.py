@@ -12,10 +12,13 @@ https://docs.djangoproject.com/en/3.1/ref/settings/
 
 from pathlib import Path
 import os
+import environ
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+env = environ.Env()
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 # ===== Meilisearch  =====
 USE_MEILI = os.getenv("USE_MEILI", "false").lower() == "true"
 MEILI_URL = os.getenv("MEILI_URL", "http://meilisearch:7700")
@@ -234,3 +237,15 @@ ACCOUNT_AUTHENTICATION_METHOD = "email"
 ACCOUNT_USER_MODEL_EMAIL_FIELD = "correo"
 ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_UNIQUE_EMAIL = True
+# Aumenta el límite a 10 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10 MB en bytes
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10 MB en bytes
+
+# CONFIGURACIÓN PARA ENVÍO DE CORREO
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = env('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER

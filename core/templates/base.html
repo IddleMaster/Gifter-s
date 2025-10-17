@@ -470,12 +470,13 @@
       border-radius: 10px;
     }
 
+    /* ——— Sugerencias (dropdown) ——— */
     .sugerencias-container {
       position: absolute;
       top: 100%;
       left: 0;
       right: 0;
-      z-index: 1050;
+      z-index: 4000;
       background: #fff;
       border: 1px solid #e5e7eb;
       border-radius: 12px;
@@ -485,9 +486,27 @@
       overflow: hidden;
       max-height: 360px;
       overflow-y: auto;
-      z-index: 2000;
     }
 
+    /* Portal que pintas en <body> (pegado al buscador) */
+    #sugerenciasPortal {
+      position: fixed;
+      /* ya lo usas para evitar recortes */
+      border: 1.5px solid #0d6efd;
+      /* mismo color que el pill */
+      border-top: none;
+      /* se “funde” con el borde inferior del pill */
+      background: #fff;
+      border-bottom-left-radius: 14px;
+      border-bottom-right-radius: 14px;
+      margin-top: -2px !important;
+      /* elimina la grieta de 1–2px */
+      box-shadow: 0 12px 22px rgba(0, 0, 0, .08);
+      max-height: 360px;
+      overflow-y: auto;
+    }
+
+    /* Ítems de sugerencia */
     .sug-item {
       display: flex;
       align-items: center;
@@ -518,7 +537,98 @@
       color: #6b7280;
       margin-left: auto;
     }
-    
+
+    /* Evita que contenedores recorten el dropdown */
+    .branding,
+    .brand-left,
+    .search-pill {
+      overflow: visible !important;
+    }
+
+    /* ——— Pill del buscador ——— */
+    .site-search {
+      position: relative;
+    }
+
+    .site-search *:focus,
+    .site-search *:focus-visible {
+      outline: none !important;
+    }
+
+    /* mata halos nativos dentro del form */
+
+    .search-pill {
+      display: flex;
+      align-items: center;
+      height: 44px;
+      /* altura consistente */
+      border: 1.5px solid #0d6efd;
+      border-radius: 999px;
+      overflow: hidden;
+      /* recorta cualquier “desfase” interior */
+      background: #fff;
+      box-sizing: border-box;
+    }
+
+    /* Input sin bordes/sombras/ornamentos nativos */
+    .search-pill .search-input {
+      flex: 1;
+      height: 100%;
+      padding: 0 .95rem;
+      font-size: 1rem;
+      line-height: 1;
+      border: 0;
+      outline: 0;
+      background: #fff;
+      box-shadow: none !important;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    .search-pill .search-input::-webkit-search-decoration,
+    .search-pill .search-input::-webkit-search-cancel-button,
+    .search-pill .search-input::-webkit-search-results-button,
+    .search-pill .search-input::-webkit-search-results-decoration {
+      display: none;
+    }
+
+    /* Botón de lupa */
+    .search-pill .btn-search {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 100%;
+      border: 0;
+      background: #fff;
+      border-left: 1px solid rgba(13, 110, 253, .22);
+      /* divisor sutil */
+      cursor: pointer;
+      outline: none;
+      box-shadow: none !important;
+    }
+
+    .search-pill .btn-search:focus,
+    .search-pill .btn-search:focus-visible {
+      outline: none;
+      box-shadow: none !important;
+    }
+
+    .search-pill .btn-search i {
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    /* Halo de focus bonito aplicado al contenedor (no al hijo) */
+    .search-pill:focus-within {
+      box-shadow: none !important;
+    }
+
+    /* Estado cuando el dropdown está abierto: quita radios inferiores para encajar */
+    .search-pill.sug-open {
+      border-bottom-left-radius: 0;
+      border-bottom-right-radius: 0;
+    }
   </style>
 
 
@@ -554,18 +664,19 @@
             <img src="{% static 'img/Gifters/favicongift.png' %}" alt="Isotipo Gifter’s" class="brand-mark" />
           </a>
 
-          <!-- Buscador solo en ≥ LG -->
-          <form class="site-search d-none d-lg-block" role="search" action="{% url 'productos_list' %}" method="get">
-            <div class="input-group search-pill position-relative">
-              <input type="search" class="form-control search-input" name="q" id="searchInputDesktop"
-                placeholder="Búsqueda: regalos, categorías, amigos..." aria-label="Buscar" value="{{ request.GET.q }}"
-                autocomplete="off" />
-              <button class="btn btn-search" type="submit" aria-label="Buscar">
+          <form class="g-search" action="{% url 'buscar_router' %}" method="get" autocomplete="off">
+            <div class="g-search__box" id="gSearchBox">
+              <input id="gSearchInput" name="q" type="text" placeholder="Búsqueda: regalos, categorías, amigos..."
+                value="{{ request.GET.q }}">
+              <button class="g-search__btn" type="submit" aria-label="Buscar">
                 <i class="bi bi-search"></i>
               </button>
-              <div id="sugerenciasDesktop" class="sugerencias-container"></div>
             </div>
+            <div id="gSug" class="g-search__sugs" role="listbox" hidden></div>
           </form>
+
+
+
         </div>
 
         <!-- CENTRO: Nav (solo desktop) -->
@@ -578,6 +689,7 @@
           </ul>
           <i class="mobile-nav-toggle d-none"></i>
         </nav>
+
 
         {% if user.is_authenticated %}
         <div class="nav-item dropdown">
@@ -779,7 +891,12 @@
         <!-- Lista de amigos superpuesta -->
         <div id="friendsList" class="chat-list"
           style="display:none; position:absolute; inset:0; overflow:auto; background:#fff;"></div>
+
+        <!-- ✅ Mueve groupsList aquí adentro para que “inset:0” funcione -->
+        <div id="groupsList" class="chat-list"
+          style="display:none; position:absolute; inset:0; overflow:auto; background:#fff;"></div>
       </div>
+
 
       <!-- Columna derecha (mensajes) -->
       <div class="chat-pane" style="flex:1; display:flex; flex-direction:column;">
@@ -810,7 +927,9 @@
       mensajesBase: "{% url 'mensajes_list_create' 0 %}", // luego se reemplaza el /0/
       convConUsuarioId: "{% url 'chat_con_usuario_id' '__USER__' %}",
       typing: "{% url 'chat_typing' 0 %}",  // ← nuevo (placeholder /0/) // placeholder literal
-      typingSummary: "{% url 'chat_typing_summary' %}"
+      typingSummary: "{% url 'chat_typing_summary' %}",
+      gruposCreate: "{% url 'grupos_create' %}",
+      conversacionDetalleBase: "{% url 'conversacion_detalle' 0 %}"
     };
   </script>
   {% if user.is_authenticated %}
@@ -865,12 +984,26 @@
         const arr = Array.isArray(j) ? j : (j.results || []);
         if (!arr.length) return;
         const m = arr[0];
-        setPreview(convId, slicePreview(m.contenido), m.creado_en);
+        const isImg = (m.tipo === 'imagen') || !!m.archivo_url || !!(m.metadatos && m.metadatos.archivo_url);
+        const prevText = isImg ? '📷 Imagen' : slicePreview(m.contenido);
+        setPreview(convId, prevText, m.creado_en);
         patchRow(convId);
       }
 
       let currentConvId = null;
       let pollTimer = null;
+      let currentConvIsGroup = false;
+      let currentConvTitle = null;
+
+      async function fetchConvMeta(convId) {
+        const url = window.URLS.conversacionDetalleBase.replace('/0/', `/${convId}/`);
+        try {
+          const r = await fetch(url, { credentials: 'same-origin' });
+          if (!r.ok) return { is_group: false };
+          return await r.json();
+        } catch { return { is_group: false }; }
+      }
+
 
       // FIX: esta función estaba rota en tu código (comillas/plantillas)
       function getCookie(name) {
@@ -918,9 +1051,7 @@
 
       function prettyTyping(users) {
         if (!users || !users.length) return "";
-        const first = users[0];
-        const nombre = (first.nombre || first.username || "Alguien").trim();
-        return users.length === 1 ? `está escribiendo…` : `Varios están escribiendo…`;
+        return (users.length === 1) ? "1 escribiendo…" : "Varios escribiendo…";
       }
 
       async function loadConversations() {
@@ -1020,19 +1151,23 @@
         }
 
         listEl.innerHTML = '';
+
         filtered.forEach(conv => {
           const p = partnerFrom(conv);
           const last = conv.ultimo_mensaje || {};
-          setPreview(conv.conversacion_id, last.contenido ? slicePreview(last.contenido) : '', last.creado_en);
+
+          // ✅ Detecta imagen y guarda en cache el texto correcto
+          const isImg = (last.tipo === 'imagen') || !!last.archivo_url || !!(last.metadatos && last.metadatos.archivo_url);
+          const prevText = isImg ? '📷 Imagen' : slicePreview(last.contenido);
+          setPreview(conv.conversacion_id, prevText, last.creado_en);
+
           const row = document.createElement('div');
           row.className = 'chat-list-item' + (conv.conversacion_id === currentConvId ? ' active' : '');
           row.dataset.convId = conv.conversacion_id;
 
-          // ¿Hay alguien escribiendo en esta conversación?
+          // ✅ Si hay typing muéstralo; si no, usa SIEMPRE el cache (no last.contenido)
           const tUsers = typingMap[String(conv.conversacion_id)] || [];
-          const line2 = tUsers.length
-            ? prettyTyping(tUsers)
-            : (last.contenido ? String(last.contenido).slice(0, 72) : '');
+          const line2 = tUsers.length ? prettyTyping(tUsers) : getPreview(conv.conversacion_id).text;
 
           row.innerHTML = `
       <img class="chat-avatar" src="${p.avatar}" alt=""
@@ -1095,6 +1230,9 @@
 
       async function openConversation(convId) {
         currentConvId = convId;
+        const meta = await fetchConvMeta(convId);
+        currentConvIsGroup = !!meta.is_group;
+        currentConvTitle = meta.titulo || null;
         Array.from(listEl.children).forEach(li => {
           li.classList.toggle('active', Number(li.dataset.convId) === Number(convId));
         });
@@ -1179,7 +1317,7 @@
           const authorId = Number(m.remitente && m.remitente.id);
           const isMe = authorId === meId;
           const whenMs = parseMs(m.creado_en);
-          const showAvatar = isBlockStart(authorId, whenMs);
+          const showAvatar = currentConvIsGroup ? true : isBlockStart(authorId, whenMs);
 
           // —— Separador de día si cambió
           const dayKey = dayKeyFromMs(whenMs || Date.now());
@@ -1211,16 +1349,24 @@
             })()
             : safeText;
 
+          const senderName =
+            (m.remitente && (m.remitente.nombre_completo ||
+              [m.remitente.nombre, m.remitente.apellido].filter(Boolean).join(' ') ||
+              m.remitente.display_name ||
+              m.remitente.username ||
+              m.remitente.nombre_usuario)) || 'Usuario';
+
           row.innerHTML = `
-        ${showAvatar ? `
-          <img class="msg-avatar" src="${avatarUrl}" alt=""
-               onerror="this.onerror=null;this.src='{% static 'img/Gifters/favicongift.png' %}'">` : ''
+            ${showAvatar ? `
+              <img class="msg-avatar" src="${avatarUrl}" alt=""
+                  onerror="this.onerror=null;this.src='${AVATAR_FALLBACK}'">` : ''
             }
-        <div class="bubble">
-          <div class="body">${bodyHTML}</div>
-          <div class="meta">${when}</div>
-        </div>
-      `;
+            <div class="bubble">
+              ${currentConvIsGroup ? `<div style="font-weight:700; font-size:.9rem; margin-bottom:4px;">${senderName}</div>` : ''}
+              <div class="body">${bodyHTML}</div>
+              <div class="meta">${when}</div>
+            </div>
+          `;
 
           msgsEl.appendChild(row);
 
@@ -1472,29 +1618,58 @@
       const drawer = document.getElementById('chatDrawer');
       if (!drawer) return;
 
-      // Elementos de la columna izquierda
+      // Columna izquierda
       const chatsEl = drawer.querySelector('#chatList');
       const friendsEl = drawer.querySelector('#friendsList');
+      const groupsEl = drawer.querySelector('#groupsList');
       const leftCol = chatsEl?.parentElement;
-
-      // Asegura posicionamiento para el absolute de friendsList
       if (leftCol && getComputedStyle(leftCol).position === 'static') {
         leftCol.style.position = 'relative';
       }
 
-      // Botones de tabs
+      // Tabs
       const tabBtns = drawer.querySelectorAll('.phone-tabs .tab-btn');
-      const btnAmigos = drawer.querySelector('.phone-tabs .tab-btn[data-tab="amigos"]');
       const btnChats = drawer.querySelector('.phone-tabs .tab-btn[data-tab="chats"]');
+      const btnAmigos = drawer.querySelector('.phone-tabs .tab-btn[data-tab="amigos"]');
       const btnGrupos = drawer.querySelector('.phone-tabs .tab-btn[data-tab="grupos"]');
 
-      // URL del endpoint que ya tienes
-      const FRIENDS_API = window.URLS.amigos;
+      // Modal crear grupo
+      const gm = document.getElementById('groupModal');
+      const gmName = document.getElementById('gmName');
+      const gmFriends = document.getElementById('gmFriends');
+      const gmCreate = document.getElementById('gmCreate');
 
-      // Reutilizamos helpers existentes si están (toAbsoluteMedia)
+      // Helpers
       const AVATAR_FALLBACK = "{% static 'img/Gifters/favicongift.png' %}";
+      const CSRFTOKEN = (function getCookie(name) {
+        const value = `; ${document.cookie}`; const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return decodeURIComponent(parts.pop().split(';').shift());
+      })('csrftoken');
 
-      let friendsLoaded = false;
+      // Estado
+      let friendsLoaded = false; // del tab amigos
+      let friendsCache = [];     // para el modal
+      let groupsLoaded = false;
+
+      // ------- AMIGOS (reutiliza tu loader existente si quieres) -------
+      async function loadFriends() {
+        if (friendsLoaded) return;
+        friendsEl.innerHTML = '<div class="p-3 text-muted">Cargando amigos…</div>';
+        try {
+          const res = await fetch(window.URLS.amigos, {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' }
+          });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const data = await res.json();
+          friendsCache = Array.isArray(data) ? data : [];
+          renderFriends(friendsCache);
+          friendsLoaded = true;
+        } catch (e) {
+          console.error('Error cargando amigos:', e);
+          friendsEl.innerHTML = '<div class="p-3 text-danger">No se pudieron cargar tus amigos.</div>';
+        }
+      }
 
       function friendUsername(u) {
         return u.nombre_usuario || u.username || '';
@@ -1510,11 +1685,7 @@
           u.avatar_url || u.avatar || u.foto_url || u.foto ||
           (u.perfil && (u.perfil.profile_picture_url || u.perfil.foto_url || u.perfil.profile_picture)) ||
           u.profile_image_url || u.profile_picture_url || null;
-        try {
-          return (typeof toAbsoluteMedia === 'function') ? toAbsoluteMedia(raw) : (raw || AVATAR_FALLBACK);
-        } catch {
-          return AVATAR_FALLBACK;
-        }
+        return raw || AVATAR_FALLBACK;
       }
 
       function renderFriends(list) {
@@ -1537,58 +1708,182 @@
           row.addEventListener('click', () => {
             const uname = friendUsername(u);
             if (uname && typeof window.openChatWith === 'function') {
-              window.openChatWith(uname);  // usa TU lógica para abrir/crear el chat en el mismo drawer
+              window.openChatWith(uname);
             }
           });
           friendsEl.appendChild(row);
         });
       }
 
-      async function loadFriends() {
-        if (friendsLoaded) return;
-        friendsEl.innerHTML = '<div class="p-3 text-muted">Cargando amigos…</div>';
+      // ------- MODAL CREAR GRUPO -------
+      function openGroupModal() {
+        const gm = document.getElementById('groupModal');
+        const gmName = document.getElementById('gmName');
+        const gmFriends = document.getElementById('gmFriends');
+
+        if (!gm || !gmFriends) { console.error('[modal grupos] Falta markup'); return; }
+
+        gmFriends.innerHTML = friendsCache.map(f => `
+    <label class="d-flex align-items-center gap-2">
+      <input type="checkbox" value="${f.id}">
+      <img src="${(f.perfil?.profile_picture_url || f.avatar_url || f.avatar || '') || AVATAR_FALLBACK}"
+           class="rounded-circle" style="width:28px;height:28px;object-fit:cover"
+           onerror="this.src='${AVATAR_FALLBACK}'">
+      <span>${f.nombre_completo || f.display_name || f.username || f.nombre_usuario}</span>
+    </label>
+  `).join('');
+
+        // 🔧 enganchamos el click AQUÍ (cuando el botón ya existe)
+        const btnCreate = document.getElementById('gmCreate');
+        if (btnCreate) {
+          btnCreate.onclick = null;                 // evita duplicados si abres varias veces
+          btnCreate.addEventListener('click', createGroup);
+        }
+
+        gm.style.display = 'block';
+      }
+
+
+      function closeGroupModal() {
+        gm.style.display = 'none';
+        gmName.value = '';
+      }
+      gm?.addEventListener('click', (e) => {
+        if (e.target.matches('.btn-close,[data-close],.modal')) closeGroupModal();
+      });
+
+      async function loadFriendsForModal() {
+        if (!friendsLoaded) await loadFriends();
+        openGroupModal();
+      }
+
+      async function createGroup() {
+        const gm = document.getElementById('groupModal');
+        const gmName = document.getElementById('gmName');
+        const gmFriends = document.getElementById('gmFriends');
+
+        const titulo = (gmName?.value || '').trim();
+        const ids = Array.from(gmFriends?.querySelectorAll('input[type=checkbox]:checked') || [])
+          .map(i => Number(i.value));
+
+        if (!titulo) { gmName?.focus(); return; }
+        if (!ids.length) { alert('Selecciona al menos 1 amigo.'); return; }
+
         try {
-          const res = await fetch(FRIENDS_API, {
+          const r = await fetch(window.URLS.gruposCreate, {
+            method: 'POST',
             credentials: 'same-origin',
-            headers: { 'Accept': 'application/json' }
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRFTOKEN },
+            body: JSON.stringify({ titulo, miembros: ids })
           });
-          if (!res.ok) throw new Error('HTTP ' + res.status);
-          const data = await res.json();
-          renderFriends(data);
-          friendsLoaded = true;
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          const j = await r.json();
+
+          // abrir el chat del grupo recién creado
+          if (j && j.conversacion_id && window.openConversation) {
+            window.openConversation(j.conversacion_id);
+          }
+          // refrescar listado de conversaciones/grupos
+          if (typeof window.loadConversations === 'function') window.loadConversations();
+
+          // cerrar modal
+          if (gm) gm.style.display = 'none';
+          if (gmName) gmName.value = '';
         } catch (e) {
-          console.error('Error cargando amigos:', e);
-          friendsEl.innerHTML = '<div class="p-3 text-danger">No se pudieron cargar tus amigos.</div>';
+          console.error(e);
+          alert('No se pudo crear el grupo.');
+        }
+      }
+      document.getElementById('gmCreate')?.addEventListener('click', createGroup);
+
+      // ------- LISTAR GRUPOS -------
+      async function loadGroups() {
+        if (groupsLoaded) return;
+        groupsEl.innerHTML = `
+      <div class="d-flex justify-content-between align-items-center p-2">
+        <span class="text-muted">Tus grupos</span>
+        <button class="btn btn-sm btn-primary" id="btnNewGroup"><i class="bi bi-plus-lg"></i> Nuevo</button>
+      </div>
+      <div class="p-3 text-muted">Cargando…</div>
+    `;
+        try {
+          const res = await fetch(window.URLS.conversaciones, { credentials: 'same-origin' });
+          const data = await res.json();
+          const grupos = (data || []).filter(c => c.is_group);
+
+          const list = document.createElement('div');
+          list.className = 'px-2';
+          if (!grupos.length) {
+            list.innerHTML = '<div class="p-3 text-muted">Aún no tienes grupos.</div>';
+          } else {
+            list.innerHTML = grupos.map(g => {
+              const ps = (g.participantes || []).slice(0, 3);
+              const imgs = ps.map(p => `<img src="${(p.avatar_url || p.avatar) || AVATAR_FALLBACK}" onerror="this.src='${AVATAR_FALLBACK}'" style="width:24px;height:24px;border-radius:50%;object-fit:cover;border:2px solid #fff;margin-left:-8px;">`).join('');
+              const prev = g.ultimo_mensaje
+                ? ((g.ultimo_mensaje.tipo === 'imagen' || g.ultimo_mensaje.archivo_url) ? '📷 Imagen' : String(g.ultimo_mensaje.contenido || '').slice(0, 72))
+                : '';
+              const when = g.ultimo_mensaje?.creado_en ? new Date(g.ultimo_mensaje.creado_en).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+              return `
+            <div class="chat-list-item" data-cid="${g.conversacion_id}">
+              <div class="d-flex align-items-center">
+                <div class="d-flex align-items-center" style="width:50px">${imgs}</div>
+                <div class="chat-names">
+                  <div class="line1">${g.titulo || 'Grupo'}</div>
+                  <div class="line2">${prev}</div>
+                </div>
+                <div class="chat-time">${when}</div>
+              </div>
+            </div>`;
+            }).join('');
+          }
+          groupsEl.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center p-2">
+          <span class="text-muted">Tus grupos</span>
+          <button class="btn btn-sm btn-primary" id="btnNewGroup"><i class="bi bi-plus-lg"></i> Nuevo</button>
+        </div>`;
+          groupsEl.appendChild(list);
+          groupsEl.querySelector('#btnNewGroup')?.addEventListener('click', loadFriendsForModal);
+          groupsEl.querySelectorAll('.chat-list-item').forEach(row => {
+            row.addEventListener('click', () => {
+              const cid = Number(row.dataset.cid);
+              if (window.openConversation) window.openConversation(cid);
+            });
+          });
+          groupsLoaded = true;
+        } catch (e) {
+          console.error(e);
+          groupsEl.innerHTML = '<div class="p-3 text-danger">No se pudieron cargar tus grupos.</div>';
         }
       }
 
+      // ------- Tabs -------
       function setActiveTab(tab) {
         tabBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
         if (tab === 'amigos') {
           friendsEl.style.display = 'block';
-          if (chatsEl) chatsEl.style.visibility = 'hidden';
+          chatsEl.style.visibility = 'hidden';
+          groupsEl.style.display = 'none';
           loadFriends();
         } else if (tab === 'chats') {
           friendsEl.style.display = 'none';
-          if (chatsEl) chatsEl.style.visibility = 'visible';
-          // si quieres refrescar la lista de conversaciones cuando vuelves a "Chats":
-          if (typeof loadConversations === 'function') { try { loadConversations(); } catch { } }
-        } else {
-          // Grupos (placeholder)
-          friendsEl.style.display = 'block';
-          friendsEl.innerHTML = '<div class="p-3 text-muted">Los grupos llegarán pronto ✨</div>';
-          if (chatsEl) chatsEl.style.visibility = 'hidden';
+          groupsEl.style.display = 'none';
+          chatsEl.style.visibility = 'visible';
+          if (typeof loadConversations === 'function') loadConversations();
+        } else { // grupos
+          friendsEl.style.display = 'none';
+          chatsEl.style.visibility = 'hidden';
+          groupsEl.style.display = 'block';
+          loadGroups();
         }
       }
 
-      // Enlaza tabs (delegación segura)
       drawer.addEventListener('click', (e) => {
         const btn = e.target.closest('.tab-btn');
         if (!btn || !btn.dataset.tab) return;
         setActiveTab(btn.dataset.tab);
       });
 
-      // Estado inicial: botón "Chats" activo (tu UI ya lo pinta así)
+      // Estado inicial
       setActiveTab('chats');
     })();
   </script>
@@ -1614,80 +1909,146 @@
 
 
   <script>
-    (function () {
-      const input = document.getElementById('searchInputDesktop');
-      const box = document.getElementById('sugerenciasDesktop');
-      if (!input || !box) return;
-
+    (() => {
       const ENDPOINT = "{% url 'buscar_sugerencias' %}";
-      let aborter = null;
-      let idx = -1;
 
-      function hide() { box.style.display = 'none'; box.innerHTML = ''; idx = -1; }
-      function show() { box.style.display = 'block'; }
+      const form = document.querySelector('.g-search');
+      const box = document.getElementById('gSearchBox');
+      const input = document.getElementById('gSearchInput');
+      const sugs = document.getElementById('gSug');
+      if (!form || !box || !input || !sugs) return;
 
-      function render(list) {
-        if (!list || !list.length) { hide(); return; }
-        box.innerHTML = list.map((s, i) => `
-      <div class="sug-item" data-url="${s.url || '#'}" data-i="${i}">
-        <span class="sug-type">${s.tipo || ''}</span>
-        <span class="sug-text">${(s.texto || '').replace(/</g, '&lt;')}</span>
-        ${s.marca || s.categoria ? `<span class="sug-meta">${[s.marca, s.categoria].filter(Boolean).join(' • ')}</span>` : ''}
-      </div>
-    `).join('');
-        show();
+      let active = -1, controller = null;
+
+      const esc = s => String(s || '').replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+      const tpl = (s, i) => `
+      <div class="g-sug" data-i="${i}" data-url="${s.url || '#'}">
+        <span class="type">${esc(s.tipo || '')}</span>
+        <span class="text">${esc(s.texto || s.title || '')}</span>
+        ${(s.marca || s.categoria) ? `<span class="meta">${esc([s.marca, s.categoria].filter(Boolean).join(' • '))}</span>` : ''}
+      </div>`;
+
+      /* === NUEVO: animaciones === */
+      function openSugs(animate = true) {
+        sugs.hidden = false;
+        form.classList.add('is-open');
+        if (animate) {
+          sugs.classList.remove('anim-out');
+          void sugs.offsetWidth;            // reflow para reiniciar anim
+          sugs.classList.add('anim-in');
+        }
+        active = -1;
       }
 
-      function move(delta) {
-        const items = box.querySelectorAll('.sug-item');
-        if (!items.length) return;
-        idx = (idx + delta + items.length) % items.length;
-        items.forEach(el => el.classList.remove('active'));
-        const target = items[idx];
-        if (target) { target.classList.add('active'); target.scrollIntoView({ block: 'nearest' }); }
+      function closeSugs() {
+        if (sugs.hidden) {                  // ya está cerrado
+          form.classList.remove('is-open');
+          active = -1;
+          return;
+        }
+        sugs.classList.remove('anim-in');
+        sugs.classList.add('anim-out');
+        const onEnd = (e) => {
+          if (e.target !== sugs) return;
+          sugs.removeEventListener('animationend', onEnd);
+          sugs.hidden = true;
+          sugs.classList.remove('anim-out');
+          sugs.innerHTML = '';
+          form.classList.remove('is-open');
+          active = -1;
+        };
+        sugs.addEventListener('animationend', onEnd);
       }
 
-      function pickCurrent() {
-        const active = box.querySelector('.sug-item.active') || box.querySelector('.sug-item');
-        if (!active) return;
-        window.location.href = active.dataset.url || '#';
+      function show(list) {
+        if (!list?.length) return closeSugs();
+        const wasHidden = sugs.hidden;      // solo animar si estaba oculto
+        sugs.innerHTML = list.map(tpl).join('');
+        openSugs(wasHidden);
       }
 
-      const debounce = (fn, ms = 220) => {
-        let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
-      };
+      const debounce = (fn, ms = 220) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
-      const fetchSugs = debounce(async (q) => {
-        if (!q || q.trim().length < 2) { hide(); return; }
+      const search = debounce(async q => {
+        if (!q || q.trim().length < 2) return closeSugs();
         try {
-          if (aborter) aborter.abort();
-          aborter = new AbortController();
-          const r = await fetch(`${ENDPOINT}?q=${encodeURIComponent(q)}`, { signal: aborter.signal, credentials: 'same-origin' });
-          if (!r.ok) throw new Error('HTTP ' + r.status);
+          controller?.abort(); controller = new AbortController();
+          const r = await fetch(`${ENDPOINT}?q=${encodeURIComponent(q)}`, { credentials: 'same-origin', signal: controller.signal });
+          if (!r.ok) throw 0;
           const j = await r.json();
-          render(j.sugerencias || []);
-        } catch (e) { /* silencio si cancela */ }
+          show(j.sugerencias || j.hits || []);
+        } catch {/* noop */ }
       }, 220);
 
-      input.addEventListener('input', e => fetchSugs(e.target.value));
+      input.addEventListener('input', e => search(e.target.value));
+      input.addEventListener('focus', () => { if (sugs.innerHTML) openSugs(true); });
+
+      function items() { return Array.from(sugs.querySelectorAll('.g-sug')); }
+      function setActive(i) {
+        const els = items(); els.forEach(el => el.classList.remove('is-active'));
+        if (!els.length) { active = -1; return; }
+        active = (i + els.length) % els.length;
+        const el = els[active]; el.classList.add('is-active');
+        const r = el.getBoundingClientRect(), cr = sugs.getBoundingClientRect();
+        if (r.top < cr.top) sugs.scrollTop -= (cr.top - r.top);
+        if (r.bottom > cr.bottom) sugs.scrollTop += (r.bottom - cr.bottom);
+      }
+
       input.addEventListener('keydown', e => {
-        if (box.style.display !== 'block') return;
-        if (e.key === 'ArrowDown') { e.preventDefault(); move(+1); }
-        if (e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
-        if (e.key === 'Enter') { if (idx >= 0) { e.preventDefault(); pickCurrent(); } }
-        if (e.key === 'Escape') { hide(); }
+        if (sugs.hidden) return;
+        if (e.key === 'ArrowDown') { e.preventDefault(); setActive(active + 1); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(active - 1); }
+        else if (e.key === 'Enter') {
+          const els = items();
+          if (active >= 0 && els[active]) {
+            e.preventDefault();
+            window.location.href = els[active].dataset.url || (form.action + '?q=' + encodeURIComponent(input.value));
+          }
+        } else if (e.key === 'Escape') { closeSugs(); input.blur(); }
       });
 
-      box.addEventListener('mousedown', e => {
-        const item = e.target.closest('.sug-item'); if (!item) return;
-        e.preventDefault(); window.location.href = item.dataset.url || '#';
+      sugs.addEventListener('mousedown', e => {
+        const el = e.target.closest('.g-sug'); if (!el) return;
+        e.preventDefault();
+        window.location.href = el.dataset.url || (form.action + '?q=' + encodeURIComponent(input.value));
       });
 
-      document.addEventListener('click', e => {
-        if (!box.contains(e.target) && e.target !== input) hide();
-      });
+      document.addEventListener('click', e => { if (!form.contains(e.target)) closeSugs(); });
     })();
   </script>
+
+
+
+
+
+
+
+  <!-- Modal crear grupo -->
+  <div id="groupModal" class="modal" tabindex="-1" style="display:none;">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Crear grupo</h5>
+          <button type="button" class="btn-close" data-close></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-2">
+            <label class="form-label">Nombre del grupo</label>
+            <input id="gmName" class="form-control" maxlength="60" placeholder="Ej: Asado del viernes">
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Miembros</label>
+            <div id="gmFriends" class="d-grid gap-2" style="max-height: 260px; overflow:auto;"></div>
+            <small class="text-muted">Puedes elegir varios.</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-light" data-close>Cancelar</button>
+          <button id="gmCreate" class="btn btn-primary">Crear</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
 
   {% block extra_js %}{% endblock %}

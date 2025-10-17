@@ -1,79 +1,248 @@
+# ========== Standard library ==========
+import json
+import os
+import uuid
 from itertools import count
-from django.http import JsonResponse, HttpResponseForbidden
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import login
-from django.contrib import messages
+from django.contrib.auth import get_user_model
+import traceback
+# ========== Django ==========
+from .forms import ContactForm
 from django.conf import settings
-from .forms import PostForm, RegisterForm, PerfilForm, PreferenciasUsuarioForm, EventoForm
-from .models import *
-from .emails import send_verification_email, send_welcome_email
-from django.core.paginator import Paginator
-from django.db.models import Q, Avg
+from django.contrib import messages
+from django.contrib.auth import authenticate, get_user_model, login
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import AuthenticationForm
-from django.contrib.auth import authenticate, login
-from django.core.mail import send_mail
-from django.urls import reverse
-from django.db import IntegrityError, transaction
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
+from django.core.files.storage import default_storage
+from django.core.mail import send_mail
+from django.core.paginator import Paginator
+from django.db import IntegrityError, transaction
+from django.db.models import (
+    Avg,
+    Case,
+    Count,
+    Prefetch,
+    Q,
+    When,
+)
+from django.http import (
+    HttpResponseBadRequest,
+    HttpResponseForbidden,
+    JsonResponse,
+)
+
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
-import uuid
-from django.shortcuts import get_object_or_404
-from .models import User, Post, Like  # ajusta si necesitas más
-from core.forms import ProfileEditForm
-from .utils import get_default_wishlist
-from django.db.models import Q, Avg, Case, When
-from django.db.models import Prefetch, Q
-from core.models import Wishlist, ItemEnWishlist
+from django.utils.html import escape
+from django.utils.text import get_valid_filename
+from django.views.decorators.http import require_GET, require_POST, require_http_methods
+from django.shortcuts import render
+# ========== Third-party ==========
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from rest_framework import generics, permissions, status
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from core.models import User, SolicitudAmistad, Seguidor, Evento  
-from .serializers import SolicitudAmistadSerializer, UsuarioLiteSerializer
-from .models import Conversacion, Mensaje, ParticipanteConversacion, EntregaMensaje
-from .serializers import ConversacionSerializer, MensajeSerializer
-from core.models import Producto, Categoria, Marca
+
+# ========== Project: forms/serializers/utils/emails/search ==========
+from core.forms import ProfileEditForm
 from core.search import meili
-from django.contrib.auth import get_user_model
-from django.shortcuts import get_object_or_404, redirect, render
-# ajusta imports según tu app
-from core.models import Evento, Post, Seguidor, SolicitudAmistad
-from rest_framework.pagination import PageNumberPagination
-from channels.layers import get_channel_layer
-from asgiref.sync import async_to_sync
-from core.models import Wishlist, ItemEnWishlist  
+from .emails import send_verification_email, send_welcome_email
+from .forms import (
+    EventoForm,
+    PerfilForm,
+    PostForm,
+    PreferenciasUsuarioForm,
+    RegisterForm,
+)
+from .serializers import (
+    ConversacionLiteSerializer,
+    ConversacionSerializer,
+    MensajeSerializer,
+    SolicitudAmistadSerializer,
+    UsuarioLiteSerializer,
+)
+from .services_social import (
+    amigos_qs,
+    obtener_o_crear_conv_directa,
+    sugerencias_qs,
+)
+from .utils import get_default_wishlist
 
+# ========== Project: models (explícitos, sin wildcards) ==========
+from .models import (
+    Categoria,
+    Comentario,
+    Conversacion,
+    EntregaMensaje,
+    Evento,
+    ItemEnWishlist,
+    Like,
+    Marca,
+    Mensaje,
+    ParticipanteConversacion,
+    Post,
+    Producto,
+    Seguidor,
+    SolicitudAmistad,
+    User,
+    Wishlist,
+)
 
-from core.models import Conversacion, Mensaje, ParticipanteConversacion
-from .serializers import ConversacionLiteSerializer, MensajeSerializer
-###nuevo hoy 1 del 10 (abajo)
-from core.services_social import amigos_qs, sugerencias_qs, obtener_o_crear_conv_directa
-from django.contrib.auth import get_user_model
-from core.models import Post, Comentario 
-from django.utils.html import escape
-from django.contrib.auth.decorators import login_required
+User = get_user_model()
+def usuarios_list(request):
+    """
+    Lista de usuarios que matchean la query en nombre / apellido / nombre_usuario / correo.
+    Separa en: amigos (follow mutuo) y otros, usando _people_matches().
+    Devuelve estructuras tipo 'card' que tu template usuarios_list.html ya espera:
+    { id, nombre, username, avatar, url }
+    """
+    query = (request.GET.get("q") or "").strip()
 
-from django.views.decorators.http import require_POST
-from django.http import JsonResponse, HttpResponseForbidden
+    # Si no hay query, mostramos vacío (o podrías redirigir a home si prefieres)
+    if not query:
+        context = {
+            "query": "",
+            "personas_amigos": [],
+            "personas_otros": [],
+        }
+        return render(request, "usuarios_list.html", context)
 
+    # Usa el helper que YA creaste con los campos correctos (nombre, apellido, nombre_usuario, correo)
+    personas_amigos, personas_otros = _people_matches(
+        request,
+        query,
+        limit_friends=24,
+        limit_others=24,
+    )
 
-from django.urls import reverse  # puedes dejarlo, pero ya no dependemos de reverse en el fallback
-from django.views.decorators.http import require_GET
-from django.core.cache import cache
+    context = {
+        "query": query,
+        "personas_amigos": personas_amigos,
+        "personas_otros": personas_otros,
+    }
+    return render(request, "usuarios_list.html", context)
 
-# Para Reseña
-from django.shortcuts import render, redirect
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.db import IntegrityError
-from django.db.models import Avg, Count
-from .models import Resena
-from .forms import ResenaForm
-from django.core.files.storage import default_storage
-from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
+# === Helpers para pintar personas en resultados ===
+def _avatar_abs(request, u):
+    """Devuelve URL absoluta del avatar si existe."""
+    try:
+        pic = getattr(getattr(u, "perfil", None), "profile_picture", None)
+        return request.build_absolute_uri(pic.url) if pic else None
+    except Exception:
+        return None
+    
+def buscar_router(request):
+    """
+    Decide si mandar a usuarios_list o a productos_list según la query.
+    Reglas:
+      1) Si empieza con @ -> usuarios
+      2) Si solo hay matches en usuarios -> usuarios
+      3) Si solo hay matches en productos -> productos
+      4) Si hay en ambos -> productos (por defecto)
+    """
+    q = (request.GET.get("q") or "").strip()
+    if not q:
+        return redirect("productos_list")  # o a donde quieras por defecto
 
-from django.utils.text import get_valid_filename
-import os, uuid
+    # Fuerza explícita por prefijo
+    if q.startswith("@"):
+        return redirect(f"{reverse('usuarios_list')}?q={q.lstrip('@')}")
+
+    # ¿Hay usuarios que coincidan?
+    users_exists = User.objects.filter(
+        is_active=True
+    ).filter(
+        Q(nombre__icontains=q) |
+        Q(apellido__icontains=q) |
+        Q(nombre_usuario__icontains=q) |
+        Q(correo__icontains=q)
+    ).exists()
+
+    # ¿Hay productos que coincidan?
+    prods_exists = Producto.objects.filter(
+        activo=True
+    ).filter(
+        Q(nombre_producto__icontains=q) |
+        Q(descripcion__icontains=q) |
+        Q(id_marca__nombre_marca__icontains=q)
+    ).exists()
+
+    if users_exists and not prods_exists:
+        return redirect(f"{reverse('usuarios_list')}?q={q}")
+    if prods_exists and not users_exists:
+        return redirect(f"{reverse('productos_list')}?q={q}")
+
+    # Empate: por defecto productos. Cambia a usuarios_list si prefieres.
+    return redirect(f"{reverse('productos_list')}?q={q}")
+
+def _user_card_dict(request, u):
+    nombre = f"{(u.nombre or '').strip()} {(u.apellido or '').strip()}".strip() or (u.nombre_usuario or '')
+    username = u.nombre_usuario or ''
+    return {
+        "id": u.id,
+        "nombre": nombre,
+        "username": username,
+        "avatar": _avatar_abs(request, u),
+        # ajusta a tu URL real si usas otra ruta
+        "url": f"/u/{username}/" if username else f"/perfil/{u.id}/",
+    }
+
+def _people_matches(request, query, limit_friends=8, limit_others=8):
+    """
+    Devuelve (amigos_cards, otros_cards) para una query.
+    Amigos = follow mutuo (Seguidor).
+    """
+    if not query:
+        return [], []
+
+    # base de búsqueda
+    base_q = (Q(nombre__icontains=query) |
+              Q(apellido__icontains=query) |
+              Q(nombre_usuario__icontains=query) |
+              Q(correo__icontains=query))
+
+    amigos_cards, otros_cards = [], []
+
+    # si no está logueado, sólo “otros”
+    if not request.user.is_authenticated:
+        otros = (User.objects
+                 .filter(is_active=True)
+                 .exclude(id=request.user.id if request.user.is_authenticated else None)
+                 .filter(base_q)
+                 .select_related('perfil')
+                 .order_by('nombre', 'apellido')[:limit_others])
+        return [ ], [_user_card_dict(request, u) for u in otros]
+
+    # ids amigos (follow mutuo)
+    ids_yo_sigo   = Seguidor.objects.filter(seguidor=request.user).values_list('seguido_id', flat=True)
+    ids_me_siguen = Seguidor.objects.filter(seguido=request.user).values_list('seguidor_id', flat=True)
+    amigos_ids = set(ids_yo_sigo).intersection(set(ids_me_siguen))
+
+    # amigos que matchean
+    amigos = (User.objects
+              .filter(id__in=amigos_ids, is_active=True)
+              .filter(base_q)
+              .select_related('perfil')
+              .order_by('nombre', 'apellido')[:limit_friends])
+
+    # otros usuarios
+    otros = (User.objects
+             .filter(is_active=True)
+             .exclude(id__in=amigos_ids)
+             .exclude(id=request.user.id)
+             .filter(base_q)
+             .select_related('perfil')
+             .order_by('nombre', 'apellido')[:limit_others])
+
+    amigos_cards = [_user_card_dict(request, u) for u in amigos]
+    otros_cards  = [_user_card_dict(request, u) for u in otros]
+    return amigos_cards, otros_cards
+
 
 
 def home(request):
@@ -319,6 +488,9 @@ def productos_list(request):
             .filter(id_wishlist=wl)
             .values_list('id_producto', flat=True)
         )
+        # ---- Personas que coinciden con la búsqueda ----
+    personas_amigos, personas_otros = _people_matches(request, query)
+
 
     context = {
         'productos': page_obj,
@@ -329,6 +501,8 @@ def productos_list(request):
         'selected_marca': marca_id,
         'favoritos_ids': favoritos_ids,
         'orden': orden,
+        'personas_amigos': personas_amigos,
+        'personas_otros': personas_otros,
     }
     return render(request, 'productos_list.html', context)
 
@@ -708,6 +882,7 @@ def buscar_productos(request):
     """Búsqueda avanzada de productos (Meilisearch + fallback DB robusto, sin reseñas)"""
     # --- Params ---
     query = (request.GET.get('q') or '').strip()
+    personas_amigos, personas_otros = _people_matches(request, query)
     categoria_id = (request.GET.get('categoria') or '').strip()
     marca_id = (request.GET.get('marca') or '').strip()
     precio_min = (request.GET.get('precio_min') or '').strip()
@@ -777,6 +952,9 @@ def buscar_productos(request):
             'precio_max': precio_max,
             'rating_min': rating_min,
             'orden': orden,
+            'personas_amigos': personas_amigos,
+            'personas_otros': personas_otros,
+
         }
         return render(request, 'productos/buscar.html', context)
 
@@ -963,35 +1141,44 @@ from django.conf import settings
 from django.db.models import Q
 from core.search import meili  # asegúrate de tenerlo importado
 
+def _user_doc_to_sug(u):
+    nombre = f"{(u.nombre or '').strip()} {(u.apellido or '').strip()}".strip() or (u.nombre_usuario or '')
+    username = u.nombre_usuario or ''
+    return {
+        "tipo": "usuario",
+        "texto": nombre,
+        "categoria": None,   # el front lo ignora si es None
+        "marca": None,       # idem
+        "url": f"/u/{username}/" if username else f"/perfil/{u.id}/",
+        "meta": f"@{username}" if username else "",
+    }
+
 def buscar_sugerencias(request):
     """Sugerencias de búsqueda en tiempo real (Meilisearch + fallback DB)."""
     query = (request.GET.get('q') or '').strip()
-    print(f"🔍 Búsqueda recibida: '{query}'")
-
     if len(query) < 2:
         return JsonResponse({'sugerencias': []})
 
     sugerencias = []
 
-    # ========== Modo Meilisearch ==========
+
+    # ======== Meilisearch ========
     if getattr(settings, "USE_MEILI", False):
         try:
-            print("⚡ Usando Meilisearch para sugerencias")
+            # --- Productos (igual que ya tenías) ---
             resp = meili().index("products").search(query, {
-                "limit": 8,
+                "limit": 6,
                 "attributesToRetrieve": ["id", "nombre_producto", "id_categoria_id", "id_marca_id"]
             })
-
             hits = resp.get("hits", [])
             ids = [h.get("id") for h in hits if "id" in h]
             productos = (Producto.objects
                          .filter(pk__in=ids, activo=True)
                          .select_related("id_categoria", "id_marca"))
-            productos_map = {p.pk: p for p in productos}
-
+            pmap = {p.pk: p for p in productos}
             for h in hits:
-                p = productos_map.get(h.get("id"))
-                if not p:
+                p = pmap.get(h.get("id"))
+                if not p: 
                     continue
                 sugerencias.append({
                     "tipo": "producto",
@@ -1001,7 +1188,22 @@ def buscar_sugerencias(request):
                     "url": f"/producto/{p.id_producto}/"
                 })
 
-            # Añadir categorías y marcas (desde DB)
+            # --- USUARIOS en Meili ----
+            uresp = meili().index("users").search(query, {
+                "limit": 5,
+                "filter": "is_active = true",
+                "attributesToRetrieve": ["id", "nombre", "apellido", "nombre_usuario", "correo", "is_active"]
+            })
+            uids = [h.get("id") for h in uresp.get("hits", []) if "id" in h]
+            # Traemos de DB para asegurar coherencia (por si cambió algo)
+            umap = {u.id: u for u in User.objects.filter(id__in=uids, is_active=True)}
+            for h in uresp.get("hits", []):
+                u = umap.get(h.get("id"))
+                if not u: 
+                    continue
+                sugerencias.append(_user_doc_to_sug(u))
+
+            # --- Categorías / Marcas (DB) ---
             for c in Categoria.objects.filter(nombre_categoria__icontains=query)[:3]:
                 sugerencias.append({
                     "tipo": "categoría",
@@ -1016,51 +1218,61 @@ def buscar_sugerencias(request):
                     "url": f"/productos/?marca={m.id_marca}"
                 })
 
-            print(f"✅ Sugerencias enviadas desde Meili: {len(sugerencias)}")
             return JsonResponse({'sugerencias': sugerencias})
 
-        except Exception as e:
-            print(f"⚠️ Meilisearch falló, usando fallback DB: {e}")
+        except Exception:
+            # cae a fallback
+            pass
 
-    # ========== Fallback a DB ==========
-    try:
-        print("🗄️ Usando fallback DB para sugerencias")
-        productos = Producto.objects.filter(
-            Q(nombre_producto__icontains=query) |
-            Q(descripcion__icontains=query) |
-            Q(id_marca__nombre_marca__icontains=query),
-            activo=True
-        ).select_related("id_categoria", "id_marca")[:6]
+    # ======== Fallback a DB ========
+    # Productos
+    productos = (Producto.objects
+                 .filter(
+                     Q(nombre_producto__icontains=query) |
+                     Q(descripcion__icontains=query) |
+                     Q(id_marca__nombre_marca__icontains=query),
+                     activo=True
+                 )
+                 .select_related("id_categoria", "id_marca")[:6])
+    for p in productos:
+        sugerencias.append({
+            "tipo": "producto",
+            "texto": p.nombre_producto,
+            "marca": p.id_marca.nombre_marca if p.id_marca else "",
+            "categoria": p.id_categoria.nombre_categoria if p.id_categoria else "",
+            "url": f"/producto/{p.id_producto}/"
+        })
 
-        for producto in productos:
-            sugerencias.append({
-                "tipo": "producto",
-                "texto": producto.nombre_producto,
-                "marca": producto.id_marca.nombre_marca if producto.id_marca else "",
-                "categoria": producto.id_categoria.nombre_categoria if producto.id_categoria else "",
-                "url": f"/producto/{producto.id_producto}/"
-            })
+    # USUARIOS (DB)
+    usuarios = (User.objects
+                .filter(
+                    Q(nombre__icontains=query) |
+                    Q(apellido__icontains=query) |
+                    Q(nombre_usuario__icontains=query) |
+                    Q(correo__icontains=query),
+                    is_active=True
+                )
+                .order_by('nombre', 'apellido')[:5])
+    for u in usuarios:
+        sugerencias.append(_user_doc_to_sug(u))
 
-        for c in Categoria.objects.filter(nombre_categoria__icontains=query)[:3]:
-            sugerencias.append({
-                "tipo": "categoría",
-                "texto": c.nombre_categoria,
-                "descripcion": c.descripcion,
-                "url": f"/productos/?categoria={c.id_categoria}"
-            })
+    # Categorías / Marcas
+    for c in Categoria.objects.filter(nombre_categoria__icontains=query)[:3]:
+        sugerencias.append({
+            "tipo": "categoría",
+            "texto": c.nombre_categoria,
+            "descripcion": c.descripcion,
+            "url": f"/productos/?categoria={c.id_categoria}"
+        })
+    for m in Marca.objects.filter(nombre_marca__icontains=query)[:2]:
+        sugerencias.append({
+            "tipo": "marca",
+            "texto": m.nombre_marca,
+            "url": f"/productos/?marca={m.id_marca}"
+        })
 
-        for m in Marca.objects.filter(nombre_marca__icontains=query)[:2]:
-            sugerencias.append({
-                "tipo": "marca",
-                "texto": m.nombre_marca,
-                "url": f"/productos/?marca={m.id_marca}"
-            })
-
-    except Exception as e:
-        print(f"❌ Error en fallback DB: {e}")
-
-    print(f"🎯 Total sugerencias enviadas: {len(sugerencias)}")
     return JsonResponse({'sugerencias': sugerencias})
+
 
 
 def login_view(request):
@@ -1920,56 +2132,173 @@ class TypingSummaryView(APIView):
 #####################################################################
 #####################################################################
 
-def resenas_home(request):
-    """
-    Muestra las reseñas globales de la página (para el home o sección 'Opiniones').
-    """
-    resenas = Resena.objects.select_related('id_usuario').order_by('-fecha_resena')[:12]
-    stats = Resena.objects.aggregate(
-        promedio=Avg('calificacion'),
-        total=Count('id_resena')
-    )
 
-    context = {
-        'resenas': resenas,
-        'promedio': round(stats['promedio'] or 0, 2),
-        'total': stats['total'] or 0,
-        'form': None,
-        'show_form': False,
+
+
+
+#####################################################################
+#####################################################################
+#####################################################################
+
+
+### CHAT GRUPALLLL
+
+
+def _participant_dict(u: User):
+    """Estructura que tu front ya consume."""
+    nombre = getattr(u, 'nombre', '') or ''
+    apellido = getattr(u, 'apellido', '') or ''
+    nombre_completo = getattr(u, 'nombre_completo', '') or (f"{nombre} {apellido}".strip() or u.get_full_name() or u.username)
+    return {
+        "id": u.id,
+        "username": getattr(u, 'username', '') or getattr(u, 'nombre_usuario', ''),
+        "nombre": nombre,
+        "apellido": apellido,
+        "nombre_completo": nombre_completo,
+        # intenta varias propiedades típicas de foto
+        "avatar_url": (
+            getattr(u, 'avatar_url', None)
+            or getattr(u, 'avatar', None)
+            or getattr(getattr(u, 'perfil', None) or {}, 'foto_url', None)
+        ),
     }
-    return render(request, 'resenas/section.html', context)
-
 
 @login_required
-def crear_resena(request):
-    """
-    Permite al usuario autenticado dejar UNA reseña global de la página.
-    Si ya tiene una, no se le permite crear otra.
-    """
+@require_http_methods(["POST"])
+def grupos_create(request):
+    try:
+        raw = request.body.decode("utf-8")
+        print("grupos_create RAW:", raw)  # LOG
+        data = json.loads(raw)
+    except Exception as e:
+        print("grupos_create JSON inválido:", e)  # LOG
+        return HttpResponseBadRequest("JSON inválido")
+
+    titulo = (data.get("titulo") or "").strip()
+    miembros = data.get("miembros") or data.get("ids") or []
+
+    print("grupos_create titulo:", titulo, "miembros:", miembros)  # LOG
+
+    if not titulo:
+        return JsonResponse({"detail": "Falta 'titulo'"}, status=400)
+
+    try:
+        miembros = [int(x) for x in miembros]
+    except Exception:
+        return JsonResponse({"detail": "'miembros'/'ids' debe ser lista de enteros"}, status=400)
+
+    if request.user.id not in miembros:
+        miembros.append(request.user.id)
+
+    users = list(User.objects.filter(id__in=miembros).distinct())
+    if len(users) < 2:
+        return JsonResponse({"detail": "Un grupo debe tener al menos 2 miembros"}, status=400)
+
+    try:
+        with transaction.atomic():
+            conv = Conversacion.objects.create(
+                tipo=Conversacion.Tipo.GRUPO,
+                nombre=titulo,
+                creador=request.user
+            )
+            ParticipanteConversacion.objects.bulk_create([
+                ParticipanteConversacion(
+                    conversacion=conv,
+                    usuario=u,
+                    rol=(ParticipanteConversacion.Rol.ADMIN if u.id == request.user.id
+                         else ParticipanteConversacion.Rol.MIEMBRO)
+                ) for u in users
+            ])
+        print("grupos_create OK:", conv.conversacion_id)  # LOG
+        return JsonResponse({"ok": True, "conversacion_id": conv.conversacion_id})
+    except Exception as e:
+        import traceback
+        print("grupos_create ERROR:", e)
+        traceback.print_exc()
+        return JsonResponse({"detail": "grupos_create_failed", "error": str(e)}, status=500)
+    
+@login_required
+@require_http_methods(["GET"])
+def conversacion_detalle(request, pk: int):
+    conv = get_object_or_404(Conversacion, conversacion_id=pk)
+
+    if not ParticipanteConversacion.objects.filter(conversacion=conv, usuario=request.user).exists():
+        return HttpResponseForbidden("No tienes acceso a esta conversación")
+
+    participantes_qs = User.objects.filter(
+        id__in=ParticipanteConversacion.objects.filter(conversacion=conv).values_list("usuario_id", flat=True)
+    ).select_related("perfil")
+
+    def abs_avatar(u):
+        try:
+            pic = getattr(getattr(u, "perfil", None), "profile_picture", None)
+            if pic:
+                return request.build_absolute_uri(pic.url)
+        except Exception:
+            pass
+        return None
+
+    data_part = []
+    for u in participantes_qs:
+        nombre = (u.nombre or "").strip()
+        apellido = (u.apellido or "").strip()
+        nombre_completo = (f"{nombre} {apellido}".strip()
+                           or getattr(u, "nombre_completo", "")
+                           or getattr(u, "get_full_name", lambda: "")()
+                           or getattr(u, "nombre_usuario", "")
+                           or getattr(u, "username", ""))
+        data_part.append({
+            "id": u.id,
+            "username": getattr(u, "nombre_usuario", "") or getattr(u, "username", ""),
+            "nombre": nombre,
+            "apellido": apellido,
+            "nombre_completo": nombre_completo,
+            "avatar_url": abs_avatar(u),
+        })
+
+    # usa 'titulo' si existe, si no 'nombre'
+    title = (getattr(conv, "titulo", None) or getattr(conv, "nombre", None) or "")  
+    # deduce grupo por tipo o por cantidad de participantes
+    tipo_val = getattr(conv, "tipo", "") or ""
+    is_group = bool(
+        getattr(conv, "is_group", False) or
+        (tipo_val.lower() == "grupo") or
+        (len(data_part) > 2)
+    )
+
+    return JsonResponse({
+        "conversacion_id": getattr(conv, "conversacion_id", conv.pk),
+        "is_group": is_group,
+        "titulo": title,
+        "participantes": data_part,
+    })
+
+def ayuda_view(request):
     if request.method == 'POST':
-        form = ResenaForm(request.POST)
+        form = ContactForm(request.POST)
         if form.is_valid():
-            resena = form.save(commit=False)
-            resena.id_usuario = request.user
+            name = form.cleaned_data['name']
+            from_email = form.cleaned_data['email']
+            subject = form.cleaned_data['subject']
+            message = form.cleaned_data['message']
+
+            full_subject = f"Contacto desde Gifters: {subject}"
+            full_message = f"Has recibido un nuevo mensaje de:\n\nNombre: {name}\nEmail: {from_email}\n\nMensaje:\n{message}"
+
             try:
-                resena.save()  # controla el UniqueConstraint (una reseña por usuario)
-            except IntegrityError:
-                messages.warning(request, 'Ya dejaste tu reseña anteriormente. ¡Gracias!')
-            else:
-                messages.success(request, '¡Gracias por compartir tu experiencia!')
-            return redirect('resenas:home')
-    else:
-        form = ResenaForm()
+                send_mail(
+                    subject=full_subject,
+                    message=full_message,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=['giftersg4@gmail.com'], # Correo de destino
+                    fail_silently=False,
+                )
+                messages.success(request, '¡Tu mensaje ha sido enviado! Te responderemos pronto.')
+            except Exception:
+                messages.error(request, 'Hubo un error al enviar tu mensaje. Por favor, inténtalo más tarde.')
 
-    # Mostrar reseñas existentes junto al formulario
-    resenas = Resena.objects.select_related('id_usuario').order_by('-fecha_resena')
-    stats = Resena.objects.aggregate(promedio=Avg('calificacion'), total=Count('id_resena'))
+            return redirect('ayuda')
+        else:
+            messages.error(request, 'Por favor, completa todos los campos del formulario.')
 
-    context = {
-        'resenas': resenas,
-        'promedio': round(stats['promedio'] or 0, 2),
-        'total': stats['total'] or 0,
-        'form': form,
-        'show_form': True,
-    }
-    return render(request, 'resenas/section.html', context)
+    return render(request, 'ayuda.html')

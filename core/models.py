@@ -7,6 +7,9 @@ from django.core.exceptions import ValidationError
 from django.conf import settings
 from datetime import timedelta, date
 
+
+
+
 class genero(models.TextChoices):
     MASCULINO = 'M', 'Masculino'
     FEMENINO = 'F', 'Femenino'
@@ -962,17 +965,17 @@ class Producto(models.Model):
         ]
     
     # Campos calculados para rating
-    @property
-    def rating_promedio(self):
-        """Calcula el rating promedio basado en reseñas"""
-        from django.db.models import Avg
-        promedio = self.resenas.aggregate(Avg('calificacion'))['calificacion__avg']
-        return round(promedio, 1) if promedio else 0
+    #@property
+    #def rating_promedio(self):
+    #    """Calcula el rating promedio basado en reseñas"""
+    #    from django.db.models import Avg
+    #    promedio = self.resenas.aggregate(Avg('calificacion'))['calificacion__avg']
+    #    return round(promedio, 1) if promedio else 0
     
-    @property
-    def total_resenas(self):
-        """Total de reseñas del producto"""
-        return self.resenas.count()
+    #@property
+    #def total_resenas(self):
+    #    """Total de reseñas del producto"""
+    #    return self.resenas.count()
     
     @property
     def fue_comprado(self):
@@ -1294,43 +1297,47 @@ class Tag(models.Model):
 ##################################################################
 ##################################################################
 ##################################################################
-class Resena(models.Model):
-    id_resena = models.AutoField(primary_key=True, verbose_name='ID Reseña')
 
-    id_usuario = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        db_column='id_usuario',
-        related_name='resenas',
-        verbose_name='Usuario'
-    )
+#class Resena(models.Model):
+#    id_resena = models.AutoField(primary_key=True, verbose_name='ID Reseña')
+#
+#    id_usuario = models.ForeignKey(
+#        User,
+#        on_delete=models.CASCADE,
+#        db_column='id_usuario',
+#        related_name='resenas',
+#        verbose_name='Usuario'
+#    )
+#
+#    calificacion = models.IntegerField(
+#        validators=[MinValueValidator(1), MaxValueValidator(5)],
+#        verbose_name='Calificación (1–5)'
+#    )
+#
+#    titulo = models.CharField(max_length=150, verbose_name='Título')
+#    comentario = models.CharField(max_length=1000, verbose_name='Comentario')
+#
+#    fecha_resena = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de reseña')
+#
+#    class Meta:
+#        db_table = 'resena'
+#        verbose_name = 'Reseña'
+#        verbose_name_plural = 'Reseñas'
+#        ordering = ['-fecha_resena']
+#        constraints = [
+#            # Un usuario solo puede dejar una reseña global
+#            models.UniqueConstraint(fields=['id_usuario'], name='uq_resena_usuario_unica'),
+#        ]
+#        indexes = [
+#            models.Index(fields=['id_usuario'], name='idx_resena_usuario'),
+#            models.Index(fields=['calificacion'], name='idx_resena_calificacion'),
+#        ]
+#
+#    def __str__(self):
+#        # Ajustado a tu modelo de usuario (usa nombre_usuario)
+#        return f"{getattr(self.id_usuario, 'nombre_usuario', str(self.id_usuario))} [{self.calificacion}/5] - {self.titulo}"
 
-    calificacion = models.IntegerField(
-        validators=[MinValueValidator(1), MaxValueValidator(5)],
-        verbose_name='Calificación (1–5)'
-    )
 
-    titulo = models.CharField(max_length=150, verbose_name='Título')
-    comentario = models.CharField(max_length=1000, verbose_name='Comentario')
-
-    fecha_resena = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de reseña')
-
-    class Meta:
-        db_table = 'resena'
-        verbose_name = 'Reseña'
-        verbose_name_plural = 'Reseñas'
-        ordering = ['-fecha_resena']
-        constraints = [
-            # Un usuario solo puede dejar una reseña global
-            models.UniqueConstraint(fields=['id_usuario'], name='uq_resena_usuario_unica'),
-        ]
-        indexes = [
-            models.Index(fields=['id_usuario'], name='idx_resena_usuario'),
-            models.Index(fields=['calificacion'], name='idx_resena_calificacion'),
-        ]
-
-    def __str__(self):
-        return f"{self.id_usuario.username} [{self.calificacion}/5] - {self.titulo}"
 
 ##################################################################
 ##################################################################

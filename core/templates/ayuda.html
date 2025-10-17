@@ -11,6 +11,17 @@
 
 <body class="index-page">
 
+  <div class="container" style="padding-top: 20px;">
+  {% if messages %}
+      {% for message in messages %}
+      <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-danger{% endif %} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+      {% endfor %}
+  {% endif %}
+  </div>
+
   <section id="contact" class="contact section">
   <div class="container section-title" data-aos="fade-up">
     <h2>Contacto</h2>
@@ -50,7 +61,8 @@
       </div>
 
       <div class="col-lg-7">
-        <form action="forms/contact.php" method="post" class="php-email-form" data-aos="fade-up" data-aos-delay="200">
+        <form action="{% url 'ayuda' %}" method="post" class="php-email-form" data-aos="fade-up" data-aos-delay="200">
+          {% csrf_token %}
           <div class="row gy-4">
             <div class="col-md-6">
               <label for="name-field" class="pb-2">Nombre</label>

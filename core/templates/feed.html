@@ -12,6 +12,16 @@
 <main class="feed-container">
     <div class="feed-main-content">
         <div class="feed-posts-column">
+            {% if messages %}
+            <div style="margin-bottom: 15px;">
+                {% for message in messages %}
+                <div class="alert {% if message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
 
             <!-- Formulario para crear un nuevo post -->
             <div class="post-card create-post-card">
@@ -23,14 +33,23 @@
                         {% else %}
                         <img src="{% static 'img/Gifters/favicongift.png' %}" alt="Sin foto" class="profile-pic">
                         {% endif %}
-                        <textarea name="contenido" class="create-post-input" rows="2"
-                            placeholder="¿Qué quieres compartir?"></textarea>
+                        <textarea name="contenido" class="create-post-input" rows="2" placeholder="¿Qué quieres compartir?"></textarea>
                     </div>
-                    <div class="create-post-actions">
-                        <div class="mb-3">
-                            <label for="id_imagen" class="form-label">Añadir imagen (opcional)</label>
-                            <input type="file" name="imagen" class="form-control" id="id_imagen" accept="image/*">
-                        </div>
+
+                    <div id="image-preview-container" class="image-preview-container" style="display: none;">
+                        <img id="image-preview" src="#" alt="Vista previa de la imagen" />
+                        <button type="button" id="remove-image-btn" class="remove-image-btn">&times;</button>
+                    </div>
+
+                    <hr class="post-divider">
+
+                    <div class="create-post-actions-new">
+                        <label for="id_imagen" class="action-btn-new">
+                            <i class="bi bi-images" style="color: #45bd62;"></i>
+                            <span>Foto</span>
+                        </label>
+                        <input type="file" name="imagen" id="id_imagen" accept="image/*" style="display: none;">
+
                         <button type="submit" class="btn-create-post">Publicar</button>
                     </div>
                 </form>
@@ -186,6 +205,34 @@
 {% block extra_js %}
 <!-- CÓDIGO JAVASCRIPT ACTUALIZADO -->
 <script>
+const imageInput = document.getElementById('id_imagen');
+const previewContainer = document.getElementById('image-preview-container');
+const imagePreview = document.getElementById('image-preview');
+const removeImageBtn = document.getElementById('remove-image-btn');
+
+if (imageInput) {
+    imageInput.addEventListener('change', function(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                imagePreview.setAttribute('src', e.target.result);
+                previewContainer.style.display = 'block';
+            }
+            reader.readAsDataURL(file);
+        }
+    });
+}
+
+if (removeImageBtn) {
+    removeImageBtn.addEventListener('click', function() {
+        // Limpia el input de archivo y oculta la vista previa
+        imageInput.value = '';
+        previewContainer.style.display = 'none';
+        imagePreview.setAttribute('src', '#');
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     const commentsModal = document.getElementById('commentsModal');
     const modalForm = document.getElementById('modal-comment-form');

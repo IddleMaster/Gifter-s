@@ -4,6 +4,7 @@ from django.views.generic import TemplateView, RedirectView
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.conf.urls.static import static
 from django.conf import settings
+from core.views import perfil_publico
 
 from core import views
 from core.views import (
@@ -29,8 +30,9 @@ urlpatterns = [
     path('register/', views.register_view, name='register'),
     path('service-details.html', TemplateView.as_view(template_name='service-details.html'), name='detallesServicio'),
     path('starter-page.html', TemplateView.as_view(template_name='starter-page.html'), name='StartPage'),
-    path('ayuda.html', TemplateView.as_view(template_name='ayuda.html'), name='ayuda'),
-
+    path('ayuda/', views.ayuda_view, name='ayuda'),
+    path("usuarios/", views.usuarios_list, name="usuarios_list"),
+    path("buscar/", views.buscar_router, name="buscar_router"),
     # Perfil
     path('perfil/', views.profile_view, name='perfil'),
     path('perfil/editar/', views.profile_edit, name='perfil_editar'),
@@ -91,7 +93,7 @@ urlpatterns = [
     # Chat API
     path('api/chat/conversaciones/', ConversacionesList.as_view(), name='conversaciones_list'),
     path('api/chat/conversaciones/<int:conv_id>/mensajes/', MensajesListCreate.as_view(), name='mensajes_list_create'),
-    path('u/<str:username>/', views.perfil_publico, name='perfil_publico'),
+    path("u/<str:username>/", perfil_publico, name="perfil_publico"),
     path("u/<str:username>/", views.perfil_publico, name="perfil_detalle"),
 
     path('', views.feed, name='feed'),
@@ -111,10 +113,12 @@ urlpatterns = [
     path("api/chat/<int:conv_id>/typing/", views.TypingView.as_view(), name="chat_typing"),
     path("api/chat/typing/", views.TypingSummaryView.as_view(), name="chat_typing_summary"),
 
-    ## Reseñas
-    #path('resenas/', resenas_views.resenas_home, name='resenas_home'),
-    #path('resenas/nueva/', resenas_views.crear_resena, name='resenas_nueva'),
 
+    ##para el chat grupal:
+    path('api/grupos/crear/', views.grupos_create, name='grupos_create'),
+    path('api/conversaciones/<int:pk>/', views.conversacion_detalle, name='conversacion_detalle'),
+
+    
 
     
 

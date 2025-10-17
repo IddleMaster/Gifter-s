@@ -1,11 +1,19 @@
 from django import forms
 from django.core.exceptions import ValidationError
 from django.core.validators import MinLengthValidator
-from .models import User, Perfil, PreferenciasUsuario, Evento, Resena
+from .models import User, Perfil, PreferenciasUsuario, Evento
 from .models import Post
 from datetime import date
 import re
 from django.utils.text import slugify
+
+def validate_image_size(file):
+    """
+    Valida que el tamaño del archivo no exceda los 10 MB.
+    """
+    max_size_mb = 10
+    if file.size > max_size_mb * 1024 * 1024:
+        raise ValidationError(f'El tamaño de la imagen no puede ser mayor a {max_size_mb} MB.')
 
 def _normalize_username(raw: str, max_len: int = 50) -> str:
     return (slugify(raw or "") or "user")[:max_len]
@@ -157,7 +165,8 @@ class PostForm(forms.ModelForm):
         required=False,
         widget=forms.ClearableFileInput(attrs={
             'class': 'form-control'
-        })
+        }),
+        validators=[validate_image_size]  
     )
 
     class Meta:
@@ -266,42 +275,22 @@ class EventoForm(forms.ModelForm):
             "descripcion": forms.Textarea(attrs={"class":"form-control", "rows":2, "placeholder":"(opcional)"}),
         }
 
+def validate_image_size(file):
+    """
+    Valida que el tamaño del archivo no exceda los 10 MB.
+    """
+    max_size_mb = 10
+    if file.size > max_size_mb * 1024 * 1024:
+        raise ValidationError(f'El tamaño de la imagen no puede ser mayor a {max_size_mb} MB.')
 
 
 ################################################################
 ################################################################
 ################################################################
 
-class ResenaForm(forms.ModelForm):
-    class Meta:
-        model = Resena
-        fields = ('calificacion', 'titulo', 'comentario')
-        labels = {
-            'calificacion': 'Calificación (1–5)',
-            'titulo': 'Título',
-            'comentario': 'Comentario',
-        }
-        widgets = {
-            'calificacion': forms.NumberInput(attrs={
-            'class': 'form-control',
-            'min': 1,
-            'max': 5,
-            'step': 1,             # evita decimales
-            'inputmode': 'numeric' # mejor teclado en mobile
-            }),
-            'titulo': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'Escribe un título corto'
-            }),
-            'comentario': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': 4,
-                'placeholder': 'Cuéntanos tu experiencia en la página'
-            }),
-        }
 
-def clean_calificacion(self):
-    calificacion = self.cleaned_data.get('calificacion')
-    if calificacion is None or not (1 <= calificacion <= 5):
-        raise forms.ValidationError('La calificación debe estar entre 1 y 5.')
-    return calificacion
+class ContactForm(forms.Form):
+    name = forms.CharField(max_length=100, required=True)
+    email = forms.EmailField(required=True)
+    subject = forms.CharField(max_length=100, required=True)
+    message = forms.CharField(widget=forms.Textarea, required=True)

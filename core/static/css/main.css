@@ -1943,3 +1943,131 @@ section,
   transform: translateY(-2px);
 }
 
+/* ======= FIX HEADER (anula saltos del theme) ======= */
+:root { --topbar-h: 40px; } /* tu topbar real */
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 997;
+  /* Reservamos el alto de la topbar SIEMPRE para que no “salte” */
+  padding-top: var(--topbar-h) !important;
+}
+
+/* La topbar NO se colapsa al hacer scroll */
+.scrolled .header .topbar {
+  height: var(--topbar-h) !important;
+  visibility: visible !important;
+  overflow: visible !important;
+}
+
+/* El bloque branding no cambia de alto ni paddings */
+.header .branding {
+  min-height: 84px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* Quitamos transiciones globales de altura/padding del theme */
+.header, .header * {
+  transition-property: opacity, box-shadow, color, background-color, transform !important;
+}
+
+/* ======= FIX BUSCADOR + SUGERENCIAS (encaje perfecto) ======= */
+:root { --pill-b: 1.5px; }
+
+.site-search,
+.branding,
+.brand-left,
+.search-pill { overflow: visible !important; }
+
+.search-pill{
+  display:flex; align-items:center;
+  height:44px; width:100%;
+  border: var(--pill-b) solid #0d6efd;
+  border-radius: 999px;
+  background:#fff; box-sizing:border-box; overflow:hidden;
+}
+.search-pill .search-input{
+  flex:1; height:100%; padding:0 .95rem; font-size:1rem;
+  border:0; outline:0; background:#fff; box-shadow:none !important;
+  -webkit-appearance:none; appearance:none;
+}
+.search-pill .btn-search{
+  display:flex; align-items:center; justify-content:center;
+  width:44px; height:100%; border:0; background:#fff;
+  border-left:1px solid rgba(13,110,253,.22);
+  outline:none; box-shadow:none !important;
+}
+
+/* Nada de halos de enfoque */
+.site-search *:focus,
+.site-search *:focus-visible,
+.search-pill:focus,
+.search-pill:focus-within { outline:none !important; box-shadow:none !important; }
+
+/* Cuando el dropdown esté abierto, el pill pierde solo los radios inferiores */
+.search-pill.open{
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+/* El dropdown queda PEGADO al borde inferior del pill (sin “grieta”) */
+#sugBox{
+  position:absolute; left:0; right:0;
+  top: calc(100% - var(--pill-b)) !important; /* <- unión exacta */
+  background:#fff;
+  border: var(--pill-b) solid #0d6efd;
+  border-top: 0;                               /* <- sin doble borde */
+  border-bottom-left-radius:14px; border-bottom-right-radius:14px;
+  box-shadow:0 12px 22px rgba(0,0,0,.08);
+  max-height:360px; overflow-y:auto; display:none; z-index:4000;
+}
+
+/* Items */
+#sugBox .sug-item{ display:flex; align-items:center; gap:8px; padding:10px 12px; cursor:pointer; }
+#sugBox .sug-item:hover, #sugBox .sug-item.active{ background:#f5f7ff; }
+#sugBox .sug-type{ font-size:.75rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:.03em; }
+#sugBox .sug-text{ font-weight:600; }
+#sugBox .sug-meta{ font-size:.85rem; color:#6b7280; margin-left:auto; }
+
+/* ======= Limpieza de estilos antiguos que causaban el borde en gris ======= */
+.sugerencias-container { display:none !important; } /* no usar esta clase */
+
+/* ==== KILL focus ring dentro del buscador ==== */
+.site-search .search-input:focus,
+.site-search .search-input:focus-visible,
+.site-search .btn-search:focus,
+.site-search .btn-search:focus-visible,
+.site-search .search-pill:focus,
+.site-search .search-pill:focus-visible {
+  outline: 0 !important;
+  box-shadow: none !important;  /* anula Bootstrap */
+}
+
+/* Bootstrap le cambia el borde a inputs al hacer focus: lo anulamos */
+.site-search .form-control:focus,
+.site-search .search-input:focus {
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Sin bordes internos que dibujen líneas extras */
+.search-pill .search-input,
+.search-pill .btn-search {
+  border: 0 !important;
+}
+
+/* Evita que el ring recortado se vea como líneas arriba/abajo */
+.search-pill { overflow: visible !important; }
+
+/* Cuando el dropdown esté abierto mantenemos el encaje (sin “grieta”) */
+:root { --pill-b: 1.5px; }
+#sugBox {
+  top: calc(100% - var(--pill-b)) !important;
+  border-top: 0 !important;
+}
+.search-pill.open {
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}

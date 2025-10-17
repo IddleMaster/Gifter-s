@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Usuarios – Gifter’s{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <h1 class="h3 mb-4">Resultados para “{{ query }}”</h1>
+
+  {% if not personas_amigos and not personas_otros %}
+    <p class="text-muted">No encontramos usuarios para tu búsqueda.</p>
+  {% endif %}
+
+  {% if personas_amigos %}
+  <h2 class="h5 fw-bold text-primary mb-3">AMIGOS</h2>
+  <div class="row gy-4 mb-5">
+    {% for a in personas_amigos %}
+    <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="{{ forloop.counter0|add:1 }}00">
+      <div class="service-item position-relative text-center p-4 border rounded-4 shadow-sm">
+        <div class="mb-3">
+          {% if a.avatar %}
+          <img src="{{ a.avatar }}" alt="{{ a.nombre }}" height="100" width="100"
+               style="object-fit:cover;border-radius:50%;">
+          {% else %}
+          <img src="{% static 'img/Gifters/favicongift.png' %}" alt="{{ a.nombre }}" height="100" width="100"
+               style="object-fit:cover;border-radius:50%;">
+          {% endif %}
+        </div>
+
+        <a href="{{ a.url }}" class="stretched-link text-decoration-none">
+          <h3 class="h5 text-dark fw-bold mb-1">{{ a.nombre }}</h3>
+        </a>
+        <p class="text-muted mb-0">@{{ a.username }}</p>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if personas_otros %}
+  <h2 class="h5 fw-bold text-primary mb-3">OTROS USUARIOS</h2>
+  <div class="row gy-4 mb-5">
+    {% for o in personas_otros %}
+    <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="{{ forloop.counter0|add:1 }}00">
+      <div class="service-item position-relative text-center p-4 border rounded-4 shadow-sm">
+        <div class="mb-3">
+          {% if o.avatar %}
+          <img src="{{ o.avatar }}" alt="{{ o.nombre }}" height="100" width="100"
+               style="object-fit:cover;border-radius:50%;">
+          {% else %}
+          <img src="{% static 'img/Gifters/favicongift.png' %}" alt="{{ o.nombre }}" height="100" width="100"
+               style="object-fit:cover;border-radius:50%;">
+          {% endif %}
+        </div>
+
+        <a href="{{ o.url }}" class="stretched-link text-decoration-none">
+          <h3 class="h5 text-dark fw-bold mb-1">{{ o.nombre }}</h3>
+        </a>
+        <p class="text-muted mb-0">@{{ o.username }}</p>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<style>
+  main.container, .container.py-5 {
+    margin-bottom: 10rem; /* empuja el footer hacia abajo */
+  }
+</style>
+{% endblock %}

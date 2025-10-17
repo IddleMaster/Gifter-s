@@ -791,138 +791,6 @@ button {
   border-bottom-color: rgba(0, 0, 0, .06);
 }
 
-/* ===== ESTILOS PARA SISTEMA DE SUGERENCIAS DE BÚSQUEDA ===== */
-
-.sugerencias-container {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: white;
-  border: 1px solid #dee2e6;
-  border-top: none;
-  border-radius: 0 0 0.375rem 0.375rem;
-  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-  z-index: 9999;
-  /* Aumentamos el z-index */
-  max-height: 350px;
-  overflow-y: auto;
-  display: none;
-}
-
-.sugerencia-item {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid #f8f9fa;
-  cursor: pointer;
-  display: block;
-  text-decoration: none;
-  color: #212529;
-  transition: background-color 0.15s ease-in-out;
-  background: white;
-  width: 100%;
-  /* Aseguramos que ocupe todo el ancho */
-}
-
-.sugerencia-item:hover {
-  background-color: #f8f9fa;
-  text-decoration: none;
-  color: #212529;
-}
-
-.sugerencia-item:last-child {
-  border-bottom: none;
-}
-
-.sugerencia-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.25rem;
-}
-
-.sugerencia-tipo {
-  font-size: 0.7rem;
-  padding: 0.2rem 0.4rem;
-  border-radius: 0.25rem;
-  background: #e9ecef;
-  color: #6c757d;
-  font-weight: 600;
-  text-transform: uppercase;
-  white-space: nowrap;
-  /* Evita que se rompa el texto */
-}
-
-.sugerencia-tipo.producto {
-  background: #d1e7dd;
-  color: #0f5132;
-}
-
-.sugerencia-tipo.categoria {
-  background: #cfe2ff;
-  color: #052c65;
-}
-
-.sugerencia-tipo.marca {
-  background: #f8d7da;
-  color: #721c24;
-}
-
-.sugerencia-texto {
-  flex: 1;
-  font-weight: 600;
-  font-size: 0.9rem;
-  white-space: nowrap;
-  /* Evita que se rompa el texto */
-  overflow: hidden;
-  text-overflow: ellipsis;
-  /* Añade "..." si el texto es muy largo */
-}
-
-.sugerencia-meta {
-  font-size: 0.8rem;
-  color: #6c757d;
-  margin-left: 1.5rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.sugerencia-meta .marca {
-  color: #0d6efd;
-  font-weight: 500;
-}
-
-.sugerencia-meta .categoria {
-  color: #198754;
-}
-
-.sugerencia-descripcion {
-  font-size: 0.75rem;
-  color: #6c757d;
-  font-style: italic;
-  margin-left: 1.5rem;
-  margin-top: 0.1rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.search-pill {
-  position: relative;
-}
-
-/* Mejorar el input cuando hay sugerencias */
-.search-input:focus {
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-  z-index: 10000;
-  /* Aseguramos que esté por encima */
-}
-
-/* Asegurar que el contenedor del input tenga posición relativa */
-.input-group.search-pill {
-  position: relative;
-}
 
 /* ===== MEJORAS PARA CARRUSEL DE CATEGORÍAS ===== */
 
@@ -1131,3 +999,603 @@ body.scrolled .header .topbar{
   overflow: visible !important;
 }
 
+/* ============================
+   Buscador + Sugerencias (FINAL)
+   — Pegar al FINAL de gifters.css —
+   ============================ */
+
+/* Evita recortes del dropdown en el header */
+.branding,
+.brand-left,
+.site-search,
+.search-pill{ overflow:visible !important; }
+
+/* Contenedor del buscador tipo “pill” */
+.site-search{ position:relative; flex:1 1 520px; max-width:560px; }
+@media (max-width: 991.98px){
+  .site-search{ display:none !important; }
+}
+
+.search-pill{
+  display:flex;
+  align-items:center;
+  height:44px;                         /* altura consistente */
+  width:100%;
+  border:1.5px solid #0d6efd;
+  border-radius:999px;
+  background:#fff;
+  overflow:hidden;                      /* recorta desfases internos */
+  box-sizing:border-box;
+}
+
+/* Input limpio (sin bordes nativos ni sombras) */
+.search-pill .search-input{
+  flex:1;
+  height:100%;
+  padding:0 .95rem;
+  font-size:1rem;
+  line-height:1;
+  border:0;
+  outline:0;
+  background:#fff;
+  box-shadow:none !important;
+  appearance:none; -webkit-appearance:none;
+}
+/* Quita adornos nativos de type="search" (si lo usas) */
+.search-pill .search-input::-webkit-search-decoration,
+.search-pill .search-input::-webkit-search-cancel-button,
+.search-pill .search-input::-webkit-search-results-button,
+.search-pill .search-input::-webkit-search-results-decoration{ display:none; }
+
+/* Botón lupa alineado y sin outline raro */
+.search-pill .btn-search{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:44px;
+  height:100%;
+  border:0;
+  background:#fff;
+  border-left:1px solid rgba(13,110,253,.22); /* divisor sutil */
+  cursor:pointer;
+  outline:none;
+  box-shadow:none !important;
+}
+.search-pill .btn-search:focus,
+.search-pill .btn-search:focus-visible{
+  outline:none; box-shadow:none !important;
+}
+.search-pill .btn-search i{ font-size:1rem; line-height:1; }
+
+/* Halo de focus bonito aplicado al contenedor (no a los hijos) */
+.search-pill:focus-within{
+  box-shadow:0 0 0 .25rem rgba(13,110,253,.15);
+}
+
+/* Cuando el dropdown está abierto, encaja visualmente */
+.search-pill.sug-open{
+  border-bottom-left-radius:0;
+  border-bottom-right-radius:0;
+}
+
+/* ----------------------------
+   Dropdown de sugerencias (portal)
+   ---------------------------- */
+
+/* Caja que insertas en <body id="sugerenciasPortal"> posicionada por JS */
+#sugerenciasPortal{
+  position:fixed;                       /* evita recortes de contenedores padres */
+  border:1.5px solid #0d6efd;           /* mismo color que el pill */
+  border-top:none;                      /* se “funde” con el borde del pill */
+  background:#fff;
+  border-bottom-left-radius:14px;
+  border-bottom-right-radius:14px;
+  margin-top:-2px !important;           /* elimina la “grieta” de 1–2px */
+  box-shadow:0 12px 22px rgba(0,0,0,.08);
+  max-height:360px;
+  overflow-y:auto;
+  display:none;                         /* tu JS lo muestra/oculta */
+  z-index:4000;
+}
+
+/* (Compat) Si en algún momento no usas portal, aplica mismos estilos */
+.sugerencias-container{
+  position:absolute;
+  top:100%; left:0; right:0;
+  background:#fff;
+  border:1.5px solid #0d6efd;
+  border-top:none;
+  border-bottom-left-radius:14px;
+  border-bottom-right-radius:14px;
+  margin-top:-2px;
+  box-shadow:0 12px 22px rgba(0,0,0,.08);
+  max-height:360px;
+  overflow-y:auto;
+  display:none;
+  z-index:4000;
+}
+
+/* Ítems del dropdown (usa las clases de tu JS: .sug-*) */
+.sug-item{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:10px 12px;
+  cursor:pointer;
+}
+.sug-item:hover,
+.sug-item.active{ background:#f5f7ff; }
+
+.sug-type{
+  font-size:.75rem;
+  font-weight:700;
+  color:#6b7280;
+  text-transform:uppercase;
+  letter-spacing:.03em;
+}
+.sug-text{ font-weight:600; }
+.sug-meta{
+  font-size:.85rem;
+  color:#6b7280;
+  margin-left:auto;
+}
+
+/* (Compat) Si aún tienes clases antiguas .sugerencia-* las mapeamos aquí
+   para que se vean igual sin tocar tu backend */
+.sugerencia-item{ display:block; text-decoration:none; color:#212529; }
+.sugerencia-item:hover{ background:#f5f7ff; color:#212529; text-decoration:none; }
+.sugerencia-header{ display:flex; align-items:center; gap:.5rem; margin-bottom:.25rem; }
+.sugerencia-tipo{ font-size:.7rem; padding:.2rem .4rem; border-radius:.25rem; background:#e9ecef; color:#6c757d; font-weight:600; text-transform:uppercase; white-space:nowrap; }
+.sugerencia-tipo.producto{ background:#d1e7dd; color:#0f5132; }
+.sugerencia-tipo.categoria{ background:#cfe2ff; color:#052c65; }
+.sugerencia-tipo.marca{ background:#f8d7da; color:#721c24; }
+.sugerencia-texto{ flex:1; font-weight:600; font-size:.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sugerencia-meta{ font-size:.8rem; color:#6c757d; margin-left:1.5rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sugerencia-descripcion{ font-size:.75rem; color:#6c757d; font-style:italic; margin-left:1.5rem; margin-top:.1rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* === Quitar halo/borde azul del buscador === */
+
+/* Nada de outline/shadow en hijos del buscador */
+.site-search *:focus,
+.site-search *:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Quita el halo del contenedor cuando el input está enfocado */
+.search-pill:focus,
+.search-pill:focus-visible,
+.search-pill:focus-within {
+  box-shadow: none !important;   /* <- elimina el resplandor azul */
+}
+
+/* Asegura que input y botón no pinten nada extra */
+.search-pill .search-input,
+.search-pill .btn-search {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Si tu input tiene la clase .form-control de Bootstrap, neutralízala aquí (solo dentro del buscador) */
+.site-search .form-control:focus {
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* En Chrome/Safari, evita decoraciones/estilo nativo del <input type="search"> */
+.search-pill .search-input {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+}
+.search-pill .search-input::-webkit-search-decoration,
+.search-pill .search-input::-webkit-search-cancel-button,
+.search-pill .search-input::-webkit-search-results-button,
+.search-pill .search-input::-webkit-search-results-decoration {
+  display: none !important;
+}
+/* Cuando el dropdown está abierto, el pill no muestra los radios inferiores */
+.search-pill.sug-open{
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+#sugerenciasPortal{
+  border: 1.5px solid #0d6efd;
+  border-top: none;          /* <- importante */
+  margin-top: -2px;          /* pega los bordes sin “grieta” */
+  z-index: 4000;
+}
+
+:root { --pill-b: 1.5px; } /* grosor del borde del pill */
+
+.site-search{ position: relative; overflow: visible; }
+
+/* Pill */
+.search-pill{
+  display:flex; align-items:center;
+  height:44px; width:100%;
+  border: var(--pill-b) solid #0d6efd;
+  border-radius: 999px;
+  background:#fff; box-sizing:border-box; overflow:hidden;
+}
+.search-pill .search-input{
+  flex:1; height:100%; padding:0 .95rem; font-size:1rem;
+  border:0; outline:0; background:#fff; box-shadow:none !important;
+  -webkit-appearance:none; appearance:none;
+}
+.search-pill .btn-search{
+  display:flex; align-items:center; justify-content:center;
+  width:44px; height:100%; border:0; background:#fff;
+  border-left:1px solid rgba(13,110,253,.22);
+  outline:none; box-shadow:none !important;
+}
+.search-pill:focus, .search-pill:focus-within{ box-shadow:none !important; }
+.site-search *:focus{ outline:none !important; box-shadow:none !important; }
+
+/* Sin radios inferiores cuando el dropdown está abierto */
+.search-pill.open{
+  border-bottom-left-radius:0 !important;
+  border-bottom-right-radius:0 !important;
+}
+
+/* Dropdown: ABSOLUTO al form (no fixed), pegado sin “grieta” */
+#sugBox{
+  position:absolute; left:0; right:0;
+  top: calc(100% - var(--pill-b));   /* pega exacto al borde inferior */
+  background:#fff;
+  border: var(--pill-b) solid #0d6efd;
+  border-top: 0;
+  border-bottom-left-radius:14px; border-bottom-right-radius:14px;
+  box-shadow:0 12px 22px rgba(0,0,0,.08);
+  max-height:360px; overflow-y:auto; display:none; z-index:4000;
+}
+
+/* Ítems */
+#sugBox .sug-item{
+  display:flex; align-items:center; gap:8px;
+  padding:10px 12px; cursor:pointer;
+}
+#sugBox .sug-item:hover, #sugBox .sug-item.active{ background:#f5f7ff; }
+#sugBox .sug-type{ font-size:.75rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:.03em; }
+#sugBox .sug-text{ font-weight:600; }
+#sugBox .sug-meta{ font-size:.85rem; color:#6b7280; margin-left:auto; }
+
+
+/* ======= FIX HEADER (anula saltos del theme) ======= */
+:root { --topbar-h: 40px; } /* tu topbar real */
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 997;
+  /* Reservamos el alto de la topbar SIEMPRE para que no “salte” */
+  padding-top: var(--topbar-h) !important;
+}
+
+/* La topbar NO se colapsa al hacer scroll */
+.scrolled .header .topbar {
+  height: var(--topbar-h) !important;
+  visibility: visible !important;
+  overflow: visible !important;
+}
+
+/* El bloque branding no cambia de alto ni paddings */
+.header .branding {
+  min-height: 84px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* Quitamos transiciones globales de altura/padding del theme */
+.header, .header * {
+  transition-property: opacity, box-shadow, color, background-color, transform !important;
+}
+
+/* ======= FIX BUSCADOR + SUGERENCIAS (encaje perfecto) ======= */
+:root { --pill-b: 1.5px; }
+
+.site-search,
+.branding,
+.brand-left,
+.search-pill { overflow: visible !important; }
+
+.search-pill{
+  display:flex; align-items:center;
+  height:44px; width:100%;
+  border: var(--pill-b) solid #0d6efd;
+  border-radius: 999px;
+  background:#fff; box-sizing:border-box; overflow:hidden;
+}
+.search-pill .search-input{
+  flex:1; height:100%; padding:0 .95rem; font-size:1rem;
+  border:0; outline:0; background:#fff; box-shadow:none !important;
+  -webkit-appearance:none; appearance:none;
+}
+.search-pill .btn-search{
+  display:flex; align-items:center; justify-content:center;
+  width:44px; height:100%; border:0; background:#fff;
+  border-left:1px solid rgba(13,110,253,.22);
+  outline:none; box-shadow:none !important;
+}
+
+/* Nada de halos de enfoque */
+.site-search *:focus,
+.site-search *:focus-visible,
+.search-pill:focus,
+.search-pill:focus-within { outline:none !important; box-shadow:none !important; }
+
+/* Cuando el dropdown esté abierto, el pill pierde solo los radios inferiores */
+.search-pill.open{
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+/* El dropdown queda PEGADO al borde inferior del pill (sin “grieta”) */
+#sugBox{
+  position:absolute; left:0; right:0;
+  top: calc(100% - var(--pill-b)) !important; /* <- unión exacta */
+  background:#fff;
+  border: var(--pill-b) solid #0d6efd;
+  border-top: 0;                               /* <- sin doble borde */
+  border-bottom-left-radius:14px; border-bottom-right-radius:14px;
+  box-shadow:0 12px 22px rgba(0,0,0,.08);
+  max-height:360px; overflow-y:auto; display:none; z-index:4000;
+}
+
+/* Items */
+#sugBox .sug-item{ display:flex; align-items:center; gap:8px; padding:10px 12px; cursor:pointer; }
+#sugBox .sug-item:hover, #sugBox .sug-item.active{ background:#f5f7ff; }
+#sugBox .sug-type{ font-size:.75rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:.03em; }
+#sugBox .sug-text{ font-weight:600; }
+#sugBox .sug-meta{ font-size:.85rem; color:#6b7280; margin-left:auto; }
+
+/* ======= Limpieza de estilos antiguos que causaban el borde en gris ======= */
+.sugerencias-container { display:none !important; } /* no usar esta clase */
+
+/* ====== Buscador nuevo ====== */
+.g-search{ position:relative; width:clamp(260px,38vw,560px); }
+
+/* Caja tipo pill con borde azul */
+.g-search__box{
+  display:flex; align-items:center; height:44px;
+  border:2px solid #1970ea; border-radius:999px;
+  background:#fff; box-sizing:border-box;
+}
+
+/* Nada de halos ni sombras al enfocar */
+.g-search__box:focus-within{ box-shadow:none; }
+.g-search input, .g-search button{ outline:0 !important; box-shadow:none !important; }
+
+.g-search input{
+  flex:1; height:100%; padding:0 12px; border:0; background:transparent;
+  font:inherit; color:inherit;
+}
+.g-search__btn{
+  width:44px; height:100%; border:0; background:transparent;
+  border-left:1px solid rgba(25,112,234,.22);
+  display:flex; align-items:center; justify-content:center;
+}
+
+/* Dropdown de sugerencias pegado sin “grieta” */
+.g-search__sugs{
+  position:absolute; left:0; right:0; top:calc(100% - 2px);
+  border:2px solid #1970ea; border-top:0;
+  border-bottom-left-radius:16px; border-bottom-right-radius:16px;
+  background:#fff; box-shadow:0 12px 22px rgba(0,0,0,.08);
+  max-height:360px; overflow-y:auto;
+}
+.g-search__sugs[hidden]{ display:none; }
+
+/* Ítems */
+.g-sug{ display:flex; align-items:center; gap:8px; padding:10px 12px; cursor:pointer; }
+.g-sug:hover, .g-sug.is-active{ background:#f5f7ff; }
+.g-sug .type{ font-size:.74rem; font-weight:700; color:#6b7280; text-transform:uppercase; }
+.g-sug .text{ font-weight:600; }
+.g-sug .meta{ margin-left:auto; color:#6b7280; font-size:.85rem; }
+
+/* (Opcional) oculta estilos antiguos para evitar conflictos */
+.site-search, #sugerenciasPortal, #sugBox, .sugerencias-container{ display:none !important; }
+
+/* ====== Buscador Gifter's - versión pulida ====== */
+.g-search {
+  position: relative;
+  width: clamp(260px, 38vw, 560px);
+  font-family: 'Poppins', sans-serif;
+}
+
+/* Caja principal */
+.g-search__box {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  border: 2px solid #1970ea;
+  border-radius: 999px;
+  background: #fff;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+/* efecto leve al enfocar */
+.g-search__box:focus-within {
+  box-shadow: 0 0 0 3px rgba(25, 112, 234, 0.2);
+}
+
+/* input y botón */
+.g-search input,
+.g-search button {
+  outline: 0 !important;
+  box-shadow: none !important;
+  border: 0 !important;
+  background: transparent;
+}
+
+.g-search input {
+  flex: 1;
+  height: 100%;
+  padding: 0 14px;
+  font-size: 0.95rem;
+  color: #333;
+}
+
+.g-search input::placeholder {
+  color: #999;
+}
+
+.g-search__btn {
+  width: 44px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-left: 1px solid rgba(25, 112, 234, 0.2);
+  cursor: pointer;
+  transition: background 0.2s ease;
+  border-radius: 0 999px 999px 0;
+}
+
+.g-search__btn:hover {
+  background: rgba(25, 112, 234, 0.07);
+}
+
+/* Dropdown de sugerencias */
+.g-search__sugs {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% - 2px);
+  border: 2px solid #1970ea;
+  border-top: 0;
+  border-bottom-left-radius: 18px;
+  border-bottom-right-radius: 18px;
+  background: #fff;
+  box-shadow: 0 12px 22px rgba(0, 0, 0, 0.08);
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 6px 0;
+  animation: fadeIn 0.15s ease;
+}
+
+.g-search__sugs[hidden] {
+  display: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* cada sugerencia */
+.g-sug {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.g-sug:hover,
+.g-sug.is-active {
+  background: #f2f6ff;
+}
+
+.g-sug .type {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #1970ea;
+  text-transform: uppercase;
+  width: 80px;
+  flex-shrink: 0;
+}
+
+.g-sug .text {
+  font-weight: 600;
+  color: #222;
+}
+
+.g-sug .meta {
+  margin-left: auto;
+  color: #777;
+  font-size: 0.85rem;
+}
+
+/* separador visual entre grupos */
+.g-sug + .g-sug[type="categoria"]:before {
+  content: "";
+  display: block;
+  border-top: 1px solid #e5e9f2;
+  margin: 4px 0;
+}
+
+/* scrollbar minimal */
+.g-search__sugs::-webkit-scrollbar {
+  width: 6px;
+}
+.g-search__sugs::-webkit-scrollbar-thumb {
+  background: rgba(25, 112, 234, 0.4);
+  border-radius: 3px;
+}
+/* Estado: sugerencias abiertas */
+.g-search.is-open .g-search__box{
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  /* quita la sombra para que no “asome” por las esquinas */
+  box-shadow: none !important;
+}
+
+/* Asegura que el dropdown “continúe” el pill sin grieta */
+.g-search.is-open .g-search__sugs{
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  top: calc(100% - 2px); /* mismo grosor del borde */
+}
+
+/* Cuando hay sugerencias abiertas, el pill pierde radios inferiores y sombra */
+.g-search.is-open #gSearchBox{
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  box-shadow: none !important; /* evita el halo azul asomando */
+}
+
+/* El dropdown continúa el borde del pill sin grietas */
+#gSug{
+  position: absolute;
+  left: 0; right: 0;
+  top: calc(100% - 1px); /* pega exacto: 2px = grosor de tu borde */
+  border: 2px solid #0d6efd;
+  border-top: 0;
+  border-bottom-left-radius: 14px;
+  border-bottom-right-radius: 14px;
+  background: #fff;
+  max-height: 360px;
+  overflow-y: auto;
+  z-index: 4000;
+}
+
+/* Item y foco */
+.g-sug{ display:flex; gap:8px; align-items:center; padding:10px 12px; cursor:pointer; }
+.g-sug:hover, .g-sug.is-active{ background:#f5f7ff; }
+.g-sug .type{ font-size:.75rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:.03em; }
+.g-sug .text{ font-weight:700; }
+.g-sug .meta{ margin-left:auto; font-size:.85rem; color:#6b7280; }
+
+/* ===== Animaciones del dropdown ===== */
+@keyframes gSugIn {
+  from { opacity: 0; transform: translateY(-6px) scaleY(.98); }
+  to   { opacity: 1; transform: translateY(0)    scaleY(1); }
+}
+@keyframes gSugOut {
+  from { opacity: 1; transform: translateY(0)    scaleY(1); }
+  to   { opacity: 0; transform: translateY(-6px) scaleY(.98); }
+}
+
+/* al abrir */
+#gSug.anim-in {
+  animation: gSugIn .18s ease-out forwards;
+}
+/* al cerrar */
+#gSug.anim-out {
+  animation: gSugOut .14s ease-in forwards;
+}
+
+/* opcional: que no haga click mientras anima la salida */
+#gSug.anim-out { pointer-events: none; }
