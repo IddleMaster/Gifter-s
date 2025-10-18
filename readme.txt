@@ -91,6 +91,10 @@ giftersg4@gmail.com
 gifters123.
 
 
+James@gmail.com email
+1234 Nombre
+apellido alcornoque
+Pass: 123456
 PAGINAS...
 
 http://localhost:8000/feed/

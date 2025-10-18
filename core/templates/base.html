@@ -683,7 +683,13 @@
         <nav id="navmenu" class="navmenu d-none d-lg-block mx-auto">
           <ul>
             <li><a href="{% url 'home' %}#clients">Categorías</a></li>
-            <li><a href="{% url 'home' %}#services">Amigos</a></li>
+            <li>
+              {% if user.is_authenticated %}
+              <a href="{% url 'perfil' %}?tab=amigos">Amigos</a>
+              {% else %}
+              <a href="{% url 'account_login' %}?next={% url 'perfil' %}%3Ftab%3Damigos">Amigos</a>
+              {% endif %}
+            </li>
             <li><a href="{% url 'home' %}#portfolio">Regalos</a></li>
             <li><a href="{% url 'home' %}feed">Feed</a></li>
           </ul>
@@ -711,8 +717,11 @@
           </ul>
         </div>
         {% else %}
-        <a href="{% url 'account_login' %}" class="btn btn-primary">Iniciar Sesión</a>
+        <a href="{% url 'account_login' %}" class="btn btn-primary btn-login ms-3">
+          Iniciar Sesión
+        </a>
         {% endif %}
+
 
         <!-- Toggle buscador móvil -->
         <button id="btnMobileSearch" class="btn btn-link p-0 ms-2 d-lg-none" type="button" data-bs-toggle="collapse"
@@ -736,7 +745,13 @@
             <ul class="nav flex-column mobile-nav">
               <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#hero">Inicio</a></li>
               <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#clients">Categorías</a></li>
-              <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#services">Amigos</a></li>
+              <li class="nav-item">
+                {% if user.is_authenticated %}
+                <a class="nav-link" href="{% url 'perfil' %}?tab=amigos">Amigos</a>
+                {% else %}
+                <a class="nav-link" href="{% url 'account_login' %}?next={% url 'perfil' %}%3Ftab%3Damigos">Amigos</a>
+                {% endif %}
+              </li>
               <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#portfolio">Regalos</a></li>
               <li class="nav-item"><a class="nav-link" href="{% url 'home' %}feed">Feed</a></li>
             </ul>
@@ -990,9 +1005,9 @@
         patchRow(convId);
       }
 
-      let currentConvId = null;
+      window.currentConvId = null;
+      window.currentConvIsGroup = false;
       let pollTimer = null;
-      let currentConvIsGroup = false;
       let currentConvTitle = null;
 
       async function fetchConvMeta(convId) {
@@ -1141,7 +1156,7 @@
         }
 
         const filtered = items.filter(conv => {
-          if (Number(conv.conversacion_id) === Number(currentConvId)) return true;
+          if (Number(conv.conversacion_id) === Number(window.currentConvId)) return true;
           return !!conv.ultimo_mensaje;
         });
 
@@ -1162,7 +1177,7 @@
           setPreview(conv.conversacion_id, prevText, last.creado_en);
 
           const row = document.createElement('div');
-          row.className = 'chat-list-item' + (conv.conversacion_id === currentConvId ? ' active' : '');
+          row.className = 'chat-list-item' + (conv.conversacion_id === window.currentConvId ? ' active' : '');
           row.dataset.convId = conv.conversacion_id;
 
           // ✅ Si hay typing muéstralo; si no, usa SIEMPRE el cache (no last.contenido)
@@ -1228,29 +1243,12 @@
         if (typingSummaryTimer) { clearInterval(typingSummaryTimer); typingSummaryTimer = null; }
       }
 
-      async function openConversation(convId) {
-        currentConvId = convId;
-        const meta = await fetchConvMeta(convId);
-        currentConvIsGroup = !!meta.is_group;
-        currentConvTitle = meta.titulo || null;
-        Array.from(listEl.children).forEach(li => {
-          li.classList.toggle('active', Number(li.dataset.convId) === Number(convId));
-        });
 
-        emptyEl.hidden = true;
-        msgsEl.hidden = false;
-        formEl.hidden = false;
-
-        msgsEl.innerHTML = '<div class="p-2 text-muted">Cargando mensajes…</div>';
-        await loadMessagesOnce();
-        scrollToBottom();
-        startPolling();
-      }
 
       async function loadMessagesOnce() {
-        if (!currentConvId) return;
+        if (!window.currentConvId) return;
         // FIX: el replace tenía una RegExp mal formada; usar template string
-        const url = "{% url 'mensajes_list_create' 0 %}".replace('/0/', `/${currentConvId}/`);
+        const url = "{% url 'mensajes_list_create' 0 %}".replace('/0/', `/${window.currentConvId}/`);
         try {
           const res = await fetch(url, { credentials: 'same-origin' });
           if (!res.ok) throw new Error('Error cargando mensajes');
@@ -1262,12 +1260,12 @@
           if (arr.length) {
             const newest = arr[0];
             const prevText = (newest.tipo === 'imagen') ? '📷 Imagen' : slicePreview(newest.contenido);
-            setPreview(currentConvId, prevText, newest.creado_en);
+            setPreview(window.currentConvId, prevText, newest.creado_en);
             // Parchea la fila visible sin reconstruir toda la lista
-            const row = Array.from(listEl.children).find(x => String(x.dataset.convId) === String(currentConvId));
+            const row = Array.from(listEl.children).find(x => String(x.dataset.convId) === String(window.currentConvId));
             if (row) {
-              const l2 = row.querySelector('.line2'); if (l2) l2.textContent = getPreview(currentConvId).text;
-              const t = row.querySelector('.chat-time'); if (t) t.textContent = formatTime(getPreview(currentConvId).time);
+              const l2 = row.querySelector('.line2'); if (l2) l2.textContent = getPreview(window.currentConvId).text;
+              const t = row.querySelector('.chat-time'); if (t) t.textContent = formatTime(getPreview(window.currentConvId).time);
             }
           }
 
@@ -1317,7 +1315,7 @@
           const authorId = Number(m.remitente && m.remitente.id);
           const isMe = authorId === meId;
           const whenMs = parseMs(m.creado_en);
-          const showAvatar = currentConvIsGroup ? true : isBlockStart(authorId, whenMs);
+          const showAvatar = window.currentConvIsGroup ? true : isBlockStart(authorId, whenMs);
 
           // —— Separador de día si cambió
           const dayKey = dayKeyFromMs(whenMs || Date.now());
@@ -1362,7 +1360,7 @@
                   onerror="this.onerror=null;this.src='${AVATAR_FALLBACK}'">` : ''
             }
             <div class="bubble">
-              ${currentConvIsGroup ? `<div style="font-weight:700; font-size:.9rem; margin-bottom:4px;">${senderName}</div>` : ''}
+              ${window.currentConvIsGroup ? `<div style="font-weight:700; font-size:.9rem; margin-bottom:4px;">${senderName}</div>` : ''}
               <div class="body">${bodyHTML}</div>
               <div class="meta">${when}</div>
             </div>
@@ -1381,10 +1379,10 @@
       formEl.addEventListener('submit', async (ev) => {
         ev.preventDefault();
         const text = (textEl.value || '').trim();
-        if (!text || !currentConvId) return;
+        if (!text || !window.currentConvId) return;
 
         // FIX: igual que arriba con el replace
-        const url = "{% url 'mensajes_list_create' 0 %}".replace('/0/', `/${currentConvId}/`);
+        const url = "{% url 'mensajes_list_create' 0 %}".replace('/0/', `/${window.currentConvId}/`);
         try {
           const res = await fetch(url, {
             method: 'POST',
@@ -1397,11 +1395,11 @@
           await loadMessagesOnce();
           scrollToBottom();
           // Pre-actualiza preview del hilo actual
-          setPreview(currentConvId, slicePreview(text), new Date().toISOString());
-          const row = Array.from(listEl.children).find(x => String(x.dataset.convId) === String(currentConvId));
+          setPreview(window.currentConvId, slicePreview(text), new Date().toISOString());
+          const row = Array.from(listEl.children).find(x => String(x.dataset.convId) === String(window.currentConvId));
           if (row) {
-            const l2 = row.querySelector('.line2'); if (l2) l2.textContent = getPreview(currentConvId).text;
-            const t = row.querySelector('.chat-time'); if (t) t.textContent = formatTime(getPreview(currentConvId).time);
+            const l2 = row.querySelector('.line2'); if (l2) l2.textContent = getPreview(window.currentConvId).text;
+            const t = row.querySelector('.chat-time'); if (t) t.textContent = formatTime(getPreview(window.currentConvId).time);
           }
           loadConversations(); // refresca preview del último mensaje
         } catch (e) {
@@ -1426,7 +1424,7 @@
       attachBtn?.addEventListener('click', () => fileEl?.click());
 
       fileEl?.addEventListener('change', async () => {
-        if (!fileEl.files || !fileEl.files.length || !currentConvId) return;
+        if (!fileEl.files || !fileEl.files.length || !window.currentConvId) return;
         const file = fileEl.files[0];
 
         // Validaciones rápidas
@@ -1442,7 +1440,7 @@
         }
 
         try {
-          const url = "{% url 'mensajes_list_create' 0 %}".replace('/0/', `/${currentConvId}/`);
+          const url = "{% url 'mensajes_list_create' 0 %}".replace('/0/', `/${window.currentConvId}/`);
           const fd = new FormData();
           fd.append('tipo', 'imagen');
           fd.append('archivo', file);
@@ -1460,11 +1458,11 @@
           // refresca mensajes y preview
           await loadMessagesOnce();
           scrollToBottom();
-          setPreview(currentConvId, '📷 Imagen', new Date().toISOString());
-          const row = Array.from(listEl.children).find(x => String(x.dataset.convId) === String(currentConvId));
+          setPreview(window.currentConvId, '📷 Imagen', new Date().toISOString());
+          const row = Array.from(listEl.children).find(x => String(x.dataset.convId) === String(window.currentConvId));
           if (row) {
-            const l2 = row.querySelector('.line2'); if (l2) l2.textContent = getPreview(currentConvId).text;
-            const t = row.querySelector('.chat-time'); if (t) t.textContent = formatTime(getPreview(currentConvId).time);
+            const l2 = row.querySelector('.line2'); if (l2) l2.textContent = getPreview(window.currentConvId).text;
+            const t = row.querySelector('.chat-time'); if (t) t.textContent = formatTime(getPreview(window.currentConvId).time);
           }
           loadConversations();
         } catch (e) {
@@ -1528,12 +1526,11 @@
       const typingWhoEl = typingEl?.querySelector('.who');
 
       function typingUrl() {
-        // usa el placeholder /0/
-        return window.URLS.typing.replace('/0/', `/${currentConvId}/`);
+        return window.URLS.typing.replace('/0/', `/${window.currentConvId}/`);
       }
 
       async function sendTyping(isTyping) {
-        if (!currentConvId) return;
+        if (!window.currentConvId) return;
         try {
           await fetch(typingUrl(), {
             method: 'POST',
@@ -1556,7 +1553,7 @@
       }
 
       async function pollTyping() {
-        if (!currentConvId) return;
+        if (!window.currentConvId) return;
         try {
           const r = await fetch(typingUrl(), { credentials: 'same-origin' });
           if (!r.ok) return;
@@ -1604,18 +1601,125 @@
         if (typingEl) typingEl.hidden = true;
       };
 
-      // cuando cambies de conversación:
-      const _openConversationOriginal = openConversation;
-      openConversation = async function (convId) {
-        await _openConversationOriginal(convId);
-        wasTypingMap.set(String(convId), false); // limpia estado para esa fila
-        pollTyping(); // primer fetch inmediato
-      };
+      Object.assign(window, {
+        loadMessagesOnce,
+        renderMessages,
+        startPolling,
+        stopPolling,
+        loadConversations,
+        pollTyping
+      });
     })();
   </script>
   <script>
     (function () {
       const drawer = document.getElementById('chatDrawer');
+      const groupsListEl = drawer.querySelector('#chat-groups-list');   // UL/Div de la pestaña "Grupos"
+      const chatsListEl = drawer.querySelector('#chat-chats-list');    // UL/Div de la pestaña "Chats"
+      const msgsEl = drawer.querySelector('#chat-messages');      // panel derecho mensajes
+      const emptyEl = drawer.querySelector('#chat-empty');         // “Selecciona un chat…”
+      const formEl = drawer.querySelector('#chat-form');          // form enviar mensaje
+      const headerTitleEl = drawer.querySelector('#chat-header-title');  // título/Nombre del chat/grupo
+      const inputMsgEl = drawer.querySelector('#chat-input');         // textarea/input mensaje
+
+      // estado global
+      window.currentConvId = null;
+
+      /* === 1) delegación de eventos (robusto para contenido dinámico) === */
+      drawer.addEventListener('click', (ev) => {
+        const row = ev.target.closest('.chat-list-item');
+        if (!row) return;
+
+        const id = Number(row.dataset.convId || row.dataset.cid);
+        if (!id) return;
+
+        ev.preventDefault();
+        openConversation(id);
+      });
+
+      document.addEventListener('click', (ev) => {
+        const { drawer } = getChatRefs();
+        if (!drawer) return;
+        if (!drawer.contains(ev.target)) return;
+
+        const row = ev.target.closest('.chat-list-item');
+        if (!row) return;
+
+        const id = Number(row.dataset.convId || row.dataset.cid);
+        if (!id) return;
+
+        ev.preventDefault();
+        openConversation(id);
+      });
+      /* === 2) marcar activo en ambas listas === */
+      function markActive(convId) {
+        const { drawer } = getChatRefs();
+        if (!drawer) return;
+        const rows = drawer.querySelectorAll('.chat-list-item');
+        rows.forEach(li => {
+          const id = Number(li.dataset.convId || li.dataset.cid);
+          li.classList.toggle('active', id === Number(convId));
+        });
+      }
+
+      /* === 3) abrir conversación (meta + mensajes) === */
+      window.currentConvId = null;
+
+      async function openConversation(convId) {
+        window.openConversation = openConversation;
+        const { msgsEl, emptyEl, formEl, headerTitleEl, inputMsgEl } = getChatRefs();
+        if (!msgsEl || !emptyEl || !formEl) {
+          console.error('[openConversation] No están los contenedores necesarios (msgsEl/emptyEl/formEl). Revisa los IDs/clases del drawer.');
+          return;
+        }
+
+        try {
+          if (!convId) return;
+          if (window.currentConvId === convId) { inputMsgEl?.focus(); return; }
+
+          window.currentConvId = convId;
+
+          markActive(convId);
+
+          // Estado UI inmediato (asegura que existen antes de setear)
+          emptyEl.hidden = true;
+          msgsEl.hidden = false;
+          formEl.hidden = false;
+          msgsEl.innerHTML = '<div class="p-2 text-muted">Cargando mensajes…</div>';
+          if (headerTitleEl) headerTitleEl.textContent = 'Cargando…';
+
+          // 1) META
+          const metaUrl = window.URLS.conversacionDetalleBase.replace('/0/', `/${convId}/`);
+          const rMeta = await fetch(metaUrl, { credentials: 'same-origin' });
+          if (rMeta.status === 403) { msgsEl.innerHTML = '<div class="p-2 text-danger">No perteneces a este grupo.</div>'; return; }
+          if (!rMeta.ok) { msgsEl.innerHTML = '<div class="p-2 text-danger">No fue posible abrir la conversación.</div>'; return; }
+          const meta = await rMeta.json();
+          const isGroup = !!meta?.is_group;
+          window.currentConvIsGroup = isGroup;      // ← sincroniza 1:1 vs grupo (restaura tu estilo)
+          if (typeof startPolling === 'function') startPolling();  // ← empieza el polling de mensajes
+          if (typeof pollTyping === 'function') pollTyping();      // ← primer fetch de “escribiendo…”
+          const titulo = meta?.titulo || 'Chat';
+          if (headerTitleEl) headerTitleEl.textContent = titulo;
+
+          // 2) MENSAJES
+          // 2) MENSAJES — usa SIEMPRE el renderer “bueno” del primer script
+          if (typeof loadMessagesOnce === 'function') {
+            await loadMessagesOnce();           // pinta con burbujas con estilos
+            msgsEl.scrollTop = msgsEl.scrollHeight;
+          }
+          inputMsgEl?.focus();
+
+          inputMsgEl?.focus();
+
+        } catch (err) {
+          console.error('[openConversation] error:', err);
+          const { msgsEl } = getChatRefs();
+          if (msgsEl) msgsEl.innerHTML = '<div class="p-2 text-danger">Error inesperado al abrir el chat.</div>';
+        }
+      }
+
+
+
       if (!drawer) return;
 
       // Columna izquierda
@@ -1809,7 +1913,9 @@
         try {
           const res = await fetch(window.URLS.conversaciones, { credentials: 'same-origin' });
           const data = await res.json();
-          const grupos = (data || []).filter(c => c.is_group);
+          const grupos = (data || []).filter(c =>
+            c.is_group || String(c.tipo || '').toLowerCase() === 'grupo'
+          );
 
           const list = document.createElement('div');
           list.className = 'px-2';
@@ -1824,7 +1930,7 @@
                 : '';
               const when = g.ultimo_mensaje?.creado_en ? new Date(g.ultimo_mensaje.creado_en).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
               return `
-            <div class="chat-list-item" data-cid="${g.conversacion_id}">
+            <div class="chat-list-item" data-conv-id="${g.conversacion_id}">
               <div class="d-flex align-items-center">
                 <div class="d-flex align-items-center" style="width:50px">${imgs}</div>
                 <div class="chat-names">
@@ -1845,7 +1951,7 @@
           groupsEl.querySelector('#btnNewGroup')?.addEventListener('click', loadFriendsForModal);
           groupsEl.querySelectorAll('.chat-list-item').forEach(row => {
             row.addEventListener('click', () => {
-              const cid = Number(row.dataset.cid);
+              const cid = Number(row.dataset.convId);
               if (window.openConversation) window.openConversation(cid);
             });
           });
@@ -2015,6 +2121,45 @@
 
       document.addEventListener('click', e => { if (!form.contains(e.target)) closeSugs(); });
     })();
+
+
+    // ===== helpers de refs (tolerantes a distintos IDs/clases) =====
+    function qOne(root, selectors) {
+      for (const sel of selectors) {
+        const el = root.querySelector(sel);
+        if (el) return el;
+      }
+      return null;
+    }
+
+    function getChatRefs() {
+      const drawer = document.getElementById('chatDrawer') || document.querySelector('.chat-drawer');
+
+      // Listas
+      const groupsListEl = qOne(drawer, ['#groupsList', '#chat-groups-list', '.chat-groups-list', '[data-chat="groups-list"]']);
+      const chatsListEl = qOne(drawer, ['#chatList', '#chat-chats-list', '.chat-chats-list', '[data-chat="chats-list"]']);
+
+      // Panel derecho
+      const msgsEl = qOne(drawer, ['#chatMessages', '#chat-messages', '.chat-messages', '[data-chat="messages"]', '.chat-pane-messages']);
+      const emptyEl = qOne(drawer, ['#chatEmpty', '#chat-empty', '.chat-empty', '[data-chat="empty"]']);
+      const formEl = qOne(drawer, ['#chatForm', '#chat-form', 'form.chat-input', 'form.chat-form', '[data-chat="form"]']);
+      const headerTitleEl = qOne(drawer, ['#chat-header-title', '.chat-header-title', '[data-chat="header-title"]', '.phone-header .brand span']);
+      const inputMsgEl = qOne(drawer, ['#chatText', '#chat-input', 'textarea#chatText', 'textarea[name="message"]', 'input[name="message"]', '[data-chat="input"]']);
+
+      const missing = [];
+      if (!drawer) missing.push('drawer (#chatDrawer / .chat-drawer)');
+      if (!groupsListEl) missing.push('groupsListEl (#groupsList / #chat-groups-list / …)');
+      if (!chatsListEl) missing.push('chatsListEl (#chatList / #chat-chats-list / …)');
+      if (!msgsEl) missing.push('msgsEl (#chatMessages / #chat-messages / …)');
+      if (!emptyEl) missing.push('emptyEl (#chatEmpty / #chat-empty / …)');
+      if (!formEl) missing.push('formEl (#chatForm / #chat-form / …)');
+      // headerTitleEl es opcional
+      if (!inputMsgEl) missing.push('inputMsgEl (#chatText / #chat-input / …)');
+
+      if (missing.length) console.warn('[chat] Faltan nodos en el DOM:', missing);
+
+      return { drawer, groupsListEl, chatsListEl, msgsEl, emptyEl, formEl, headerTitleEl, inputMsgEl };
+    }
   </script>
 
 

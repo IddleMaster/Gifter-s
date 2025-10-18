@@ -109,3 +109,21 @@ class LikeAdmin(admin.ModelAdmin):
         else:
             return f"Comentario {obj.id_comentario_id}"
     elemento_likeado.short_description = 'Elemento Likeado'
+    
+
+@admin.register(Categoria)
+class CategoriaAdmin(admin.ModelAdmin):
+    list_display = ['id_categoria', 'nombre_categoria']
+    search_fields = ['nombre_categoria']
+
+@admin.register(Marca)
+class MarcaAdmin(admin.ModelAdmin):
+    list_display = ['id_marca', 'nombre_marca']
+    search_fields = ['nombre_marca']
+
+@admin.register(Producto)
+class ProductoAdmin(admin.ModelAdmin):
+    list_display = ['id_producto', 'nombre_producto', 'precio', 'id_categoria', 'id_marca', 'activo']
+    list_filter = ['activo', 'id_categoria', 'id_marca']
+    search_fields = ['nombre_producto', 'descripcion']
+    list_editable = ['precio', 'activo']

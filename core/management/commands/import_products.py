@@ -192,7 +192,7 @@ class Command(BaseCommand):
                                     url=row[mapping['url_tienda']].strip(),
                                     defaults={'nombre_tienda': 'Tienda Principal', 'es_principal': True}
                                 )
-                            url_imagen = cleaned_row.get(mapping.get('url_imagen')) # Usamos .get para que no falle si no existe
+                            url_imagen = row.get(mapping.get('url_imagen')) # Usamos .get para que no falle si no existe 
                             if url_imagen:
                                 try:
                                     response = requests.get(url_imagen, stream=True)

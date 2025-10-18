@@ -1,0 +1,51 @@
+nombre;descripcion;precio;categoria;marca;imagen_url
+Polera Lisa;Polera de algodón;15000;Ropa;Genérica;productos/producto_1.png
+Zapatillas Deportivas;Zapatillas para correr;45000;Calzado;Nike;productos/producto_2.png
+Balón de Fútbol;Balón oficial;25000;Deportes;Adidas;productos/producto_3.png
+Set de Maquillaje;Set completo de maquillaje;30000;Belleza;L'Oréal;productos/producto_4.png
+Lego Nissan GTR;Auto de juguete armable;50000;Juguetes;Lego;productos/producto_5.png
+Trencito de Juguete;Tren de madera para niños;18000;Juguetes;Genérica;productos/producto_6.png
+Reloj Festina;Reloj de pulsera elegante;120000;Accesorios;Festina;productos/producto_7.png
+Lentes Ray-Ban;Lentes de sol modelo aviador;90000;Accesorios;Ray-Ban;productos/producto_8.png
+Comida Master Dog;Comida para perro adulto 20kg;22000;Mascotas;Master Dog;productos/producto_9.png
+Dron Sonic;Dron con cámara HD;75000;Tecnología;Sonic;productos/producto_10.png
+Audífonos Inalámbricos;Audífonos Bluetooth;35000;Tecnología;Sony;productos/producto_11.png
+Teclado Mecánico;Teclado gamer retroiluminado;60000;Tecnología;Razer;productos/producto_12.png
+Mouse Gamer;Mouse óptico alta precisión;40000;Tecnología;Logitech;productos/producto_13.png
+Monitor Curvo;Monitor 27 pulgadas;180000;Tecnología;Samsung;productos/producto_14.png
+Silla Gamer;Silla ergonómica;130000;Hogar;Genérica;productos/producto_15.png
+Escritorio Eléctrico;Escritorio ajustable;250000;Hogar;Genérica;productos/producto_16.png
+Lámpara de Escritorio;Lámpara LED;12000;Hogar;Genérica;productos/producto_17.png
+Botella de Agua;Botella reutilizable 1L;8000;Hogar;Genérica;productos/producto_18.png
+Mochila Urbana;Mochila para notebook;28000;Accesorios;Head;productos/producto_19.png
+Smartwatch;Reloj inteligente;85000;Tecnología;Xiaomi;productos/producto_20.png
+Cafetera Italiana;Cafetera moka 6 tazas;16000;Hogar;Bialetti;productos/producto_21.png
+Hervidor Eléctrico;Hervidor 1.7L;19000;Hogar;Oster;productos/producto_22.png
+Juego de Sábanas;Sábanas 2 plazas;24000;Hogar;Cannon;productos/producto_23.png
+Toalla de Baño;Toalla grande;9000;Hogar;Genérica;productos/producto_24.png
+Pesa Rusa;Kettlebell 8kg;14000;Deportes;Genérica;productos/producto_25.png
+Mat de Yoga;Mat de 6mm;11000;Deportes;Genérica;productos/producto_26.png
+Banda Elástica;Set de 3 bandas;7000;Deportes;Genérica;productos/producto_27.png
+Libro "Dune";Libro de ciencia ficción;20000;Libros;Genérica;productos/producto_28.png
+Libro "1984";Novela distópica;13000;Libros;Genérica;productos/producto_29.png
+Funko Pop Grogu;Figura coleccionable;15000;Juguetes;Funko;productos/producto_30.png
+Funko Pop Spiderman;Figura coleccionable;15000;Juguetes;Funko;productos/producto_31.png
+Puzzle 1000 piezas;Puzzle de paisaje;17000;Juguetes;Genérica;productos/producto_32.png
+Crema Hidratante;Crema facial;23000;Belleza;Nivea;productos/producto_33.png
+Perfume Hombre;Eau de Toilette 100ml;55000;Belleza;Hugo Boss;productos/producto_34.png
+Perfume Mujer;Eau de Parfum 50ml;65000;Belleza;Dior;productos/producto_35.png
+Shampoo Anticaspa;Shampoo 400ml;6000;Belleza;Head & Shoulders;productos/producto_36.png
+Acondicionador;Acondicionador 400ml;6000;Belleza;Pantene;productos/producto_37.png
+Pelota de Tenis;Pack 3 pelotas;5000;Deportes;Wilson;productos/producto_38.png
+Raqueta de Tenis;Raqueta adulto;70000;Deportes;Babolat;productos/producto_39.png
+Jeans Hombre;Pantalón denim;32000;Ropa;Levi's;productos/producto_40.png
+Polerón con Capucha;Polerón de algodón;29000;Ropa;Gap;productos/producto_41.png
+Chaqueta Impermeable;Chaqueta cortaviento;48000;Ropa;The North Face;productos/producto_42.png
+Calcetines Deportivos;Pack 3 pares;8000;Ropa;Genérica;productos/producto_43.png
+Billetera de Cuero;Billetera clásica;21000;Accesorios;Genérica;productos/producto_44.png
+Cinturón de Cuero;Cinturón formal;17000;Accesorios;Genérica;productos/producto_45.png
+Zapatos Formales;Zapatos de cuero;55000;Calzado;Gacel;productos/producto_46.png
+Sandalias;Sandalias de verano;19000;Calzado;Genérica;productos/producto_47.png
+Botines;Botines de cuero;65000;Calzado;CAT;productos/producto_48.png
+Rascador para Gato;Rascador con niveles;33000;Mascotas;Genérica;productos/producto_49.png
+Arena Sanitaria;Arena 10kg;13000;Mascotas;Genérica;productos/producto_50.png

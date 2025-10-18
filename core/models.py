@@ -946,7 +946,7 @@ class Producto(models.Model):
     imagen = models.ImageField(upload_to="productos/", blank=True, null=True)
     id_categoria = models.ForeignKey(Categoria, on_delete=models.CASCADE)
     id_marca = models.ForeignKey(Marca, on_delete=models.CASCADE)
-    precio = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    precio = models.IntegerField(null=True, blank=True)
     
     # Campos de control
     activo = models.BooleanField(default=True, verbose_name='¿Activo?')

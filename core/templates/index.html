@@ -261,49 +261,6 @@
   <div class="container section-title" data-aos="fade-up">
     <h2>Conecta en Gifter’s</h2>
 
-    {# ----- Solicitudes ----- #}
-    {% if solicitudes_recibidas %}
-      <div class="mb-2">
-        <h3 class="h6">Solicitudes recibidas</h3>
-      </div>
-      <div class="row gy-3 mb-4">
-        {% for s in solicitudes_recibidas %}
-        <div class="col-md-6">
-          <div class="d-flex align-items-center gap-3">
-            <strong>@{{ s.emisor.nombre_usuario }}</strong>
-            <form method="post" action="{% url 'amistad_aceptar' s.emisor.nombre_usuario %}">
-              {% csrf_token %}
-              <button class="btn btn-success btn-sm">Aceptar</button>
-            </form>
-            <form method="post" action="{% url 'amistad_cancelar' s.emisor.nombre_usuario %}">
-              {% csrf_token %}
-              <button class="btn btn-outline-secondary btn-sm">Rechazar</button>
-            </form>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
-    {% endif %}
-
-    {% if solicitudes_enviadas %}
-      <div class="mb-2">
-        <h3 class="h6">Solicitudes enviadas</h3>
-      </div>
-      <div class="row gy-3 mb-4">
-        {% for s in solicitudes_enviadas %}
-        <div class="col-md-6">
-          <div class="d-flex align-items-center gap-3">
-            <span>Para @{{ s.receptor.nombre_usuario }}</span>
-            <form method="post" action="{% url 'amistad_cancelar' s.receptor.nombre_usuario %}">
-              {% csrf_token %}
-              <button class="btn btn-outline-danger btn-sm">Cancelar</button>
-            </form>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
-    {% endif %}
-
     {# >>>>>>>>>>> Mantenemos este texto tal cual <<<<<<<<<<< #}
     <p><span>Personas que quizás conozcas</span> <span class="description-title"></span></p>
   </div>

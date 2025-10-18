@@ -1,98 +1,90 @@
-# ========== Standard library ==========
-import json
-import os
-import uuid
 from itertools import count
-from django.contrib.auth import get_user_model
-import traceback
-# ========== Django ==========
-from .forms import ContactForm
-from django.conf import settings
+from django.http import JsonResponse, HttpResponseForbidden
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth import login
 from django.contrib import messages
-from django.contrib.auth import authenticate, get_user_model, login
+from django.conf import settings
+from .forms import PostForm, RegisterForm, PerfilForm, PreferenciasUsuarioForm, EventoForm
+from .models import *
+from .emails import send_verification_email, send_welcome_email
+from django.core.paginator import Paginator
+from django.db.models import Q, Avg
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import AuthenticationForm
-from django.core.cache import cache
-from django.core.exceptions import ValidationError
-from django.core.files.storage import default_storage
+from django.contrib.auth import authenticate, login
 from django.core.mail import send_mail
-from django.core.paginator import Paginator
-from django.db import IntegrityError, transaction
-from django.db.models import (
-    Avg,
-    Case,
-    Count,
-    Prefetch,
-    Q,
-    When,
-)
-from django.http import (
-    HttpResponseBadRequest,
-    HttpResponseForbidden,
-    JsonResponse,
-)
-
-from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.db import IntegrityError, transaction
+from django.core.exceptions import ValidationError
 from django.utils import timezone
-from django.utils.html import escape
-from django.utils.text import get_valid_filename
-from django.views.decorators.http import require_GET, require_POST, require_http_methods
-from django.shortcuts import render
-# ========== Third-party ==========
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
+import uuid
+from django.shortcuts import get_object_or_404
+from .models import User, Post, Like  # ajusta si necesitas más
+from core.forms import ProfileEditForm
+from .utils import get_default_wishlist
+from django.db.models import Q, Avg, Case, When
+from django.db.models import Prefetch, Q
+from core.models import Wishlist, ItemEnWishlist
 from rest_framework import generics, permissions, status
-from rest_framework.pagination import PageNumberPagination
-from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
-# ========== Project: forms/serializers/utils/emails/search ==========
-from core.forms import ProfileEditForm
+from core.models import User, SolicitudAmistad, Seguidor, Evento
+from .serializers import SolicitudAmistadSerializer, UsuarioLiteSerializer
+from .models import *
+from .serializers import *
+from core.models import Producto, Categoria, Marca
 from core.search import meili
-from .emails import send_verification_email, send_welcome_email
-from .forms import (
-    EventoForm,
-    PerfilForm,
-    PostForm,
-    PreferenciasUsuarioForm,
-    RegisterForm,
-)
-from .serializers import (
-    ConversacionLiteSerializer,
-    ConversacionSerializer,
-    MensajeSerializer,
-    SolicitudAmistadSerializer,
-    UsuarioLiteSerializer,
-)
-from .services_social import (
-    amigos_qs,
-    obtener_o_crear_conv_directa,
-    sugerencias_qs,
-)
-from .utils import get_default_wishlist
+from django.contrib.auth import get_user_model
+from django.shortcuts import get_object_or_404, redirect, render  # ajusta imports según tu app
+from core.models import Evento, Post, Seguidor, SolicitudAmistad
+from rest_framework.pagination import PageNumberPagination
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+from core.models import Wishlist, ItemEnWishlist
+from core.models import Conversacion, Mensaje, ParticipanteConversacion
+from .serializers import ConversacionLiteSerializer, MensajeSerializer
+###nuevo hoy 1 del 10 (abajo)
+from core.services_social import amigos_qs, sugerencias_qs, obtener_o_crear_conv_directa
+from django.contrib.auth import get_user_model
+from core.models import Post, Comentario
+from django.utils.html import escape
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
+from django.http import JsonResponse, HttpResponseForbidden
+from django.urls import reverse  # puedes dejarlo, pero ya no dependemos de reverse en el fallback
+from django.views.decorators.http import require_GET
+from django.core.cache import cache
+# Para Reseña
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.db import IntegrityError
+from django.db.models import Avg, Count
+from django.core.files.storage import default_storage
+from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
+from django.utils.text import get_valid_filename
+import os, uuid
+import json
+from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse, HttpResponseBadRequest, HttpResponseForbidden
+from django.views.decorators.http import require_http_methods
+from django.shortcuts import get_object_or_404
 
-# ========== Project: models (explícitos, sin wildcards) ==========
-from .models import (
-    Categoria,
-    Comentario,
-    Conversacion,
-    EntregaMensaje,
-    Evento,
-    ItemEnWishlist,
-    Like,
-    Marca,
-    Mensaje,
-    ParticipanteConversacion,
-    Post,
-    Producto,
-    Seguidor,
-    SolicitudAmistad,
-    User,
-    Wishlist,
-)
 
+# Decoradores/permissions DRF
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAdminUser,IsAuthenticated
+
+# Utilidades Django
+from django.core.management import call_command
+from rest_framework.authentication import SessionAuthentication, BasicAuthentication
+
+# Stdlib
+import traceback
+
+# Formularios locales (solo si tienes una vista de contacto que lo use)
+from .forms import ContactForm
 User = get_user_model()
 def usuarios_list(request):
     """
@@ -126,6 +118,29 @@ def usuarios_list(request):
         "personas_otros": personas_otros,
     }
     return render(request, "usuarios_list.html", context)
+@login_required
+def amistad_rechazar(request, username):
+    """
+    Rechaza una solicitud RECIBIDA (emisor = 'username', receptor = request.user).
+    Responde JSON si es AJAX; si no, redirige con mensaje.
+    """
+    User = get_user_model()
+    emisor = get_object_or_404(User, nombre_usuario=username)
+
+    sol = get_object_or_404(
+        SolicitudAmistad,
+        emisor=emisor,
+        receptor=request.user,
+        estado=SolicitudAmistad.Estado.PENDIENTE,
+    )
+
+    sol.rechazar()
+
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JsonResponse({"ok": True, "username": emisor.nombre_usuario})
+
+    messages.info(request, "Solicitud rechazada.")
+    return redirect("perfil")
 
 # === Helpers para pintar personas en resultados ===
 def _avatar_abs(request, u):
@@ -1136,10 +1151,7 @@ def buscar_productos(request):
        
         return _render_db(Producto.objects.filter(activo=True))
 
-from django.http import JsonResponse
-from django.conf import settings
-from django.db.models import Q
-from core.search import meili  # asegúrate de tenerlo importado
+
 
 def _user_doc_to_sug(u):
     nombre = f"{(u.nombre or '').strip()} {(u.apellido or '').strip()}".strip() or (u.nombre_usuario or '')
@@ -1369,9 +1381,11 @@ def profile_view(request):
     perfil, _ = Perfil.objects.get_or_create(user=request.user)
     prefs, _ = PreferenciasUsuario.objects.get_or_create(user=request.user)
 
-    eventos = (Evento.objects
-               .filter(id_usuario=request.user)
-               .order_by('fecha_evento', 'evento_id'))
+    eventos = (
+        Evento.objects
+        .filter(id_usuario=request.user)
+        .order_by('fecha_evento', 'evento_id')
+    )
 
     # Crear evento inline
     if request.method == 'POST' and request.POST.get('form') == 'evento':
@@ -1388,18 +1402,20 @@ def profile_view(request):
     # ===== Amigos (seguimiento mutuo) =====
     User = get_user_model()
     ids_yo_sigo   = Seguidor.objects.filter(seguidor=request.user)\
-                     .values_list('seguido_id', flat=True)
+                      .values_list('seguido_id', flat=True)
     ids_me_siguen = Seguidor.objects.filter(seguido=request.user)\
-                     .values_list('seguidor_id', flat=True)
+                      .values_list('seguidor_id', flat=True)
     ids_amigos = set(ids_yo_sigo).intersection(set(ids_me_siguen))
 
-    amigos = User.objects.filter(id__in=ids_amigos)\
-             .select_related('perfil')\
-             .order_by('nombre', 'apellido')
-    
+    amigos = (
+        User.objects.filter(id__in=ids_amigos)
+        .select_related('perfil')
+        .order_by('nombre', 'apellido')
+    )
+
     wl = get_default_wishlist(request.user)
 
-    # ⬇️ PEQUEÑO ajuste: sólo items NO recibidos en la wishlist
+    # Wishlist: solo NO recibidos
     wishlist_items = (
         ItemEnWishlist.objects
         .filter(id_wishlist=wl, fecha_comprado__isnull=True)
@@ -1408,7 +1424,7 @@ def profile_view(request):
         .order_by('-id_item')
     )
 
-    # ⬇️ NUEVO: items YA recibidos para la pestaña "Regalos recibidos"
+    # Recibidos (para pestaña "Regalos recibidos")
     recibidos_items = (
         ItemEnWishlist.objects
         .filter(id_wishlist=wl, fecha_comprado__isnull=False)
@@ -1417,21 +1433,40 @@ def profile_view(request):
         .order_by('-fecha_comprado', '-id_item')
     )
 
-    favoritos_ids = set(
-        wishlist_items.values_list('id_producto', flat=True)
+    # ==== Solicitudes (mismos nombres que en index) ====
+    solicitudes_recibidas = (
+        SolicitudAmistad.objects
+        .filter(receptor=request.user, estado=SolicitudAmistad.Estado.PENDIENTE)
+        .select_related('emisor', 'emisor__perfil')
+        .order_by('-creada_en')
     )
+    solicitudes_enviadas = (
+        SolicitudAmistad.objects
+        .filter(emisor=request.user, estado=SolicitudAmistad.Estado.PENDIENTE)
+        .select_related('receptor', 'receptor__perfil')
+        .order_by('-creada_en')
+    )
+    sol_pendientes_count = solicitudes_recibidas.count()
+
+    favoritos_ids = set(wishlist_items.values_list('id_producto', flat=True))
 
     context = {
         'perfil': perfil,
         'prefs': prefs,
         'eventos': eventos,
         'evento_form': evento_form,
-        'amigos': amigos, 
+        'amigos': amigos,
         'wishlist_items': wishlist_items,
         'favoritos_ids': favoritos_ids,
         'recibidos_items': recibidos_items,
+
+        # ← nombres idénticos a index.html
+        'solicitudes_recibidas': solicitudes_recibidas,
+        'solicitudes_enviadas': solicitudes_enviadas,
+        'sol_pendientes_count': sol_pendientes_count,
     }
     return render(request, 'perfil.html', context)
+
 
 
 
@@ -1596,6 +1631,34 @@ class AceptarSolicitud(APIView):
         data["conversacion_id"] = getattr(conv, "conversacion_id", None)
         return Response(data)
 
+@login_required
+@require_POST
+def amistad_eliminar(request, username):
+
+    User = get_user_model()
+    amigo = get_object_or_404(User, nombre_usuario=username)
+
+    if amigo.id == request.user.id:
+        return JsonResponse({"ok": False, "error": "no_self"}, status=400)
+
+    # Quita seguimiento en ambos sentidos (tu modelo usa Seguidor)
+    Seguidor.objects.filter(seguidor=request.user, seguido=amigo).delete()
+    Seguidor.objects.filter(seguidor=amigo, seguido=request.user).delete()
+
+    # Limpia solicitudes pendientes (cualquiera de las direcciones)
+    SolicitudAmistad.objects.filter(
+        Q(emisor=request.user, receptor=amigo) | Q(emisor=amigo, receptor=request.user),
+        estado=SolicitudAmistad.Estado.PENDIENTE
+    ).delete()
+
+    # Respuesta AJAX
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JsonResponse({"ok": True, "username": amigo.nombre_usuario})
+
+    # Fallback no-AJAX
+    messages.success(request, f"Dejaste de ser amigo de {amigo.nombre} {amigo.apellido}.")
+    return redirect("perfil")
+
 # POST /amistad/solicitudes/{id}/rechazar
 class RechazarSolicitud(APIView):
     permission_classes = [IsAuthenticated]
@@ -1655,6 +1718,9 @@ class SmallPagination(PageNumberPagination):
     max_page_size = 100
 
 class ConversacionesList(APIView):
+    authentication_classes = (SessionAuthentication, BasicAuthentication)
+    permission_classes = [IsAuthenticated]  # ✅ exige login
+
     def get(self, request):
         qs = (Conversacion.objects
               .filter(participantes__usuario=request.user)
@@ -1662,10 +1728,13 @@ class ConversacionesList(APIView):
               .prefetch_related("participantes__usuario__perfil")
               .order_by("-actualizada_en")
               .distinct())
-        data = ConversacionLiteSerializer(qs, many=True).data
+
+        # ✅ pasa request en context (evita 500 cuando el serializer lo necesita)
+        data = ConversacionLiteSerializer(qs, many=True, context={"request": request}).data
         return Response(data)
 
 class MensajesListCreate(APIView):
+    authentication_classes = (SessionAuthentication, BasicAuthentication)
     permission_classes = [IsAuthenticated]
     pagination_class = SmallPagination
     parser_classes = [JSONParser, MultiPartParser, FormParser]   # <-- importante
@@ -1744,20 +1813,76 @@ class MensajesListCreate(APIView):
 def amistad_enviar(request, username):
     User = get_user_model()
     receptor = get_object_or_404(User, nombre_usuario=username)
-    if receptor == request.user:
-        messages.warning(request, "No puedes enviarte una solicitud a ti mismo.")
-        return redirect('home')  # o 'index' si así se llama tu url de inicio
 
-    # Respetamos tu UniqueConstraint (emisor, receptor)
+    if receptor == request.user:
+        msg = "No puedes enviarte una solicitud a ti mismo."
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({"ok": False, "detail": msg}, status=400)
+        messages.warning(request, msg)
+        return redirect('perfil_publico', username=username)
+
+    # 1) Si el otro ya me envió una PENDIENTE → la aceptamos directo
+    pendiente_recibida = SolicitudAmistad.objects.filter(
+        emisor=receptor, receptor=request.user,
+        estado=SolicitudAmistad.Estado.PENDIENTE
+    ).first()
+    if pendiente_recibida:
+        conv = pendiente_recibida.aceptar()
+        msg = f"¡Ahora eres amigo de {receptor.nombre}!"
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({"ok": True, "auto_accepted": True,
+                                 "username": receptor.nombre_usuario,
+                                 "conversacion_id": getattr(conv, "conversacion_id", None)})
+        messages.success(request, msg)
+        return redirect('perfil_publico', username=username)
+
+    # 2) Si ya existe una solicitud mía → la reactivamos/actualizamos a PENDIENTE
+    sol = SolicitudAmistad.objects.filter(
+        emisor=request.user, receptor=receptor
+    ).first()
+
+    if sol:
+        if sol.estado == SolicitudAmistad.Estado.PENDIENTE:
+            msg = "Ya tienes una solicitud pendiente con este usuario."
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({"ok": True, "already_pending": True,
+                                     "username": receptor.nombre_usuario})
+            messages.info(request, msg)
+            return redirect('perfil_publico', username=username)
+
+        # reactivar (upsert)
+        sol.estado = SolicitudAmistad.Estado.PENDIENTE
+        sol.mensaje = ""
+        sol.creada_en = timezone.now()
+        sol.save(update_fields=["estado", "mensaje", "creada_en"])
+
+        msg = f"Solicitud reenviada a {receptor.nombre}."
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({"ok": True, "reused": True,
+                                 "username": receptor.nombre_usuario})
+        messages.success(request, msg)
+        return redirect('perfil_publico', username=username)
+
+    # 3) No existe: crear normal
     try:
         with transaction.atomic():
             SolicitudAmistad.objects.create(
                 emisor=request.user, receptor=receptor, mensaje=""
             )
-            messages.success(request, f"Solicitud enviada a {receptor.nombre}.")
     except IntegrityError:
-        messages.info(request, "Ya existe una solicitud o relación con este usuario.")
-    return redirect('home')
+        msg = "Ya existe una solicitud o relación con este usuario."
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({"ok": False, "detail": msg}, status=400)
+        messages.info(request, msg)
+        return redirect('perfil_publico', username=username)
+
+    msg = f"Solicitud enviada a {receptor.nombre}."
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({"ok": True, "created": True,
+                             "username": receptor.nombre_usuario})
+    messages.success(request, msg)
+    return redirect('perfil_publico', username=username)
+
 
 
 @login_required
@@ -1770,9 +1895,17 @@ def amistad_aceptar(request, username):
         receptor=request.user,
         estado=SolicitudAmistad.Estado.PENDIENTE
     )
-    conv = sol.aceptar()  # usa tu método: follow mutuo + crea Conversacion directa
+    conv = sol.aceptar()
+
+    # 👇 Responder JSON si es AJAX
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({
+            "ok": True,
+            "username": emisor.nombre_usuario,
+            "conversacion_id": getattr(conv, "conversacion_id", None)
+        })
+
     messages.success(request, f"Ahora eres amigo de {emisor.nombre}.")
-    # si quieres llevar al chat inmediatamente:
     if conv:
         return redirect('chat_room', conversacion_id=conv.conversacion_id)
     return redirect('home')
@@ -1789,6 +1922,11 @@ def amistad_cancelar(request, username):
         estado=SolicitudAmistad.Estado.PENDIENTE
     )
     sol.cancelar()
+
+    # 👇 Responder JSON si es AJAX
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({"ok": True, "username": receptor.nombre_usuario})
+
     messages.info(request, "Solicitud cancelada.")
     return redirect('home')
 
@@ -2046,6 +2184,7 @@ def conversacion_con_usuario_id(request, username):
 
 #### para que salga el escribiendo...
 class TypingView(APIView):
+    authentication_classes = (SessionAuthentication, BasicAuthentication)
     permission_classes = [IsAuthenticated]
 
     def _conv_for(self, request, conv_id):
@@ -2099,6 +2238,7 @@ class TypingView(APIView):
 
         return Response({"typing": typing_users})
 class TypingSummaryView(APIView):
+    authentication_classes = (SessionAuthentication, BasicAuthentication)
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -2302,3 +2442,84 @@ def ayuda_view(request):
             messages.error(request, 'Por favor, completa todos los campos del formulario.')
 
     return render(request, 'ayuda.html')
+
+@api_view(['POST'])
+@permission_classes([IsAdminUser]) # ¡Importante! Asegura que solo los admins puedan usar esto
+def upload_csv_view(request):
+    """
+    Recibe un archivo CSV subido desde la app de escritorio y 
+    ejecuta el management command 'import_products'.
+    """
+    if 'csv_file' not in request.FILES:
+        return Response({"error": "No se encontró el archivo 'csv_file'."}, status=status.HTTP_400_BAD_REQUEST)
+
+    file = request.FILES['csv_file']
+    file_name = ""
+
+    try:
+        # Guardar el archivo temporalmente en el sistema de archivos (en la carpeta 'media')
+        file_name = default_storage.save(file.name, file)
+        file_path = default_storage.path(file_name)
+
+        # Llamar al management command que ya tienes, pasándole la ruta del archivo
+        call_command('import_products', file_path)
+
+        # Limpiar el archivo temporal
+        default_storage.delete(file_name)
+
+        # Enviar una respuesta exitosa
+        return Response({"message": "Archivo CSV procesado e importación completada."}, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        # Si algo sale mal, borra el archivo temporal si es que se creó
+        if file_name and default_storage.exists(file_name):
+            default_storage.delete(file_name)
+
+        return Response({"error": f"Error durante la importación: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+class ProductoListAPIView(generics.ListAPIView):
+    """
+    Vista de API para listar todos los productos (con paginación).
+    Accesible en /api/productos/
+    """
+    queryset = Producto.objects.filter(activo=True) # Solo muestra productos activos
+    serializer_class = ProductoSerializer
+    permission_classes = [IsAuthenticated]
+    # DRF maneja la paginación automáticamente si está configurada en settings.py
+    # Si no, puedes añadirla aquí:
+    # from rest_framework.pagination import PageNumberPagination
+    # pagination_class = PageNumberPagination
+    
+class ProductoDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Vista de API para ver, actualizar (parcial o total) o eliminar un producto específico.
+    Accesible en /api/productos/<int:pk>/
+    Donde <int:pk> es el id_producto.
+    """
+    queryset = Producto.objects.all() # Busca en todos los productos
+    serializer_class = ProductoSerializer
+    permission_classes = [IsAdminUser] # Solo los administradores pueden modificar/eliminar
+    lookup_field = 'pk' # Indica que el ID vendrá en la URL como 'pk'
+    
+# --- Vistas API para Usuarios (Admin) ---
+
+class UserListAPIView(generics.ListAPIView):
+    """
+    Vista de API para listar todos los usuarios (solo para admins).
+    Accesible en /api/users/
+    """
+    queryset = User.objects.all().order_by('id') # Obtener todos los usuarios
+    serializer_class = AdminUserSerializer
+    permission_classes = [IsAdminUser] # Solo admins pueden listar usuarios
+    # Puedes añadir paginación si tienes muchos usuarios, igual que con productos
+
+class UserDetailAPIView(generics.RetrieveUpdateAPIView): # Usamos RetrieveUpdate, no Destroy
+    """
+    Vista de API para ver y actualizar (parcial) un usuario específico.
+    Accesible en /api/users/<int:pk>/
+    Donde <int:pk> es el id del usuario.
+    """
+    queryset = User.objects.all()
+    serializer_class = AdminUserSerializer
+    permission_classes = [IsAdminUser] # Solo admins pueden ver/editar usuarios
+    lookup_field = 'pk' # El ID vendrá como 'pk' en la URL

@@ -27,7 +27,7 @@
       {# --- Acciones de relación / chat --- #}
       {% if request.user.is_authenticated %}
       {% if es_amigo %}
-      <a href="#" id="btnChatPerfilPublico" class="btn-edit" data-username="{{ usuario_publico.nombre_usuario }}">💬
+      <a href="#" id="btnChatPerfilPublico" class="btn-edit" data-username="{{ usuario_publico.nombre_usuario }}"><i class="bi bi-chat-dots"></i>
         Chatear</a>
 
       {% elif pendiente_enviada %}
@@ -36,24 +36,22 @@
         <button class="btn-edit" style="background:#f44336;">Cancelar solicitud</button>
       </form>
 
-      {% elif pendiente_recibida %}
-      <div style="display:flex; gap:.5rem;">
-        <form method="post" action="{% url 'amistad_aceptar' usuario_publico.nombre_usuario %}">
-          {% csrf_token %}
-          <button class="btn-edit" style="background:#4caf50;">Aceptar</button>
-        </form>
-        <form method="post" action="{% url 'amistad_cancelar' usuario_publico.nombre_usuario %}">
-          {% csrf_token %}
-          <button class="btn-edit" style="background:#9e9e9e;">Rechazar</button>
-        </form>
-      </div>
 
+      {% elif pendiente_enviada %}
+      <form method="post" action="{% url 'amistad_cancelar' usuario_publico.nombre_usuario %}"
+        class="js-amistad-cancelar">
+        {% csrf_token %}
+        <button class="btn-edit" style="background:#f44336;">Cancelar solicitud</button>
+      </form>
+
+      {# estado: sin relación/pendientes #}
       {% else %}
-      <form method="post" action="{% url 'amistad_enviar' usuario_publico.nombre_usuario %}">
+      <form method="post" action="{% url 'amistad_enviar' usuario_publico.nombre_usuario %}" class="js-amistad-enviar">
         {% csrf_token %}
         <button class="btn-edit">➕ Agregar amigo</button>
       </form>
       {% endif %}
+
       {% else %}
       <a href="{% url 'login' %}?next={{ request.path }}" class="btn-edit">Inicia sesión</a>
       {% endif %}
@@ -61,14 +59,14 @@
 
   </div>
 
-<nav class="profile-nav">
-  <ul>
-    <li><a href="#" data-tab="wishlist" class="active">Wishlist</a></li>
-    <li><a href="#" data-tab="recibidos">Regalos recibidos</a></li>
-    <li><a href="#" data-tab="actividad">Actividad pública</a></li>
-    <li><a href="#" data-tab="eventos">Eventos importantes</a></li>
-  </ul>
-</nav>
+  <nav class="profile-nav">
+    <ul>
+      <li><a href="#" data-tab="wishlist" class="active">Wishlist</a></li>
+      <li><a href="#" data-tab="recibidos">Regalos recibidos</a></li>
+      <li><a href="#" data-tab="actividad">Actividad pública</a></li>
+      <li><a href="#" data-tab="eventos">Eventos importantes</a></li>
+    </ul>
+  </nav>
 
 
 </div>
@@ -77,65 +75,70 @@
 
   <!-- Actividad pública -->
   <section id="actividad" class="tab-content">
-    <h3>Actividad pública de “{{ usuario_publico.nombre_usuario }}”</h3>
+  <h3>Actividad de “{{ usuario_publico.nombre_usuario }}”</h3>
 
+  {% if not es_amigo %}
+    <p class="text-muted">Solo los amigos pueden ver la actividad.</p>
+  {% else %}
     {% if ultimos_posts %}
-    <div class="gift-grid">
-      {% for p in ultimos_posts %}
-      <div class="gift-card">
-        <div class="gift-info">
-          <h4>
-            {% if p.tipo_post == 'texto' %}Publicación{% else %}{{ p.tipo_post|title }}{% endif %}
-            · {{ p.fecha_publicacion|date:"d/m/Y H:i" }}
-          </h4>
-          {% if p.tipo_post == 'texto' %}
-          <p>{{ p.contenido|default:"(sin contenido)"|truncatechars:160 }}</p>
-          {% else %}
-          <p>Contenido multimedia</p>
-          {% if p.url_media %}
-          <a href="{{ p.url_media }}" target="_blank" rel="noopener">Ver</a>
-          {% endif %}
-          {% endif %}
+      <div class="gift-grid">
+        {% for p in ultimos_posts %}
+        <div class="gift-card">
+          <div class="gift-info">
+            <h4>
+              {% if p.tipo_post == 'texto' %}Publicación{% else %}{{ p.tipo_post|title }}{% endif %}
+              · {{ p.fecha_publicacion|date:"d/m/Y H:i" }}
+            </h4>
+            {% if p.tipo_post == 'texto' %}
+              <p>{{ p.contenido|default:"(sin contenido)"|truncatechars:160 }}</p>
+            {% else %}
+              <p>Contenido multimedia</p>
+              {% if p.url_media %}<a href="{{ p.url_media }}" target="_blank" rel="noopener">Ver</a>{% endif %}
+            {% endif %}
+          </div>
         </div>
+        {% endfor %}
       </div>
-      {% endfor %}
-    </div>
     {% else %}
-    <p class="text-muted">Aún no hay actividad pública.</p>
+      <p class="text-muted">Aún no hay actividad.</p>
     {% endif %}
-  </section>
+  {% endif %}
+</section>
+
 
   {% load i18n %}
-  <section id="eventos" class="tab-content {% if not ultimos_posts and eventos_publicos %}{% endif %}">
-    <div class="events-header">
-      <h3>Eventos importantes de “{{ usuario_publico.nombre_usuario }}”</h3>
-    </div>
+  <section id="eventos" class="tab-content">
+  <div class="events-header">
+    <h3>Eventos importantes de “{{ usuario_publico.nombre_usuario }}”</h3>
+  </div>
 
+  {% if not es_amigo %}
+    <p class="text-muted">Solo los amigos pueden ver los eventos.</p>
+  {% else %}
     <div class="events-list">
       {% if eventos_publicos %}
-      {% for ev in eventos_publicos %}
-      <div class="event-item" data-event-id="{{ ev.pk }}">
-        <div class="left event-toggle" role="button" tabindex="0" aria-expanded="false"
-          aria-controls="desc-{{ ev.pk }}">
-          <span class="badge">
-            {% language 'es' %}
-            {{ ev.fecha_evento|date:"j" }} de {{ ev.fecha_evento|date:"F" }}
-            {% endlanguage %}
-          </span>
-          <div class="name">{{ ev.titulo }}</div>
+        {% for ev in eventos_publicos %}
+        <div class="event-item" data-event-id="{{ ev.pk }}">
+          <div class="left event-toggle" role="button" tabindex="0" aria-expanded="false" aria-controls="desc-{{ ev.pk }}">
+            <span class="badge">
+              {% language 'es' %}{{ ev.fecha_evento|date:"j" }} de {{ ev.fecha_evento|date:"F" }}{% endlanguage %}
+            </span>
+            <div class="name">{{ ev.titulo }}</div>
+          </div>
+          {% if ev.descripcion %}
+          <div id="desc-{{ ev.pk }}" class="event-desc" hidden>
+            <p>{{ ev.descripcion|linebreaksbr }}</p>
+          </div>
+          {% endif %}
         </div>
-        {% if ev.descripcion %}
-        <div id="desc-{{ ev.pk }}" class="event-desc" hidden>
-          <p>{{ ev.descripcion|linebreaksbr }}</p>
-        </div>
-        {% endif %}
-      </div>
-      {% endfor %}
+        {% endfor %}
       {% else %}
-      <p class="text-muted">Este usuario aún no comparte eventos públicos.</p>
+        <p class="text-muted">Este usuario aún no registra eventos.</p>
       {% endif %}
     </div>
-  </section>
+  {% endif %}
+</section>
+
   <!-- Wishlist pública -->
   <section id="wishlist" class="tab-content active">
     <h3>Wishlist de “{{ usuario_publico.nombre_usuario }}”</h3>
@@ -179,54 +182,49 @@
   </section>
   <!-- pegar esto junto a las otras secciones dentro de .profile-content -->
 
-<section id="recibidos" class="tab-content">
+  <section id="recibidos" class="tab-content">
   <h3>Regalos recibidos de “{{ usuario_publico.nombre_usuario }}”</h3>
 
-  {# Muestra un aviso si no hay datos #}
-  {% if not recibidos_publicos %}
-    <p class="text-muted">Aún no registra regalos recibidos (o no son visibles).</p>
+  {% if not es_amigo %}
+    <p class="text-muted">Solo los amigos pueden ver los regalos recibidos.</p>
   {% else %}
-    <div class="gift-grid">
-      {% for it in recibidos_publicos %}
-        {% with p=it.id_producto %}
-        <div class="gift-card" id="recibido-{{ it.id_item }}" data-product-id="{{ p.id_producto }}">
-          <img
-            src="{% if p.imagen and p.imagen.url %}{{ p.imagen.url }}{% else %}{% static 'img/Gifters/favicongift.png' %}{% endif %}"
-            alt="{{ p.nombre_producto }}">
+    {% if not recibidos_publicos %}
+      <p class="text-muted">Aún no registra regalos recibidos.</p>
+    {% else %}
+      <div class="gift-grid">
+        {% for it in recibidos_publicos %}
+          {% with p=it.id_producto %}
+          <div class="gift-card" id="recibido-{{ it.id_item }}" data-product-id="{{ p.id_producto }}">
+            <img
+              src="{% if p.imagen and p.imagen.url %}{{ p.imagen.url }}{% else %}{% static 'img/Gifters/favicongift.png' %}{% endif %}"
+              alt="{{ p.nombre_producto }}">
 
-          <div class="gift-info">
-            <h4>{{ p.nombre_producto }}</h4>
-            <p>{{ p.id_marca.nombre_marca }}</p>
-            {% if p.precio %}
-              <div class="price">${{ p.precio }}</div>
-            {% endif %}
-            {% if it.fecha_comprado %}
-              <div class="text-muted" style="font-size:.85rem">
-                Recibido el {{ it.fecha_comprado|date:"d/m/Y H:i" }}
-              </div>
-            {% endif %}
-          </div>
-
-          <div class="gift-actions">
-            <a class="btn btn-sm btn-outline-primary"
-               href="{% url 'producto_detalle' p.id_producto %}"
-               title="Ver detalle">Ver</a>
-
-            {% with url_tienda=p.urls_tienda.first %}
-              {% if url_tienda %}
-                <a class="btn btn-sm btn-outline-secondary"
-                   href="{{ url_tienda.url }}" target="_blank" rel="noopener"
-                   title="Ver en tienda">Tienda</a>
+            <div class="gift-info">
+              <h4>{{ p.nombre_producto }}</h4>
+              <p>{{ p.id_marca.nombre_marca }}</p>
+              {% if p.precio %}<div class="price">${{ p.precio }}</div>{% endif %}
+              {% if it.fecha_comprado %}
+                <div class="text-muted" style="font-size:.85rem">
+                  Recibido el {{ it.fecha_comprado|date:"d/m/Y H:i" }}
+                </div>
               {% endif %}
-            {% endwith %}
+            </div>
+
+            <div class="gift-actions">
+              <a class="btn btn-sm btn-outline-primary" href="{% url 'producto_detalle' p.id_producto %}" title="Ver detalle">Ver</a>
+              {% with url_tienda=p.urls_tienda.first %}
+                {% if url_tienda %}
+                  <a class="btn btn-sm btn-outline-secondary" href="{{ url_tienda.url }}" target="_blank" rel="noopener" title="Ver en tienda">Tienda</a>
+                {% endif %}
+              {% endwith %}
+            </div>
           </div>
-        </div>
-        {% endwith %}
-      {% endfor %}
-    </div>
+          {% endwith %}
+        {% endfor %}
+      </div>
+    {% endif %}
   {% endif %}
 </section>
-
 
 
 </div>
@@ -241,7 +239,7 @@
 
     // --- inicial: muestra la sección de la pestaña que ya tenga .active (Wishlist)
     const initial = document.querySelector(".profile-nav a.active")
-                  || document.querySelector('.profile-nav a[data-tab="wishlist"]');
+      || document.querySelector('.profile-nav a[data-tab="wishlist"]');
     if (initial) {
       sections.forEach(s => s.classList.remove("active"));
       const target = document.getElementById(initial.getAttribute("data-tab"));
@@ -363,5 +361,126 @@
     });
   });
 </script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+  // Toast compacto
+  const Toast = Swal.mixin({
+    toast: true,
+    position: 'top-end',
+    showConfirmButton: false,
+    timer: 1600,
+    timerProgressBar: true
+  });
+
+  document.addEventListener('DOMContentLoaded', function () {
+    // CSRF
+    function getCookie(name) {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(';').shift();
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    // Enviar solicitud (AJAX)
+    document.body.addEventListener('submit', async (e) => {
+      const form = e.target.closest('.js-amistad-enviar');
+      if (!form) return;
+      e.preventDefault();
+
+      try {
+        const res = await fetch(form.action, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data?.detail || 'request_failed');
+
+        // UI updates según caso
+        if (data.auto_accepted) {
+          Toast.fire({ icon: 'success', title: '¡Ahora son amigos!' });
+          // Cambiar a botón de chat
+          const wrap = form.parentElement;
+          if (wrap) {
+            wrap.innerHTML = `
+              <a href="#" id="btnChatPerfilPublico" class="btn-edit" data-username="{{ usuario_publico.nombre_usuario }}">💬 Chatear</a>
+            `;
+            // Reenganchar click chat
+            const btn = document.getElementById('btnChatPerfilPublico');
+            btn?.addEventListener('click', function (ev) {
+              ev.preventDefault();
+              const u = this.dataset.username;
+              if (window.openChatWith) window.openChatWith(u);
+              else document.getElementById('chatFab')?.click();
+            });
+          }
+          return;
+        }
+
+        if (data.already_pending) {
+          Toast.fire({ icon: 'info', title: 'Ya tienes una solicitud pendiente' });
+          // ya debería estar el botón "Cancelar"; si no, lo pintamos:
+          const wrap = form.parentElement;
+          if (wrap) {
+            wrap.innerHTML = `
+              <form method="post" action="{% url 'amistad_cancelar' usuario_publico.nombre_usuario %}" class="js-amistad-cancelar">
+                {% csrf_token %}
+                <button class="btn-edit" style="background:#f44336;">Cancelar solicitud</button>
+              </form>
+            `;
+          }
+          return;
+        }
+
+        // created o reused → tratamos igual: pintamos "Cancelar" y toast “enviada/reenviada”
+        Toast.fire({ icon: 'success', title: data.reused ? 'Solicitud reenviada' : 'Solicitud enviada' });
+
+        const wrap = form.parentElement;
+        if (wrap) {
+          wrap.innerHTML = `
+            <form method="post" action="{% url 'amistad_cancelar' usuario_publico.nombre_usuario %}" class="js-amistad-cancelar">
+              {% csrf_token %}
+              <button class="btn-edit" style="background:#f44336;">Cancelar solicitud</button>
+            </form>
+          `;
+        }
+      } catch (err) {
+        console.error(err);
+        Toast.fire({ icon: 'error', title: 'No se pudo enviar la solicitud' });
+      }
+    });
+
+    // Cancelar solicitud (AJAX)
+    document.body.addEventListener('submit', async (e) => {
+      const form = e.target.closest('.js-amistad-cancelar');
+      if (!form) return;
+      e.preventDefault();
+
+      try {
+        const res = await fetch(form.action, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data?.detail || 'request_failed');
+
+        Toast.fire({ icon: 'info', title: 'Solicitud cancelada' });
+
+        const wrap = form.parentElement;
+        if (wrap) {
+          wrap.innerHTML = `
+            <form method="post" action="{% url 'amistad_enviar' usuario_publico.nombre_usuario %}" class="js-amistad-enviar">
+              {% csrf_token %}
+              <button class="btn-edit">➕ Agregar amigo</button>
+            </form>
+          `;
+        }
+      } catch (err) {
+        console.error(err);
+        Toast.fire({ icon: 'error', title: 'No se pudo cancelar' });
+      }
+    });
+  });
+</script>
+
 
 {% endblock %}

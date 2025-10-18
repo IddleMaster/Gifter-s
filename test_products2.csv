@@ -1,0 +1,3 @@
+nombre_producto;descripcion;precio;id_categoria;id_marca;id_producto;url_imagen
+Producto de Prueba 101;Descripción de prueba 101;1000;1;1;101;
+Producto de Prueba 102;Descripción de prueba 102;2000;2;2;102;

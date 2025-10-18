@@ -4,15 +4,15 @@ from django.views.generic import TemplateView, RedirectView
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.conf.urls.static import static
 from django.conf import settings
-from core.views import perfil_publico
-
+from core.views import *
 from core import views
-from core.views import (
-    EnviarSolicitudAmistad, SolicitudesRecibidasList, SolicitudesEnviadasList,
-    AceptarSolicitud, RechazarSolicitud, CancelarSolicitud,
-    AmigosList, EliminarAmigo,
-    ConversacionesList, MensajesListCreate,toggle_like_post_view, get_comments_view,
+
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
 )
+
+
 
 #from resenas import views as resenas_views
 
@@ -80,6 +80,14 @@ urlpatterns = [
     path('amistad/cancelar/<str:username>/', views.amistad_cancelar, name='amistad_cancelar'),
 
     # --- API REST (si las usas desde frontend) ---
+    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/admin/upload-csv/', views.upload_csv_view, name='api_upload_csv'),
+    path('api/productos/', views.ProductoListAPIView.as_view(), name='api_producto_list'), 
+    path('api/productos/<int:pk>/', views.ProductoDetailAPIView.as_view(), name='api_producto_detail'),
+    # --- Rutas API para Usuarios (Admin) --- # <-- NUEVA SECCIÓN
+    path('api/users/', views.UserListAPIView.as_view(), name='api_user_list'),
+    path('api/users/<int:pk>/', views.UserDetailAPIView.as_view(), name='api_user_detail'),
     # Amistad
     path('api/amistad/solicitudes/', EnviarSolicitudAmistad.as_view(), name='api_amistad_enviar'),
     path('api/amistad/solicitudes/recibidas/', SolicitudesRecibidasList.as_view(), name='api_amistad_recibidas'),
@@ -89,6 +97,8 @@ urlpatterns = [
     path('api/amistad/solicitudes/<int:pk>/cancelar/', CancelarSolicitud.as_view(), name='api_amistad_cancelar'),
     path('api/amistad/amigos/', AmigosList.as_view(), name='api_amigos_list'),
     path('api/amistad/amigos/<int:pk>/', EliminarAmigo.as_view(), name='api_amigos_eliminar'),
+    path("amistad/eliminar/<str:username>/", views.amistad_eliminar, name="amistad_eliminar"),
+    path("amistad/rechazar/<str:username>/", views.amistad_rechazar, name="amistad_rechazar"),
 
     # Chat API
     path('api/chat/conversaciones/', ConversacionesList.as_view(), name='conversaciones_list'),
@@ -117,7 +127,9 @@ urlpatterns = [
     ##para el chat grupal:
     path('api/grupos/crear/', views.grupos_create, name='grupos_create'),
     path('api/conversaciones/<int:pk>/', views.conversacion_detalle, name='conversacion_detalle'),
-
+    ##path("chat/typing/<int:conv_id>/", views.chat_typing, name="chat_typing"),
+    ##path("chat/con-usuario/<str:username_or_id>/", views.chat_con_usuario_id, name="chat_con_usuario_id"),
+    
     
 
     
@@ -134,3 +146,4 @@ urlpatterns += staticfiles_urlpatterns()
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
