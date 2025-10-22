@@ -304,5 +304,33 @@ class ApiClient:
                 return False, f"Error al actualizar usuario: {response.status_code} - {error_detail}"
         except requests.exceptions.RequestException as e:
             return False, f"Error de conexión al actualizar usuario: {e}"
-        
+    def delete_product(self, product_id):
+        """
+        Envía una petición DELETE para borrar un producto específico a la API.
+        """
+        if not self.token:
+            return False, "No autenticado."
+    
+        delete_url = f"{self.base_url}/productos/{product_id}/" # Misma URL que para actualizar/ver detalle
+    
+        try:
+            response = requests.delete(delete_url, headers=self.headers)
+    
+            # DELETE exitoso usualmente devuelve 204 No Content
+            if response.status_code == 204:
+                return True, "Producto borrado correctamente."
+            elif response.status_code == 404:
+                 return False, f"Error al borrar: Producto con ID {product_id} no encontrado."
+            else:
+                # Intentar obtener un mensaje de error más detallado
+                error_detail = response.text
+                try:
+                    error_data = response.json()
+                    if isinstance(error_data.get('detail'), str):
+                         error_detail = error_data['detail']
+                except json.JSONDecodeError:
+                    pass
+                return False, f"Error al borrar producto: {response.status_code} - {error_detail}"
+        except requests.exceptions.RequestException as e:
+            return False, f"Error de conexión al borrar: {e}"    
     

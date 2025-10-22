@@ -1,51 +1,51 @@
-nombre;descripcion;precio;categoria;marca;imagen_url
-Polera Lisa;Polera de algodón;15000;Ropa;Genérica;productos/producto_1.png
-Zapatillas Deportivas;Zapatillas para correr;45000;Calzado;Nike;productos/producto_2.png
-Balón de Fútbol;Balón oficial;25000;Deportes;Adidas;productos/producto_3.png
-Set de Maquillaje;Set completo de maquillaje;30000;Belleza;L'Oréal;productos/producto_4.png
-Lego Nissan GTR;Auto de juguete armable;50000;Juguetes;Lego;productos/producto_5.png
-Trencito de Juguete;Tren de madera para niños;18000;Juguetes;Genérica;productos/producto_6.png
-Reloj Festina;Reloj de pulsera elegante;120000;Accesorios;Festina;productos/producto_7.png
-Lentes Ray-Ban;Lentes de sol modelo aviador;90000;Accesorios;Ray-Ban;productos/producto_8.png
-Comida Master Dog;Comida para perro adulto 20kg;22000;Mascotas;Master Dog;productos/producto_9.png
-Dron Sonic;Dron con cámara HD;75000;Tecnología;Sonic;productos/producto_10.png
-Audífonos Inalámbricos;Audífonos Bluetooth;35000;Tecnología;Sony;productos/producto_11.png
-Teclado Mecánico;Teclado gamer retroiluminado;60000;Tecnología;Razer;productos/producto_12.png
-Mouse Gamer;Mouse óptico alta precisión;40000;Tecnología;Logitech;productos/producto_13.png
-Monitor Curvo;Monitor 27 pulgadas;180000;Tecnología;Samsung;productos/producto_14.png
-Silla Gamer;Silla ergonómica;130000;Hogar;Genérica;productos/producto_15.png
-Escritorio Eléctrico;Escritorio ajustable;250000;Hogar;Genérica;productos/producto_16.png
-Lámpara de Escritorio;Lámpara LED;12000;Hogar;Genérica;productos/producto_17.png
-Botella de Agua;Botella reutilizable 1L;8000;Hogar;Genérica;productos/producto_18.png
-Mochila Urbana;Mochila para notebook;28000;Accesorios;Head;productos/producto_19.png
-Smartwatch;Reloj inteligente;85000;Tecnología;Xiaomi;productos/producto_20.png
-Cafetera Italiana;Cafetera moka 6 tazas;16000;Hogar;Bialetti;productos/producto_21.png
-Hervidor Eléctrico;Hervidor 1.7L;19000;Hogar;Oster;productos/producto_22.png
-Juego de Sábanas;Sábanas 2 plazas;24000;Hogar;Cannon;productos/producto_23.png
-Toalla de Baño;Toalla grande;9000;Hogar;Genérica;productos/producto_24.png
-Pesa Rusa;Kettlebell 8kg;14000;Deportes;Genérica;productos/producto_25.png
-Mat de Yoga;Mat de 6mm;11000;Deportes;Genérica;productos/producto_26.png
-Banda Elástica;Set de 3 bandas;7000;Deportes;Genérica;productos/producto_27.png
-Libro "Dune";Libro de ciencia ficción;20000;Libros;Genérica;productos/producto_28.png
-Libro "1984";Novela distópica;13000;Libros;Genérica;productos/producto_29.png
-Funko Pop Grogu;Figura coleccionable;15000;Juguetes;Funko;productos/producto_30.png
-Funko Pop Spiderman;Figura coleccionable;15000;Juguetes;Funko;productos/producto_31.png
-Puzzle 1000 piezas;Puzzle de paisaje;17000;Juguetes;Genérica;productos/producto_32.png
-Crema Hidratante;Crema facial;23000;Belleza;Nivea;productos/producto_33.png
-Perfume Hombre;Eau de Toilette 100ml;55000;Belleza;Hugo Boss;productos/producto_34.png
-Perfume Mujer;Eau de Parfum 50ml;65000;Belleza;Dior;productos/producto_35.png
-Shampoo Anticaspa;Shampoo 400ml;6000;Belleza;Head & Shoulders;productos/producto_36.png
-Acondicionador;Acondicionador 400ml;6000;Belleza;Pantene;productos/producto_37.png
-Pelota de Tenis;Pack 3 pelotas;5000;Deportes;Wilson;productos/producto_38.png
-Raqueta de Tenis;Raqueta adulto;70000;Deportes;Babolat;productos/producto_39.png
-Jeans Hombre;Pantalón denim;32000;Ropa;Levi's;productos/producto_40.png
-Polerón con Capucha;Polerón de algodón;29000;Ropa;Gap;productos/producto_41.png
-Chaqueta Impermeable;Chaqueta cortaviento;48000;Ropa;The North Face;productos/producto_42.png
-Calcetines Deportivos;Pack 3 pares;8000;Ropa;Genérica;productos/producto_43.png
-Billetera de Cuero;Billetera clásica;21000;Accesorios;Genérica;productos/producto_44.png
-Cinturón de Cuero;Cinturón formal;17000;Accesorios;Genérica;productos/producto_45.png
-Zapatos Formales;Zapatos de cuero;55000;Calzado;Gacel;productos/producto_46.png
-Sandalias;Sandalias de verano;19000;Calzado;Genérica;productos/producto_47.png
-Botines;Botines de cuero;65000;Calzado;CAT;productos/producto_48.png
-Rascador para Gato;Rascador con niveles;33000;Mascotas;Genérica;productos/producto_49.png
-Arena Sanitaria;Arena 10kg;13000;Mascotas;Genérica;productos/producto_50.png
+id;nombre;descripcion;precio;categoria;marca;imagen_url
+1;Polera Lisa Azul;Polera de algodón Azul;15000;Ropa;Nike;productos/NewWave/PoleraAlgodonAzul.jpg
+2;Zapatillas Deportivas;Zapatillas para correr;45000;Calzado;Nike;productos/NewWave/ZapatillasNikeNegras.jpg
+3;Balón de Fútbol;Balón oficial;25000;Deportes;Adidas;productos/NewWave/BalonDeFootbal.jpg
+4;Set de Maquillaje;Set completo de maquillaje;30000;Belleza;L'Oréal;productos/NewWave/SetMaquillaje.jpg
+5;Lego Nissan GTR;Auto de juguete armable;50000;Juguetes;Lego;productos/NewWave/LegoAuto.jpg
+6;Trencito de Juguete;Tren de madera para niños;18000;Juguetes;Genérica;productos/NewWave/TrencitoDeMadera.jpg
+7;Reloj Festina;Reloj de pulsera elegante;120000;Accesorios;Festina;productos/NewWave/RelojFestina.jpg
+8;Lentes Ray-Ban;Lentes de sol modelo aviador;90000;Accesorios;Ray-Ban;productos/NewWave/LentesRay-Ban.jpg
+9;Comida Master Dog;Comida para perro adulto 20kg;22000;Mascotas;Master Dog;productos/NewWave/MasterDog.jpg
+10;Dron Sonic;Dron con cámara HD;75000;Tecnología;Sonic;productos/NewWave/DronSonic.jpg
+11;Audífonos Inalámbricos;Audífonos Bluetooth;35000;Tecnología;Sony;productos/NewWave/AudifonosSonyInalambricos.jpg
+12;Teclado Mecánico;Teclado gamer retroiluminado;60000;Tecnología;Razer;productos/NewWave/TecladoRazer.jpg
+13;Mouse Gamer;Mouse óptico alta precisión;40000;Tecnología;Logitech;productos/NewWave/LogitechMouseGamer.jpg
+14;Monitor Curvo;Monitor 27 pulgadas;180000;Tecnología;Samsung;productos/NewWave/MonitorCurvo.jpg
+15;Silla Gamer;Silla ergonómica;130000;Hogar;Genérica;productos/NewWave/SillaGamer.jpg
+16;Escritorio Eléctrico;Escritorio ajustable;250000;Hogar;Genérica;productos/NewWave/EscritorioElectrico.jpg
+103;Lámpara de Escritorio;Lámpara LED;12000;Hogar;Genérica;productos/NewWave/LamparaEscritorio.jpg
+104;Botella de Agua;Botella reutilizable 1L;8000;Hogar;Miniso;productos/NewWave/BotellaAgua.jpg
+105;Mochila Urbana;Mochila para notebook;28000;Accesorios;Head;productos/NewWave/MochilaUrbana.jpg
+106;Smartwatch;Reloj inteligente;85000;Tecnología;Xiaomi;productos/NewWave/Smartwatch.jpg
+107;Cafetera Italiana;Cafetera moka 6 tazas;16000;Hogar;Bialetti;productos/NewWave/CafeteraItaliana.jpg
+108;Hervidor Eléctrico;Hervidor 1.7L;19000;Hogar;Oster;productos/NewWave/HervidorElectrico.jpg
+109;Juego de Sábanas;Sábanas 2 plazas;24000;Hogar;Cannon;productos/NewWave/JuegoDeSabanas.jpg
+110;Toalla de Baño;Toalla grande;9000;Hogar;Miniso;productos/NewWave/ToallaDeBano.jpg
+111;Pesa Rusa;Kettlebell 8kg;14000;Deportes;Genérica;productos/NewWave/PesaRusa.jpg
+112;Mat de Yoga;Mat de 6mm;11000;Deportes;Miniso;productos/NewWave/MatDeYoga.jpg
+113;Banda Elástica;Set de 3 bandas;7000;Deportes;Genérica;productos/NewWave/BandaElastica.jpg
+114;Libro "Dune";Libro de ciencia ficción;20000;Libros;Genérica;productos/NewWave/LibroDune.jpg
+115;Libro "1984";Novela distópica;13000;Libros;Genérica;productos/NewWave/Libro1984.jpg
+116;Funko Pop Grogu;Figura coleccionable;15000;Juguetes;Funko;productos/NewWave/FunkoPopGrogu.jpg
+117;Funko Pop Spiderman;Figura coleccionable;15000;Juguetes;Funko;productos/NewWave/FunkoPopSpiderman.jpg
+118;Puzzle 1000 piezas Dinosaurios;Puzzle de paisaje;17000;Juguetes;Miniso;productos/NewWave/PuzzleDinosaurios.jpg
+119;Crema Hidratante;Crema facial;23000;Belleza;Nivea;productos/NewWave/CremaHidratante.jpg
+120;Perfume Hombre;Eau de Toilette 100ml;55000;Belleza;Hugo Boss;productos/NewWave/PerfumeHugoBoss.jpg
+121;Perfume Mujer;Eau de Parfum 50ml;65000;Belleza;Dior;productos/NewWave/PerfumeDior.jpg
+122;Shampoo Anticaspa;Shampoo 400ml;6000;Belleza;Head & Shoulders;productos/NewWave/ShampooAnticaspa.jpg
+123;Acondicionador;Acondicionador 400ml;6000;Belleza;Pantene;productos/NewWave/AcondicionadorPantene.jpg
+124;Pelota de Tenis;Pack 3 pelotas;5000;Deportes;Wilson;productos/NewWave/PelotaDeTenisWilson.jpg 
+125;Raqueta de Tenis;Raqueta adulto;70000;Deportes;Wilson;productos/NewWave/RaquetaTenisWilson.jpg
+126;Jeans Hombre;Pantalón denim;32000;Ropa;Levi's;productos/NewWave/PantalonHombreLevis.jpg
+128;Polerón con Capucha;Polerón de algodón;29000;Ropa;Gap;productos/NewWave/PoleronCapuchaGAP.jpg
+129;Chaqueta Impermeable;Chaqueta cortaviento;48000;Ropa;The North Face;productos/NewWave/PoleronTheNorthFace.jpg
+130;Calcetines Deportivos;Pack 3 pares;8000;Ropa;Nike;productos/NewWave/CalcetinesNike.jpg
+131;Billetera de Cuero;Billetera clásica;21000;Accesorios;Nike;productos/NewWave/BilleteraNike.jpg
+132;Cinturón de Cuero;Cinturón formal;17000;Accesorios;Dior;productos/NewWave/CinturonDior.jpg
+133;Zapatos Formales;Zapatos de cuero;55000;Calzado;Gacel;productos/NewWave/ZapatosGacelNegros.jpg
+134;Sandalias;Sandalias de verano;19000;Calzado;Nike;productos/NewWave/SandaliasNike.jpg
+135;Botines;Botines de cuero;65000;Calzado;CAT;productos/NewWave/BotinesCat.jpg
+136;Rascador para Gato;Rascador con niveles;33000;Mascotas;Genérica;productos/NewWave/RascadorParaGato.jpg
+137;Arena Sanitaria;Arena 10kg;13000;Mascotas;HappyCat;productos/NewWave/ArenaSanitariaHappyCat.jpg

@@ -1642,3 +1642,71 @@ body.scrolled .header .topbar{
     border-radius: 10px;
   }
 }
+/* --- Estilos para el Formulario de Contacto (Ayuda) --- */
+
+.gifters-contact-form {
+    width: 100%;
+}
+
+.gifters-contact-form .form-group {
+    padding-bottom: 8px;
+    margin-bottom: 20px;
+}
+
+/* Aplica a los inputs de texto, email y al textarea */
+.gifters-contact-form input[type=text],
+.gifters-contact-form input[type=email],
+.gifters-contact-form textarea {
+    border-radius: 0;
+    box-shadow: none;
+    font-size: 14px;
+    padding: 10px 15px;
+    /* Asegúrate de que los bordes sean visibles, puedes ajustar el color */
+    border: 1px solid #ced4da;
+}
+
+.gifters-contact-form input[type=text]:focus,
+.gifters-contact-form input[type=email]:focus,
+.gifters-contact-form textarea:focus {
+    /* Puedes usar el color de acento de tu plantilla si lo tienes definido */
+    /* border-color: var(--accent-color); */
+    border-color: #80bdff; /* Un azul claro estándar para el foco */
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25); /* Sombra de foco estilo Bootstrap */
+}
+
+.gifters-contact-form textarea {
+    padding: 12px 15px;
+}
+
+.gifters-contact-form button[type=submit] {
+    background: #0d6efd; /* Un azul vibrante (puedes ajustarlo a tu gusto) */
+    border: 0;
+    padding: 12px 35px; /* Un poco más de padding para mejor tamaño */
+    color: #ffffff;
+    transition: all 0.3s ease; /* Transición suave para todos los cambios */
+    border-radius: 50px; /* <-- Bordes completamente redondeados (estilo "píldora") */
+    font-weight: 600; /* Texto en negrita */
+    font-size: 16px; /* Tamaño de fuente ligeramente mayor */
+    box-shadow: 0 4px 15px rgba(13, 110, 253, 0.4); /* Sombra azulada sutil */
+    cursor: pointer; /* Asegura que aparezca la manito */
+    display: inline-block; /* Asegura el correcto comportamiento del padding/margen */
+}
+
+.gifters-contact-form button[type=submit]:hover {
+    background: #0b5ed7; /* Azul un poco más oscuro al pasar el mouse */
+    box-shadow: 0 6px 20px rgba(13, 110, 253, 0.5); /* Sombra más pronunciada */
+    transform: translateY(-2px); /* Efecto ligero de "levantamiento" */
+}
+
+.gifters-contact-form button[type=submit]:active {
+    background: #0a58ca; /* Azul aún más oscuro al hacer clic */
+    box-shadow: 0 2px 10px rgba(13, 110, 253, 0.3); /* Sombra reducida */
+    transform: translateY(0); /* Vuelve a la posición original */
+}
+
+/* Asegura que el contenedor centre el botón si es necesario */
+.gifters-contact-form .text-center {
+    text-align: center;
+    margin-top: 20px; /* Añade un espacio arriba del botón */
+}

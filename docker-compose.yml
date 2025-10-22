@@ -23,6 +23,8 @@ services:
       - "8000:8000"
     volumes:
       - .:/app  # Mapea todo tu proyecto, incluyendo la carpeta 'media'
+    env_file:
+      - .env
     depends_on:
       db:
         condition: service_healthy

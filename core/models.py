@@ -9,7 +9,40 @@ from datetime import timedelta, date
 
 
 
+class NotificationDevice(models.Model):
+    PLATFORM_CHOICES = (
+        ("web", "Web"),
+        ("android", "Android"),
+        ("ios", "iOS"),
+    )
 
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="devices",
+        db_column="id_usuario",
+    )
+    token = models.CharField(max_length=255, unique=True, db_index=True)
+    platform = models.CharField(max_length=16, choices=PLATFORM_CHOICES, default="web")
+    user_agent = models.TextField(blank=True, default="")
+    active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_seen_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "notification_device"
+        verbose_name = "Dispositivo de notificaciones"
+        verbose_name_plural = "Dispositivos de notificaciones"
+        ordering = ["-last_seen_at"]
+        indexes = [
+            models.Index(fields=["user"], name="idx_nd_user"),
+            models.Index(fields=["active"], name="idx_nd_active"),
+        ]
+
+    def __str__(self):
+        return f"{self.user_id} · {self.platform}"
+    
 class genero(models.TextChoices):
     MASCULINO = 'M', 'Masculino'
     FEMENINO = 'F', 'Femenino'
@@ -1298,45 +1331,38 @@ class Tag(models.Model):
 ##################################################################
 ##################################################################
 
-#class Resena(models.Model):
-#    id_resena = models.AutoField(primary_key=True, verbose_name='ID Reseña')
-#
-#    id_usuario = models.ForeignKey(
-#        User,
-#        on_delete=models.CASCADE,
-#        db_column='id_usuario',
-#        related_name='resenas',
-#        verbose_name='Usuario'
-#    )
-#
-#    calificacion = models.IntegerField(
-#        validators=[MinValueValidator(1), MaxValueValidator(5)],
-#        verbose_name='Calificación (1–5)'
-#    )
-#
-#    titulo = models.CharField(max_length=150, verbose_name='Título')
-#    comentario = models.CharField(max_length=1000, verbose_name='Comentario')
-#
-#    fecha_resena = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de reseña')
-#
-#    class Meta:
-#        db_table = 'resena'
-#        verbose_name = 'Reseña'
-#        verbose_name_plural = 'Reseñas'
-#        ordering = ['-fecha_resena']
-#        constraints = [
-#            # Un usuario solo puede dejar una reseña global
-#            models.UniqueConstraint(fields=['id_usuario'], name='uq_resena_usuario_unica'),
-#        ]
-#        indexes = [
-#            models.Index(fields=['id_usuario'], name='idx_resena_usuario'),
-#            models.Index(fields=['calificacion'], name='idx_resena_calificacion'),
-#        ]
-#
-#    def __str__(self):
-#        # Ajustado a tu modelo de usuario (usa nombre_usuario)
-#        return f"{getattr(self.id_usuario, 'nombre_usuario', str(self.id_usuario))} [{self.calificacion}/5] - {self.titulo}"
 
+class ResenaSitio(models.Model):
+    id_resena = models.AutoField(primary_key=True, verbose_name='ID Reseña')
+
+    id_usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        db_column='id_usuario',
+        related_name='resenas_sitio',
+        verbose_name='Usuario'
+    )
+
+    calificacion = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        verbose_name='Calificación (1–5)'
+    )
+
+    comentario = models.TextField(blank=True, verbose_name='Comentario')
+    fecha_resena = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de reseña')
+
+    class Meta:
+        db_table = 'resena_sitio'
+        verbose_name = 'Reseña del sitio'
+        verbose_name_plural = 'Reseñas del sitio'
+        ordering = ['-fecha_resena']
+        indexes = [
+            models.Index(fields=['id_usuario'], name='idx_rs_usuario'),
+            models.Index(fields=['fecha_resena'], name='idx_rs_fecha'),
+        ]
+
+    def __str__(self):
+        return f"Reseña sitio #{self.id_resena} · {self.id_usuario} ({self.calificacion}/5)"
 
 
 ##################################################################
@@ -1435,6 +1461,11 @@ class PreferenciasUsuario(models.Model):
         default=False, # Importante: Por defecto es False (opt-in)
         verbose_name='Acepta correos de marketing',
         help_text='Aceptar recibir correos con promociones y noticias.'
+    )
+    
+    allow_push_web = models.BooleanField(
+        default=True,
+        verbose_name='Permitir notificaciones push en la web'
     )
 
     class Meta:
@@ -1666,6 +1697,7 @@ class Conversacion(models.Model):
         related_name='conversaciones_creadas'
     )
 
+
     # FK opcional a Evento para “chat de evento”
     evento = models.ForeignKey(
         'core.Evento',
@@ -1751,8 +1783,24 @@ class Mensaje(models.Model):
             models.Index(fields=['remitente'], name='idx_msg_remitente'),  # <-- campo, no db_column
         ]
 
-        def __str__(self):
-            return f"Msg {self.mensaje_id} en conv {self.conversacion_id} por {self.remitente_id}"
+    def __str__(self):
+        return f"Msg {self.mensaje_id} en conv {self.conversacion_id} por {self.remitente_id}"  
+        
+  # Helpers para frontend/API (no cambian la BD)
+    @property
+    def author_id(self):
+        return self.creador_id
+
+    def es_autor(self, user):
+        uid = getattr(user, 'id', None)
+        return uid is not None and self.creador_id == uid
+
+    @property
+    def is_group(self):
+        return self.tipo == self.Tipo.GRUPO
+
+    def __str__(self):
+        return f"Msg {self.mensaje_id} en conv {self.conversacion_id} por {self.remitente_id}"
     # --- ParticipanteConversacion ---
 
 class ParticipanteConversacion(models.Model):

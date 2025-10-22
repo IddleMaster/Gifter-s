@@ -4,7 +4,9 @@
 
 {% block title %}Gifter’s{% endblock %}
 {% block body_class %}ayuda-page{% endblock %}
-
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/gifters.css' %}">
+{% endblock %}
 {% block content %}
 <html lang="es">
 
@@ -61,32 +63,25 @@
       </div>
 
       <div class="col-lg-7">
-        <form action="{% url 'ayuda' %}" method="post" class="php-email-form" data-aos="fade-up" data-aos-delay="200">
-          {% csrf_token %}
-          <div class="row gy-4">
-            <div class="col-md-6">
-              <label for="name-field" class="pb-2">Nombre</label>
-              <input type="text" name="name" id="name-field" class="form-control" required>
+        <form action="{% url 'ayuda' %}" method="post" class="gifters-contact-form" data-aos="fade-up" data-aos-delay="200">
+            {% csrf_token %}
+            <div class="row gy-4">
+                <div class="col-lg-6 form-group">
+                    <input type="text" name="name" class="form-control" id="name" placeholder="Tu Nombre" required="">
+                </div>
+                <div class="col-lg-6 form-group">
+                    <input type="email" class="form-control" name="email" id="email" placeholder="Tu Email" required="">
+                </div>
             </div>
-            <div class="col-md-6">
-              <label for="email-field" class="pb-2">Gmail</label>
-              <input type="email" class="form-control" name="email" id="email-field" required>
+            <div class="form-group">
+                <input type="text" class="form-control" name="subject" id="subject" placeholder="Asunto" required="">
             </div>
-            <div class="col-md-12">
-              <label for="subject-field" class="pb-2">Asunto</label>
-              <input type="text" class="form-control" name="subject" id="subject-field" required>
-            </div>
-            <div class="col-md-12">
-              <label for="message-field" class="pb-2">Mensaje</label>
-              <textarea class="form-control" name="message" rows="10" id="message-field" required></textarea>
+            <div class="form-group">
+                <textarea class="form-control" name="message" rows="5" placeholder="Mensaje" required=""></textarea>
             </div>
             <div class="col-md-12 text-center">
-              <div class="loading">Loading</div>
-              <div class="error-message"></div>
-              <div class="sent-message">Your message has been sent. Thank you!</div>
-              <button type="submit">Enviar Mensaje</button>
+                <button type="submit">Enviar Mensaje</button>
             </div>
-          </div>
         </form>
       </div>
 

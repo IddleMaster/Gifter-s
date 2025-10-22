@@ -10,7 +10,6 @@
   <form method="post" enctype="multipart/form-data" class="row g-4" novalidate>
     {% csrf_token %}
 
-    <!-- Columna izquierda: Datos de usuario + Perfil -->
     <div class="col-12 col-lg-6">
       <div class="card p-3 h-100">
         <h4 class="mb-3">Datos de perfil</h4>
@@ -33,7 +32,7 @@
           <label class="form-label" for="{{ u_form.nombre_usuario.id_for_label }}">Usuario</label>
           <div class="input-group">
             <span class="input-group-text">@</span>
-            {{ u_form.nombre_usuario }}  <!-- Editable; no uses disabled/readonly -->
+            {{ u_form.nombre_usuario }}
           </div>
           {% for e in u_form.nombre_usuario.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
           <div class="form-text">Usa letras, números o guiones; se normaliza automáticamente.</div>
@@ -52,8 +51,8 @@
         <div class="mb-3">
           <label class="form-label">{{ p_form.profile_picture.label }}</label><br>
           {% if request.user.perfil.profile_picture %}
-            <img src="{{ request.user.perfil.profile_picture.url }}" alt="Foto actual"
-                 style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin-bottom:8px;">
+          <img src="{{ request.user.perfil.profile_picture.url }}" alt="Foto actual"
+            style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin-bottom:8px;">
           {% endif %}
           {{ p_form.profile_picture }}
           {% for e in p_form.profile_picture.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
@@ -67,52 +66,31 @@
       </div>
     </div>
 
-    <!-- Columna derecha: Preferencias 
     <div class="col-12 col-lg-6">
       <div class="card p-3 h-100">
-        <h4 class="mb-3">Preferencias</h4>
-
-        {{ pref_form.non_field_errors }}
-
-        <div class="form-check mb-2">
+        <h4 class="mb-3">Preferencias de Notificación (Email)</h4>
+        {# Aquí puedes añadir los campos de tu pref_form si los tenías #}
+        {# Ejemplo:
+        <div class="form-check form-switch mb-3">
           {{ pref_form.email_on_new_follower }}
           <label class="form-check-label" for="{{ pref_form.email_on_new_follower.id_for_label }}">
-            {{ pref_form.fields.email_on_new_follower.label }}
+            {{ pref_form.email_on_new_follower.label }}
           </label>
-          {% for e in pref_form.email_on_new_follower.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          <small class="form-text text-muted d-block">{{ pref_form.email_on_new_follower.help_text }}</small>
         </div>
-
-        <div class="form-check mb-2">
-          {{ pref_form.email_on_event_invite }}
-          <label class="form-check-label" for="{{ pref_form.email_on_event_invite.id_for_label }}">
-            {{ pref_form.fields.email_on_event_invite.label }}
-          </label>
-          {% for e in pref_form.email_on_event_invite.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
-        </div>
-
-        <div class="form-check mb-2">
-          {{ pref_form.email_on_birthday_reminder }}
-          <label class="form-check-label" for="{{ pref_form.email_on_birthday_reminder.id_for_label }}">
-            {{ pref_form.fields.email_on_birthday_reminder.label }}
-          </label>
-          {% for e in pref_form.email_on_birthday_reminder.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
-        </div>
-
-        <div class="form-check mb-2">
-          {{ pref_form.accepts_marketing_emails }}
-          <label class="form-check-label" for="{{ pref_form.accepts_marketing_emails.id_for_label }}">
-            {{ pref_form.fields.accepts_marketing_emails.label }}
-          </label>
-          {% for e in pref_form.accepts_marketing_emails.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
-        </div>
+        #}
+        <p class="text-muted">Configura aquí cómo prefieres recibir notificaciones por correo.</p>
       </div>
     </div>
-    -->
 
-    <div class="col-12 d-flex gap-2">
+
+    <div class="col-12 d-flex gap-2 mt-4"> {# Añadido mt-4 para espacio #}
       <a href="{% url 'perfil' %}" class="btn btn-outline-secondary">Cancelar</a>
       <button type="submit" class="btn btn-primary">Guardar cambios</button>
     </div>
   </form>
 </div>
+
+{# --- SE HAN ELIMINADO LOS SCRIPTS DE FIREBASE --- #}
+
 {% endblock %}

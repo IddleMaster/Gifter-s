@@ -6,22 +6,32 @@ from core.models import Producto, Categoria, Marca, UrlTienda
 from django.utils import timezone
 import requests
 from django.core.files.base import ContentFile
+from django.conf import settings # Para obtener BASE_DIR
+from django.core.files import File # Para manejar archivos locales
 
 # Define los campos requeridos y los posibles nombres que pueden tener en el CSV.
 # Esto hace el script flexible a diferentes formatos de archivo.
 REQUIRED_FIELDS = {
-    'id_producto': ['id_producto', 'product_id', 'ID', 'SKU'],
-    'nombre_producto': ['nombre_producto', 'nombre', 'product_name', 'Title'],
+    # Cambia 'id_producto': ['id_producto', ...] por:
+    'id_producto': ['id', 'id_producto', 'product_id', 'ID', 'SKU'],
+    # Cambia 'nombre_producto': ['nombre_producto', ...] por:
+    'nombre_producto': ['nombre', 'nombre_producto', 'product_name', 'Title'],
+    # 'descripcion' ya está bien si tu CSV usa 'descripcion'
     'descripcion': ['descripcion', 'description', 'cuerpo', 'body'],
-    'id_categoria': ['id_categoria', 'category_id', 'categoría', 'id categoria'],
-    'id_marca': ['id_marca', 'brand_id', 'marca', 'id marca'],
+    # Cambia 'id_categoria': ['id_categoria', ...] por:
+    'id_categoria': ['categoria', 'id_categoria', 'category_id', 'categoría', 'id categoria'],
+    # Cambia 'id_marca': ['id_marca', ...] por:
+    'id_marca': ['marca', 'id_marca', 'brand_id', 'id marca'],
 }
 
 # Define campos opcionales que, si existen, se procesarán.
 OPTIONAL_FIELDS = {
+    # 'precio' ya está bien si tu CSV usa 'precio'
     'precio': ['precio', 'price', 'valor'],
+    # 'url_tienda' no está en tu CSV actual, pero lo dejamos por si acaso
     'url_tienda': ['url_tienda', 'url', 'link', 'product_url'],
-    'url_imagen': ['url_imagen', 'imagen_url', 'image_url', 'imagen']
+
+    'url_imagen': ['imagen_url', 'url_imagen', 'image_url', 'imagen']
 }
 
 
@@ -131,23 +141,38 @@ class Command(BaseCommand):
 
                     for row_num, row in enumerate(csv_reader, start=2):
                         try:
-                            # Obtener o crear Categoría
-                            categoria_id_val = row[mapping['id_categoria']].strip()
-                            if not categoria_id_val.isdigit():
-                                raise ValueError(f"id_categoria '{categoria_id_val}' no es un número válido.")
-                            categoria, _ = Categoria.objects.get_or_create(
-                                id_categoria=int(categoria_id_val),
-                                defaults={'nombre_categoria': f'Categoría {categoria_id_val}', 'descripcion': 'Importada desde CSV'}
-                            )
+                            try:
+                            # Obtener o crear Categoría POR NOMBRE
+                            # (Asegúrate de que esta línea y las siguientes dentro del 'try'
+                            # estén indentadas UN NIVEL MÁS que el 'try')
+                                categoria_nombre = row[mapping['id_categoria']].strip()
+                                if not categoria_nombre:
+                                    raise ValueError("El nombre de la categoría no puede estar vacío.")
+                                categoria, cat_created = Categoria.objects.get_or_create(
+                                    nombre_categoria=categoria_nombre,
+                                    defaults={'descripcion': f'Importada: {categoria_nombre}'}
+                                )
+                                if cat_created:
+                                    self.stdout.write(f"  -> Creada nueva categoría: {categoria_nombre}")
 
-                            # Obtener o crear Marca
-                            marca_id_val = row[mapping['id_marca']].strip()
-                            if not marca_id_val.isdigit():
-                                raise ValueError(f"id_marca '{marca_id_val}' no es un número válido.")
-                            marca, _ = Marca.objects.get_or_create(
-                                id_marca=int(marca_id_val),
-                                defaults={'nombre_marca': f'Marca {marca_id_val}'}
-                            )
+                                # Obtener o crear Marca POR NOMBRE
+                                marca_nombre = row[mapping['id_marca']].strip()
+                                if not marca_nombre:
+                                    raise ValueError("El nombre de la marca no puede estar vacío.")
+                                marca, marca_created = Marca.objects.get_or_create(
+                                    nombre_marca=marca_nombre
+                                )
+                                if marca_created:
+                                    self.stdout.write(f"  -> Creada nueva marca: {marca_nombre}")
+
+                            # (Asegúrate de que esta línea 'except' esté AL MISMO NIVEL que el 'try')
+                            except KeyError as ke:
+                                # (Esta línea y la siguiente indentadas UN NIVEL MÁS que el 'except')
+                                raise ValueError(f"Falta la columna necesaria en el CSV: {ke}")
+                            # (Asegúrate de que esta línea 'except' esté AL MISMO NIVEL que el 'try' y el 'except' anterior)
+                            except ValueError as ve:
+                                 # (Esta línea y la siguiente indentadas UN NIVEL MÁS que el 'except')
+                                 raise ValueError(f"Error en categoría/marca: {ve}")
 
                             # Preparar datos del producto
                             producto_data = {
@@ -169,22 +194,48 @@ class Command(BaseCommand):
                                         producto_data['precio'] = None
 
                             # Crear o actualizar producto
-                            producto_id_val = row[mapping['id_producto']].strip()
-                            if not producto_id_val.isdigit():
-                                raise ValueError(f"id_producto '{producto_id_val}' no es un número válido.")
+                            producto_id_val = None
+                            if 'id_producto' in mapping and row.get(mapping['id_producto']):
+                                 id_str = row[mapping['id_producto']].strip()
+                                 if id_str.isdigit():
+                                     producto_id_val = int(id_str)
+                                 else:
+                                     # Si hay un ID pero no es un número, registrar como error y saltar fila
+                                     raise ValueError(f"id_producto '{id_str}' no es un número válido.")
 
-                            producto, created = Producto.objects.update_or_create(
-                                id_producto=int(producto_id_val),
-                                defaults=producto_data
-                            )
-
-                            if created:
-                                productos_creados += 1
-                                self.stdout.write(self.style.SUCCESS(f'✓ Creado: {producto.nombre_producto}'))
+                            if producto_id_val is not None:
+                                # SI TENEMOS ID VÁLIDO: Usar update_or_create (comportamiento anterior)
+                                producto, created = Producto.objects.update_or_create(
+                                    id_producto=producto_id_val,
+                                    defaults=producto_data
+                                )
+                                if created:
+                                    productos_creados += 1
+                                    self.stdout.write(self.style.SUCCESS(f'✓ Creado con ID={producto_id_val}: {producto.nombre_producto}'))
+                                else:
+                                    productos_actualizados += 1
+                                    self.stdout.write(self.style.NOTICE(f'↻ Actualizado ID={producto_id_val}: {producto.nombre_producto}'))
                             else:
-                                productos_actualizados += 1
-                                self.stdout.write(self.style.NOTICE(f'↻ Actualizado: {producto.nombre_producto}'))
-
+                                # SI NO TENEMOS ID VÁLIDO: Crear un nuevo producto (ID automático)
+                                # Primero, verificamos si ya existe un producto con el mismo nombre para evitar duplicados simples
+                                # (Podrías hacer esta verificación más robusta si lo necesitas)
+                                existing_product = Producto.objects.filter(nombre_producto=producto_data['nombre_producto']).first()
+                                if existing_product:
+                                    producto = existing_product
+                                    created = False
+                                    # Opcional: Actualizar datos si ya existe por nombre
+                                    # for key, value in producto_data.items():
+                                    #    setattr(producto, key, value)
+                                    # producto.save()
+                                    # productos_actualizados += 1
+                                    self.stdout.write(self.style.WARNING(f'→ Ya existe producto con nombre "{producto.nombre_producto}" (ID={producto.id_producto}). Fila ignorada (o actualizada, si descomentas el código).'))
+                                    # Si decides ignorar, puedes añadir 'continue' aquí para saltar al siguiente
+                                else:
+                                    # Crear el nuevo producto (Django/DB asignará el ID)
+                                    producto = Producto.objects.create(**producto_data)
+                                    created = True
+                                    productos_creados += 1
+                                    self.stdout.write(self.style.SUCCESS(f'✓ Creado con ID automático={producto.id_producto}: {producto.nombre_producto}'))
                             # Manejar URL de tienda (opcional)
                             if 'url_tienda' in mapping and row[mapping['url_tienda']].strip():
                                 UrlTienda.objects.update_or_create(
@@ -192,18 +243,30 @@ class Command(BaseCommand):
                                     url=row[mapping['url_tienda']].strip(),
                                     defaults={'nombre_tienda': 'Tienda Principal', 'es_principal': True}
                                 )
-                            url_imagen = row.get(mapping.get('url_imagen')) # Usamos .get para que no falle si no existe 
+                            url_imagen = row.get(mapping.get('url_imagen')) # Obtener la ruta del CSV
                             if url_imagen:
-                                try:
-                                    response = requests.get(url_imagen, stream=True)
-                                    if response.status_code == 200:
-                                                                    # Obtener el nombre del archivo de la URL
-                                        file_name = url_imagen.split('/')[-1]
-                                        producto.imagen.save(file_name, ContentFile(response.content), save=True)
-                                        self.stdout.write(self.style.SUCCESS(f"  ✓ Imagen descargada para {producto.nombre_producto}"))
-                                except Exception as img_e:
-                                    self.stdout.write(self.style.WARNING(f"  ! No se pudo descargar la imagen para {producto.nombre_producto}: {img_e}"))
-                           
+                                # Construir la ruta completa del archivo DENTRO del contenedor
+                                # Asumimos que la ruta en el CSV es relativa a la raíz del proyecto (BASE_DIR)
+                                # Ej: si BASE_DIR es /app y CSV dice 'productos/img.jpg', buscará /app/productos/img.jpg
+                                # AJUSTA 'settings.BASE_DIR' si tus rutas son relativas a otra carpeta (ej: settings.MEDIA_ROOT)
+                                image_path_in_container = os.path.join(settings.BASE_DIR, url_imagen)
+
+                                if os.path.exists(image_path_in_container):
+                                    try:
+                                        # Abrir el archivo local
+                                        with open(image_path_in_container, 'rb') as img_file:
+                                            # Obtener el nombre del archivo
+                                            file_name = os.path.basename(url_imagen)
+                                            # Guardar el archivo en el campo ImageField del producto
+                                            # Usamos Django File wrapper
+                                            producto.imagen.save(file_name, File(img_file), save=True)
+                                            self.stdout.write(self.style.SUCCESS(f"  ✓ Imagen local asignada para {producto.nombre_producto} desde {url_imagen}"))
+                                    except Exception as img_e:
+                                        # Error al abrir o guardar el archivo
+                                        self.stdout.write(self.style.WARNING(f"  ! Error al procesar imagen local para {producto.nombre_producto}: {img_e}"))
+                                else:
+                                    # El archivo no existe en la ruta esperada dentro del contenedor
+                                    self.stdout.write(self.style.WARNING(f"  ! Imagen local no encontrada para {producto.nombre_producto} en {image_path_in_container}")) 
                         except Exception as e:
                             error_msg = f'Fila {row_num}: {str(e)}'
                             errores.append(error_msg)
@@ -225,3 +288,16 @@ class Command(BaseCommand):
              self.stdout.write(self.style.ERROR(f"El archivo {csv_file_path} no fue encontrado."))
         except Exception as e:
             self.stdout.write(self.style.ERROR(f'Error general al procesar el archivo: {str(e)}'))
+
+
+#url_imagen = row.get(mapping.get('url_imagen')) # Usamos .get para que no falle si no existe 
+                            #if url_imagen:
+                            #    try:
+                            #        response = requests.get(url_imagen, stream=True)
+                            #        if response.status_code == 200:
+                            #                                        # Obtener el nombre del archivo de la URL
+                            #            file_name = url_imagen.split('/')[-1]
+                            #            producto.imagen.save(file_name, ContentFile(response.content), save=True)
+                            #            self.stdout.write(self.style.SUCCESS(f"  ✓ Imagen descargada para {producto.nombre_producto}"))
+                            #    except Exception as img_e:
+                            #        self.stdout.write(self.style.WARNING(f"  ! No se pudo descargar la imagen para {producto.nombre_producto}: {img_e}"))

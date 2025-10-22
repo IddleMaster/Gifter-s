@@ -242,6 +242,13 @@ class MainWindow(QMainWindow):
         self.table_products.itemChanged.connect(self.handle_product_change)
         # --------------------    
         layout.addWidget(self.table_products)
+        
+        # --- BOTÓN BORRAR ---
+        self.btn_delete_product = QPushButton("Borrar Producto Seleccionado")
+        self.btn_delete_product.setStyleSheet("background-color: #dc3545; color: white; padding: 10px; font-size: 14px;") # Estilo rojo
+        self.btn_delete_product.clicked.connect(self.handle_delete_product) # Conectar a nueva función
+        layout.addWidget(self.btn_delete_product)
+        # ---------------------
 
         # TODO: Llamar a la función para cargar datos de la API
         # self.load_products()
@@ -343,6 +350,52 @@ class MainWindow(QMainWindow):
             # item.setText(valor_anterior) # Necesitarías haber guardado el valor_anterior antes
             # Por ahora, simplemente informamos del error. Recargar manualmente refrescará.
             self.load_products() # Recarga toda la tabla para deshacer el cambio visual si falla
+    def handle_delete_product(self):
+        """
+        Maneja el clic en el botón 'Borrar Producto Seleccionado'.
+        """
+        selected_items = self.table_products.selectedItems()
+        if not selected_items:
+            QMessageBox.warning(self, "Borrar Producto", "Por favor, selecciona una fila para borrar.")
+            return
+    
+        # El ID está en la primera celda de la fila seleccionada
+        selected_row = self.table_products.currentRow()
+        product_id_item = self.table_products.item(selected_row, 0)
+        product_name_item = self.table_products.item(selected_row, 1) # Para el mensaje
+    
+        if not product_id_item:
+            QMessageBox.critical(self, "Error", "No se pudo obtener el ID del producto seleccionado.")
+            return
+    
+        product_id = product_id_item.text()
+        product_name = product_name_item.text() if product_name_item else f"ID {product_id}"
+    
+        # --- Pedir Confirmación ---
+        reply = QMessageBox.question(self, 'Confirmar Borrado',
+                                     f"¿Estás seguro de que quieres borrar el producto '{product_name}' (ID: {product_id})?\n"
+                                     "Esta acción no se puede deshacer.",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                     QMessageBox.StandardButton.No) # Default es No
+    
+        if reply == QMessageBox.StandardButton.Yes:
+            print(f"Borrando producto ID={product_id}")
+            self.statusBar.showMessage(f"Borrando Producto {product_id}...")
+            QApplication.processEvents()
+    
+            # --- LLAMADA A LA API (Próximo paso) ---
+            success, message = self.api_client.delete_product(product_id)
+            # -------------------------------------
+    
+            if success:
+                self.statusBar.showMessage(f"Producto {product_id} borrado exitosamente.", 3000)
+                # Recargar la tabla para que desaparezca el producto
+                self.load_products()
+            else:
+                QMessageBox.critical(self, "Error al Borrar", message)
+                self.statusBar.showMessage(f"Error al borrar Producto {product_id}.", 5000)
+        else:
+            self.statusBar.showMessage("Borrado cancelado.")
         
     def open_csv_importer(self):
         """

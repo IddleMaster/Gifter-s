@@ -1,4 +1,4 @@
-{# templates/login.html #}
+getOrCreateToken{# templates/login.html #}
 {% extends "base.html" %}
 {% load static %}
 {% load socialaccount %}
@@ -67,7 +67,7 @@
       {% if request.POST.remember %}checked{% endif %}
     >
     <label class="form-check-label" for="remember">Recordarme</label>
-    <a href="#" style="float:right; color:#6c63ff;">¿Olvidaste tu contraseña?</a>
+    <a href="{% url 'account_reset_password' %}" style="float:right; color:#6c63ff;">¿Olvidaste tu contraseña?</a>
   </div>
 
   <button type="submit" class="btn btn-login">Iniciar Sesión</button>

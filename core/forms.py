@@ -6,6 +6,8 @@ from .models import Post
 from datetime import date
 import re
 from django.utils.text import slugify
+from .models import ResenaSitio
+
 
 def validate_image_size(file):
     """
@@ -243,6 +245,7 @@ class ProfileEditForm(forms.ModelForm):
         return normalized
 
 
+# core/forms.py
 class PreferenciasUsuarioForm(forms.ModelForm):
     class Meta:
         model = PreferenciasUsuario
@@ -251,19 +254,24 @@ class PreferenciasUsuarioForm(forms.ModelForm):
             'email_on_event_invite',
             'email_on_birthday_reminder',
             'accepts_marketing_emails',
+            'allow_push_web',            # <- NUEVO
         ]
         labels = {
             'email_on_new_follower': 'Email por nuevo seguidor',
             'email_on_event_invite': 'Email por invitación a evento',
             'email_on_birthday_reminder': 'Recordatorio de cumpleaños',
             'accepts_marketing_emails': 'Acepta correos de marketing',
+            'allow_push_web': 'Recibir notificaciones push en este navegador',  # <- NUEVO
         }
         widgets = {
             'email_on_new_follower': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'email_on_event_invite': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'email_on_birthday_reminder': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'accepts_marketing_emails': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'allow_push_web': forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'allowPushWeb'}),  # <- NUEVO
         }
+
+        
 
 class EventoForm(forms.ModelForm):
     class Meta:
@@ -288,6 +296,47 @@ def validate_image_size(file):
 ################################################################
 ################################################################
 
+class ResenaSitioForm(forms.ModelForm):
+    class Meta:
+        model = ResenaSitio
+        fields = ("calificacion", "comentario")
+        labels = {
+            "calificacion": "Calificación",
+            "comentario": "Comentario",
+        }
+        help_texts = {
+            "calificacion": "Del 1 al 5.",
+            "comentario": "Opcional. Cuéntanos tu experiencia en la página.",
+        }
+        widgets = {
+            "calificacion": forms.NumberInput(attrs={
+                "min": 1,
+                "max": 5,
+                "value": 5,
+                "class": "form-control",
+                "style": "max-width:120px;",
+                "aria-label": "Calificación de 1 a 5",
+            }),
+            "comentario": forms.Textarea(attrs={
+                "rows": 3,
+                "class": "form-control",
+                "placeholder": "¿Qué te pareció la página? (opcional)",
+            }),
+        }
+        error_messages = {
+            "calificacion": {
+                "required": "Indica una calificación de 1 a 5.",
+                "invalid": "La calificación debe ser un número entre 1 y 5.",
+            },
+            "comentario": {
+                "max_length": "Tu comentario es demasiado largo.",
+            },
+        }
+
+    def clean_comentario(self):
+        """Normaliza espacios; el comentario es opcional."""
+        comentario = (self.cleaned_data.get("comentario") or "").strip()
+        return comentario
 
 class ContactForm(forms.Form):
     name = forms.CharField(max_length=100, required=True)

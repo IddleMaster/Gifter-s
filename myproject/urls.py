@@ -1,20 +1,28 @@
 from django.contrib import admin
+from django.http import HttpResponse
 from django.urls import path, include
 from django.views.generic import TemplateView, RedirectView
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
-from django.conf.urls.static import static
+from django.conf.urls.static import static as dj_static
 from django.conf import settings
 from core.views import *
 from core import views
+from django.contrib.auth import views as auth_views
+from django.views.decorators.cache import never_cache
+
+
+from django.utils.safestring import mark_safe
+from django.views.decorators.http import require_GET
+import json
 
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
 
+# para las fakin reseñaaaaas
 
 
-#from resenas import views as resenas_views
 
 
 
@@ -62,7 +70,7 @@ urlpatterns = [
     # Feed
     path('feed/', views.feed_view, name='feed'),
     path('post/<int:post_id>/like/', views.toggle_like_post_view, name='toggle_like'),
-    path('api/post/<int:post_id>/comments/', get_comments_view, name='get_comments'),
+    path('api/post/<int:post_id>/comments/', views.get_comments_view, name='get_comments'),
     path('post/crear/', views.post_crear, name='post_crear'),
     path('post/<int:pk>/eliminar/', views.post_eliminar, name='post_eliminar'), 
     path('comentarios/crear/', views.comentario_crear, name='comentario_crear'),
@@ -89,21 +97,21 @@ urlpatterns = [
     path('api/users/', views.UserListAPIView.as_view(), name='api_user_list'),
     path('api/users/<int:pk>/', views.UserDetailAPIView.as_view(), name='api_user_detail'),
     # Amistad
-    path('api/amistad/solicitudes/', EnviarSolicitudAmistad.as_view(), name='api_amistad_enviar'),
-    path('api/amistad/solicitudes/recibidas/', SolicitudesRecibidasList.as_view(), name='api_amistad_recibidas'),
-    path('api/amistad/solicitudes/enviadas/', SolicitudesEnviadasList.as_view(), name='api_amistad_enviadas'),
-    path('api/amistad/solicitudes/<int:pk>/aceptar/', AceptarSolicitud.as_view(), name='api_amistad_aceptar'),
-    path('api/amistad/solicitudes/<int:pk>/rechazar/', RechazarSolicitud.as_view(), name='api_amistad_rechazar'),
-    path('api/amistad/solicitudes/<int:pk>/cancelar/', CancelarSolicitud.as_view(), name='api_amistad_cancelar'),
-    path('api/amistad/amigos/', AmigosList.as_view(), name='api_amigos_list'),
-    path('api/amistad/amigos/<int:pk>/', EliminarAmigo.as_view(), name='api_amigos_eliminar'),
+    path('api/amistad/solicitudes/', views.EnviarSolicitudAmistad.as_view(), name='api_amistad_enviar'),
+    path('api/amistad/solicitudes/recibidas/', views.SolicitudesRecibidasList.as_view(), name='api_amistad_recibidas'),
+    path('api/amistad/solicitudes/enviadas/', views.SolicitudesEnviadasList.as_view(), name='api_amistad_enviadas'),
+    path('api/amistad/solicitudes/<int:pk>/aceptar/', views.AceptarSolicitud.as_view(), name='api_amistad_aceptar'),
+    path('api/amistad/solicitudes/<int:pk>/rechazar/', views.RechazarSolicitud.as_view(), name='api_amistad_rechazar'),
+    path('api/amistad/solicitudes/<int:pk>/cancelar/', views.CancelarSolicitud.as_view(), name='api_amistad_cancelar'),
+    path('api/amistad/amigos/', views.AmigosList.as_view(), name='api_amigos_list'),
+    path('api/amistad/amigos/<int:pk>/', views.EliminarAmigo.as_view(), name='api_amigos_eliminar'),
     path("amistad/eliminar/<str:username>/", views.amistad_eliminar, name="amistad_eliminar"),
     path("amistad/rechazar/<str:username>/", views.amistad_rechazar, name="amistad_rechazar"),
 
     # Chat API
-    path('api/chat/conversaciones/', ConversacionesList.as_view(), name='conversaciones_list'),
-    path('api/chat/conversaciones/<int:conv_id>/mensajes/', MensajesListCreate.as_view(), name='mensajes_list_create'),
-    path("u/<str:username>/", perfil_publico, name="perfil_publico"),
+    path('api/chat/conversaciones/', views.ConversacionesList.as_view(), name='conversaciones_list'),
+    path('api/chat/conversaciones/<int:conv_id>/mensajes/', views.MensajesListCreate.as_view(), name='mensajes_list_create'),
+    path("u/<str:username>/", views.perfil_publico, name="perfil_publico"),
     path("u/<str:username>/", views.perfil_publico, name="perfil_detalle"),
 
     path('', views.feed, name='feed'),
@@ -129,21 +137,56 @@ urlpatterns = [
     path('api/conversaciones/<int:pk>/', views.conversacion_detalle, name='conversacion_detalle'),
     ##path("chat/typing/<int:conv_id>/", views.chat_typing, name="chat_typing"),
     ##path("chat/con-usuario/<str:username_or_id>/", views.chat_con_usuario_id, name="chat_con_usuario_id"),
+
+    path('sugerencias-ia/<str:amigo_username>/', views.sugerencias_regalo_ia, name='sugerencias_regalo_ia'),
+
+
+    path('grupos/<int:pk>/miembros/', views.grupos_members, name='grupos_members'),
+    path('grupos/<int:pk>/agregar/', views.grupos_add_members, name='grupos_add_members'),
+    path('grupos/<int:pk>/quitar/', views.grupos_remove_member, name='grupos_remove_member'),
+    path('grupos/<int:pk>/eliminar/', views.grupos_delete, name='grupos_delete'),
+    path('grupos/<int:pk>/leave/', views.grupos_leave, name='grupos_leave'),
     
-    
+    ##para resena jiji
+    path("resena/", views.resena_sitio_crear, name="resena_sitio_crear"),
+    path("resena/editar/", views.resena_sitio_editar, name="resena_sitio_editar"),
+    path("resena/eliminar/", views.resena_sitio_eliminar, name="resena_sitio_eliminar"),
+
+    # --- URLs PARA RESTABLECIMIENTO DE CONTRASEÑA (Flujo de Django) ---
+    path('password_reset/',
+         auth_views.PasswordResetView.as_view(
+             template_name='registration/password_reset_form.html', # Usa nuestra plantilla
+             email_template_name='registration/password_reset_email.html', # Plantilla para el cuerpo del email
+             subject_template_name='registration/password_reset_subject.txt', # Plantilla para el asunto
+             success_url='/password_reset/done/' # A dónde ir tras enviar el form
+         ),
+         name='password_reset'), # <--- ESTE ES EL NOMBRE QUE BUSCA EL {% url %}
+    path('password_reset/done/',
+         auth_views.PasswordResetDoneView.as_view(
+             template_name='registration/password_reset_done.html' # Usa nuestra plantilla de "enviado"
+         ),
+         name='password_reset_done'),
+    path('reset/<uidb64>/<token>/',
+         auth_views.PasswordResetConfirmView.as_view(
+             template_name='registration/password_reset_confirm.html', # Usa nuestra plantilla para nueva contraseña
+             success_url='/reset/done/' # A dónde ir tras cambiarla
+         ),
+         name='password_reset_confirm'),
+    path('reset/done/',
+         auth_views.PasswordResetCompleteView.as_view(
+             template_name='registration/password_reset_complete.html' # Usa nuestra plantilla de "completado"
+         ),
+         name='password_reset_complete'),
+    # --- Fin URLs para Restablecimiento ---
 
     
-
 
 ]
 
-# Archivos media en desarrollo
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-
-# Archivos estáticos (de la app)
+# Archivos estáticos de las apps
 urlpatterns += staticfiles_urlpatterns()
 
+# Media en desarrollo
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += dj_static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

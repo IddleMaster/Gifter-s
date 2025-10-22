@@ -1,1 +1,1 @@
-nombre_producto,descripcion,precio,id_categoria,id_marca,id_producto,url_imagen,error_detalle
+id,nombre,descripcion,precio,categoria,marca,imagen_url,error_detalle

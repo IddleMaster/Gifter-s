@@ -1,9 +1,12 @@
 from itertools import count
+from django.templatetags.static import static
 from django.http import JsonResponse, HttpResponseForbidden
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login
 from django.contrib import messages
 from django.conf import settings
+from core.services.gifter_ai import generar_sugerencias_regalo
+from core.services.recommendations import recommend_when_wishlist_empty
 from .forms import PostForm, RegisterForm, PerfilForm, PreferenciasUsuarioForm, EventoForm
 from .models import *
 from .emails import send_verification_email, send_welcome_email
@@ -23,6 +26,7 @@ from .models import User, Post, Like  # ajusta si necesitas más
 from core.forms import ProfileEditForm
 from .utils import get_default_wishlist
 from django.db.models import Q, Avg, Case, When
+import openai
 from django.db.models import Prefetch, Q
 from core.models import Wishlist, ItemEnWishlist
 from rest_framework import generics, permissions, status
@@ -42,6 +46,7 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from core.models import Wishlist, ItemEnWishlist
 from core.models import Conversacion, Mensaje, ParticipanteConversacion
+from core.models import NotificationDevice, PreferenciasUsuario, Perfil
 from .serializers import ConversacionLiteSerializer, MensajeSerializer
 ###nuevo hoy 1 del 10 (abajo)
 from core.services_social import amigos_qs, sugerencias_qs, obtener_o_crear_conv_directa
@@ -55,6 +60,13 @@ from django.urls import reverse  # puedes dejarlo, pero ya no dependemos de reve
 from django.views.decorators.http import require_GET
 from django.core.cache import cache
 # Para Reseña
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.shortcuts import redirect
+from .forms import ResenaSitioForm
+from .models import ResenaSitio
+#########################
+
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -70,7 +82,8 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.views.decorators.http import require_http_methods
 from django.shortcuts import get_object_or_404
-
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_GET
 
 # Decoradores/permissions DRF
 from rest_framework.decorators import api_view, permission_classes
@@ -80,12 +93,34 @@ from rest_framework.permissions import IsAdminUser,IsAuthenticated
 from django.core.management import call_command
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
 
+
+from django.db import transaction
+from .models import Conversacion
+
+
 # Stdlib
 import traceback
 
 # Formularios locales (solo si tienes una vista de contacto que lo use)
 from .forms import ContactForm
 User = get_user_model()
+
+
+if hasattr(settings, 'OPENAI_API_KEY') and settings.OPENAI_API_KEY:
+    # Intenta inicializar el cliente aquí para detectar errores de clave temprano
+    try:
+        openai_client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
+        # Podrías hacer una llamada de prueba simple aquí si quieres verificar la clave
+        print("[OpenAI] Cliente inicializado correctamente.")
+    except Exception as e:
+        print(f"¡ADVERTENCIA! Error al inicializar cliente OpenAI: {e}")
+        openai_client = None # Define como None si falla
+        openai.api_key = None # Mantén api_key compatible si usas código viejo
+else:
+    print("¡ADVERTENCIA! La variable OPENAI_API_KEY no está configurada.")
+    openai_client = None
+    openai.api_key = None
+
 def usuarios_list(request):
     """
     Lista de usuarios que matchean la query en nombre / apellido / nombre_usuario / correo.
@@ -263,7 +298,10 @@ def _people_matches(request, query, limit_friends=8, limit_others=8):
 def home(request):
     try:
         productos_destacados = Producto.objects.filter(activo=True).order_by('-fecha_creacion')[:9]
-        categorias = Categoria.objects.filter(producto__activo=True).distinct().order_by('nombre_categoria')[:12]
+        categorias = (Categoria.objects
+                      .filter(producto__activo=True)
+                      .distinct()
+                      .order_by('nombre_categoria')[:12])
 
         amigos = []
         sugerencias = []
@@ -282,7 +320,7 @@ def home(request):
                         .filter(emisor=request.user, estado=SolicitudAmistad.Estado.PENDIENTE)
                         .select_related('receptor')
                         .order_by('-creada_en')[:10])
-            
+
             wl = get_default_wishlist(request.user)
             favoritos_ids = set(
                 ItemEnWishlist.objects
@@ -290,16 +328,34 @@ def home(request):
                 .values_list('id_producto', flat=True)
             )
 
+        # === Reseñas del sitio (últimas 6) ===
+        try:
+            # Si tienes Perfil (OneToOne) y quieres evitar N+1, descomenta la siguiente línea:
+            # resenas = (ResenaSitio.objects.select_related('id_usuario', 'id_usuario__perfil')
+            resenas = (ResenaSitio.objects
+                       .select_related('id_usuario')
+                       .order_by('-fecha_resena')[:6])
+        except Exception:
+            resenas = []
+
+        # === Tu reseña (para mostrar botones y prellenar el form) ===
+        own_resena = None
+        if request.user.is_authenticated:
+            own_resena = ResenaSitio.objects.filter(id_usuario=request.user).first()
+
         context = {
             'productos_destacados': productos_destacados,
             'categorias': categorias,
             'amigos': amigos,
             'sugerencias': sugerencias,
-            'solicitudes_recibidas': recibidas,   
-            'solicitudes_enviadas': enviadas,   
-            'favoritos_ids': favoritos_ids,  
+            'solicitudes_recibidas': recibidas,
+            'solicitudes_enviadas': enviadas,
+            'favoritos_ids': favoritos_ids,
+            'resenas': resenas,
+            'own_resena': own_resena,  # <- nuevo
         }
         return render(request, 'index.html', context)
+
     except Exception:
         return render(request, 'index.html', {
             'productos_destacados': [],
@@ -309,7 +365,10 @@ def home(request):
             'solicitudes_recibidas': [],
             'solicitudes_enviadas': [],
             'favoritos_ids': set(),
+            'resenas': [],
+            'own_resena': None,  # <- nuevo en fallback
         })
+
 
 def register_view(request):
     if request.method == 'POST':
@@ -1472,31 +1531,30 @@ def profile_view(request):
 
 @login_required
 def profile_edit(request):
-    """
-    Edita: datos del User (nombre, apellido, nombre_usuario),
-    más Perfil (bio, foto, birth_date) y Preferencias.
-    """
+
     user = request.user
     perfil, _ = Perfil.objects.get_or_create(user=user)
-    prefs, _ = PreferenciasUsuario.objects.get_or_create(user=user)
+    prefs, _  = PreferenciasUsuario.objects.get_or_create(user=user)
 
     if request.method == 'POST':
-        u_form   = ProfileEditForm(request.POST, instance=user)
-        p_form   = PerfilForm(request.POST, request.FILES, instance=perfil)
+        u_form    = ProfileEditForm(request.POST, instance=user)
+        p_form    = PerfilForm(request.POST, request.FILES, instance=perfil)
         pref_form = PreferenciasUsuarioForm(request.POST, instance=prefs)
 
         if u_form.is_valid() and p_form.is_valid() and pref_form.is_valid():
-            u = u_form.save()      # guarda nombre/apellido/nombre_usuario (con unicidad)
+            u_form.save()
             p_form.save()
             pref_form.save()
             messages.success(request, 'Perfil actualizado correctamente.')
-            return redirect('perfil')  # o a donde corresponda
+            return redirect('perfil')
         else:
             messages.error(request, 'Revisa los campos marcados.')
     else:
-        u_form   = ProfileEditForm(instance=user)
-        p_form   = PerfilForm(instance=perfil)
+        u_form    = ProfileEditForm(instance=user)
+        p_form    = PerfilForm(instance=perfil)
         pref_form = PreferenciasUsuarioForm(instance=prefs)
+
+
 
     return render(request, 'perfil_editar.html', {
         'u_form': u_form,
@@ -1939,79 +1997,106 @@ def chat_con_usuario(request, username):
     return redirect('chat_room', conversacion_id=conv.conversacion_id)        
 
 
-from django.db.models import Prefetch  # ya lo tienes importado arriba
 
 def perfil_publico(request, username):
-    User = get_user_model()
     usuario = get_object_or_404(User, nombre_usuario=username)
 
-    # Si es tu propio perfil → redirige a tu perfil
     if request.user.is_authenticated and request.user.id == usuario.id:
         return redirect('perfil')
 
     perfil = getattr(usuario, 'perfil', None)
 
-    es_mi_perfil = False
     es_amigo = False
     pendiente_enviada = None
     pendiente_recibida = None
     puede_chatear = False
 
     if request.user.is_authenticated:
-        sigo = Seguidor.objects.filter(seguidor=request.user, seguido=usuario).exists()
-        me_sigue = Seguidor.objects.filter(seguidor=usuario, seguido=request.user).exists()
-        es_amigo = sigo and me_sigue                 # ← OJO: "and", NUNCA "&&"
+        seguimientos = Seguidor.objects.filter(
+            Q(seguidor=request.user, seguido=usuario) | Q(seguidor=usuario, seguido=request.user)
+        ).values_list('seguidor_id', flat=True)
+        sigo = request.user.id in seguimientos
+        me_sigue = usuario.id in seguimientos
+        es_amigo = sigo and me_sigue
         puede_chatear = es_amigo
 
-        pendiente_enviada = SolicitudAmistad.objects.filter(
-            emisor=request.user, receptor=usuario, estado=SolicitudAmistad.Estado.PENDIENTE
-        ).first()
-        pendiente_recibida = SolicitudAmistad.objects.filter(
-            emisor=usuario, receptor=request.user, estado=SolicitudAmistad.Estado.PENDIENTE
-        ).first()
-
-    eventos_publicos = (
-        Evento.objects
-        .filter(id_usuario=usuario)
-        .order_by('fecha_evento')
-    )
-
-    ultimos_posts = (
-        Post.objects
-        .filter(id_usuario=usuario, es_publico=True)
-        .order_by('-fecha_publicacion')[:6]
-    )
-
-    # Wishlist pública (solo si son amigos)
-    wl = Wishlist.objects.filter(usuario=usuario).first()
-    wishlist_items_publicos = []
-    if wl and es_amigo:
-        wishlist_items_publicos = (
-            ItemEnWishlist.objects
-            # ⇩⇩⇩ SOLO PENDIENTES (NO RECIBIDOS)
-            .filter(id_wishlist=wl, fecha_comprado__isnull=True)
-            # Si además tienes un booleano 'recibido', podrías añadir (opcional):
-            # .filter(Q(recibido=False) | Q(recibido__isnull=True))
-            .select_related('id_producto', 'id_producto__id_marca')
-            .prefetch_related('id_producto__urls_tienda')
-            .order_by('-pk')
+        solicitudes = SolicitudAmistad.objects.filter(
+            (Q(emisor=request.user, receptor=usuario) | Q(emisor=usuario, receptor=request.user)),
+            estado=SolicitudAmistad.Estado.PENDIENTE
         )
+        pendiente_enviada = solicitudes.filter(emisor=request.user).first()
+        pendiente_recibida = solicitudes.filter(emisor=usuario).first()
 
-    # Recibidos públicos (visible para cualquiera)
-    recibidos_publicos = []
+    eventos_publicos = Evento.objects.filter(id_usuario=usuario).order_by('fecha_evento')
+    ultimos_posts = Post.objects.filter(id_usuario=usuario, es_publico=True).order_by('-fecha_publicacion')[:6]
+
+    wl = Wishlist.objects.filter(usuario=usuario).first()
+    wishlist_items_publicos = ItemEnWishlist.objects.none()
+    recibidos_publicos = ItemEnWishlist.objects.none()
+
+    # NUEVO: contenedores
+    sugerencias_ia_lista = []
+    recomendados = []
+
+    print(f"[DEBUG] perfil_publico para {username}. Es amigo: {es_amigo}. Wishlist encontrada: {'Sí' if wl else 'No'}")
+
     if wl:
         recibidos_publicos = (
             ItemEnWishlist.objects
-            .filter(id_wishlist=wl, fecha_comprado__isnull=False)   # clave
+            .filter(id_wishlist=wl, fecha_comprado__isnull=False)
             .select_related('id_producto', 'id_producto__id_marca')
-            .prefetch_related(Prefetch('id_producto__urls_tienda'))
+            .prefetch_related(Prefetch('id_producto__urls_tienda', queryset=UrlTienda.objects.filter(activo=True)))
             .order_by('-fecha_comprado', '-pk')
         )
 
+        if es_amigo:
+            wishlist_items_publicos = (
+                ItemEnWishlist.objects
+                .filter(id_wishlist=wl, fecha_comprado__isnull=True)
+                .filter(id_producto__activo=True)
+                .select_related('id_producto', 'id_producto__id_marca')
+                .prefetch_related(Prefetch('id_producto__urls_tienda', queryset=UrlTienda.objects.filter(activo=True)))
+                .order_by('-pk')
+            )
+
+            wishlist_count = wishlist_items_publicos.count()
+            print(f"[DEBUG] Conteo de wishlist_items_publicos (activos): {wishlist_count}")
+
+            # --- RECOMENDADOR: si la wishlist activa está vacía ---
+            if wishlist_count == 0:
+                # 1) Productos REALES recomendados (según recibidos/wishlist histórica)
+                cache_key_rec = f"reco_user_{usuario.id}"
+                recomendados = cache.get(cache_key_rec, [])
+                if not recomendados:
+                    recomendados = recommend_when_wishlist_empty(usuario, limit=3)
+                    cache.set(cache_key_rec, recomendados, 60 * 30)  # 30 min
+                print(f"[RECO] Recomendados generados: {len(recomendados)}")
+
+                # 2) (Opcional) IA como fallback SOLO si no encontramos candidatos
+                if not recomendados:
+                    datos_para_ia = ""
+                    nombres_recibidos = [item.id_producto.nombre_producto for item in recibidos_publicos[:3]]
+                    if nombres_recibidos:
+                        datos_para_ia += f"Regalos que ha recibido antes: {', '.join(nombres_recibidos)}.\n"
+                        print(f"[IA] Usando regalos recibidos: {nombres_recibidos}")
+                    elif perfil and getattr(perfil, "bio", ""):
+                        datos_para_ia += f"Su biografía: {perfil.bio}\n"
+                        print(f"[IA] Usando biografía.")
+
+                    if datos_para_ia:
+                        cache_key_ia = f"ia_sugg_user_{usuario.id}"
+                        sugerencias_ia_lista = cache.get(cache_key_ia, [])
+                        if not sugerencias_ia_lista:
+                            sugerencias_ia_lista = generar_sugerencias_regalo(usuario.nombre, datos_para_ia)
+                            cache.set(cache_key_ia, sugerencias_ia_lista, 60 * 60)  # 1 hora
+                        print(f"[IA] Sugerencias IA: {len(sugerencias_ia_lista)}")
+            else:
+                print(f"[DEBUG] La wishlist NO está vacía ({wishlist_count} items activos), saltando recomendaciones/IA.")
+
+    # --- Contexto Final ---
     context = {
         'usuario_publico': usuario,
         'perfil_publico': perfil,
-        'es_mi_perfil': es_mi_perfil,
         'es_amigo': es_amigo,
         'pendiente_enviada': pendiente_enviada,
         'pendiente_recibida': pendiente_recibida,
@@ -2020,8 +2105,11 @@ def perfil_publico(request, username):
         'eventos_publicos': eventos_publicos,
         'wishlist_items_publicos': wishlist_items_publicos,
         'recibidos_publicos': recibidos_publicos,
+        'recomendados': recomendados,          # NUEVO: productos reales sugeridos
+        'sugerencias_ia': sugerencias_ia_lista # IA solo si no hubo recomendados
     }
     return render(request, 'perfil_publico.html', context)
+
 
 
 
@@ -2272,8 +2360,59 @@ class TypingSummaryView(APIView):
 #####################################################################
 #####################################################################
 
+@login_required
+def resena_sitio_crear(request):
+    if request.method != "POST":
+        return redirect("home")
+
+    # bloquea duplicados: si ya tiene, pide usar editar
+    if ResenaSitio.objects.filter(id_usuario=request.user).exists():
+        messages.warning(request, "Ya tienes una reseña. Usa el botón Editar para actualizarla.")
+        return redirect("home")
+
+    form = ResenaSitioForm(request.POST)
+    if form.is_valid():
+        r = form.save(commit=False)
+        r.id_usuario = request.user
+        r.save()
+        messages.success(request, "¡Gracias por tu reseña!")
+    else:
+        messages.error(request, "Revisa la calificación (1–5) y/o tu comentario.")
+    return redirect(f"{reverse('home')}#testimonials")
+
+@login_required
+def resena_sitio_editar(request):
+    if request.method != "POST":
+        return redirect("home")
+
+    # solo edita la reseña del usuario actual
+    instancia = ResenaSitio.objects.filter(id_usuario=request.user).first()
+    if not instancia:
+        messages.warning(request, "Aún no tienes reseña para editar.")
+        return redirect("home")
+
+    form = ResenaSitioForm(request.POST, instance=instancia)
+    if form.is_valid():
+        form.save()
+        messages.success(request, "¡Actualizamos tu reseña! ✨")
+    else:
+        messages.error(request, "Revisa la calificación (1–5) y/o tu comentario.")
+    return redirect(f"{reverse('home')}#testimonials")
 
 
+@login_required
+def resena_sitio_eliminar(request):
+    if request.method != "POST":
+        return redirect("home")
+
+    instancia = ResenaSitio.objects.filter(id_usuario=request.user).first()
+    if not instancia:
+        messages.warning(request, "No tienes reseña para eliminar.")
+        return redirect("home")
+
+    instancia.delete()
+    messages.success(request, "Reseña eliminada.")
+    return redirect(f"{reverse('home')}#testimonials")
 
 
 #####################################################################
@@ -2411,6 +2550,8 @@ def conversacion_detalle(request, pk: int):
         "is_group": is_group,
         "titulo": title,
         "participantes": data_part,
+        "es_autor": (conv.creador_id == request.user.id),   # ← NECESARIO para mostrar ⋮
+        "author_id": conv.creador_id,          
     })
 
 def ayuda_view(request):
@@ -2523,3 +2664,290 @@ class UserDetailAPIView(generics.RetrieveUpdateAPIView): # Usamos RetrieveUpdate
     serializer_class = AdminUserSerializer
     permission_classes = [IsAdminUser] # Solo admins pueden ver/editar usuarios
     lookup_field = 'pk' # El ID vendrá como 'pk' en la URL
+
+
+ # === Listar miembros de grupo ===
+@login_required
+@require_http_methods(["GET"])
+def grupos_members(request, pk: int):
+    conv = _get_group_or_403(request, pk)
+    if not conv:
+        return HttpResponseForbidden("No tienes acceso a este grupo")
+
+    part_qs = (ParticipanteConversacion.objects
+               .select_related("usuario", "usuario__perfil")
+               .filter(conversacion=conv)
+               .order_by("usuario__nombre", "usuario__apellido"))
+
+    data = []
+    for p in part_qs:
+        u = p.usuario
+        # arma avatar absoluto si existe
+        avatar_url = None
+        try:
+            pic = getattr(getattr(u, "perfil", None), "profile_picture", None)
+            if pic:
+                avatar_url = request.build_absolute_uri(pic.url)
+        except Exception:
+            pass
+
+        data.append({
+            "id": u.id,
+            "username": u.nombre_usuario or "",
+            "nombre": u.nombre or "",
+            "apellido": u.apellido or "",
+            "rol": p.rol,  # "admin" | "miembro"
+            "avatar_url": avatar_url,
+        })
+
+    # quién es el creador (autor del grupo)
+    return JsonResponse({
+        "conversacion_id": conv.conversacion_id,
+        "creador_id": conv.creador_id,
+        "miembros": data,
+        "soy_admin": _is_group_admin(request.user, conv),
+    })
+# === Agregar miembros (solo autor) ===
+@login_required
+@require_http_methods(["POST"])
+def grupos_add_members(request, pk: int):
+    conv = _get_group_or_403(request, pk)
+    if not conv:
+        return HttpResponseForbidden("No tienes acceso a este grupo")
+    if not _is_group_admin(request.user, conv):
+        return JsonResponse({'error': 'Solo el autor/admin puede agregar miembros'}, status=403)
+
+    try:
+        body = json.loads(request.body or '{}')
+    except Exception:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+    ids = body.get('miembros') or body.get('ids') or []
+    if not isinstance(ids, list):
+        return JsonResponse({'error': "'miembros' debe ser lista de enteros"}, status=400)
+
+    # normaliza y evita duplicados / self-joins existentes
+    try:
+        ids = [int(x) for x in ids]
+    except Exception:
+        return JsonResponse({'error': 'IDs inválidos'}, status=400)
+
+    # ya participantes:
+    ya = set(ParticipanteConversacion.objects
+             .filter(conversacion=conv)
+             .values_list("usuario_id", flat=True))
+    a_crear_ids = [i for i in ids if i not in ya]
+
+    users = list(User.objects.filter(id__in=a_crear_ids).distinct())
+    if not users:
+        return JsonResponse({"ok": True, "agregados": []})
+
+    with transaction.atomic():
+        ParticipanteConversacion.objects.bulk_create([
+            ParticipanteConversacion(
+                conversacion=conv,
+                usuario=u,
+                rol=ParticipanteConversacion.Rol.MIEMBRO
+            ) for u in users
+        ])
+
+    return JsonResponse({"ok": True, "agregados": [u.id for u in users]})
+# === Quitar miembro (solo autor) ===
+@login_required
+@require_http_methods(["POST"])
+def grupos_remove_member(request, pk: int):
+    conv = _get_group_or_403(request, pk)
+    if not conv:
+        return HttpResponseForbidden("No tienes acceso a este grupo")
+    if not _is_group_admin(request.user, conv):
+        return JsonResponse({'error': 'Solo el autor/admin puede quitar miembros'}, status=403)
+
+    try:
+        body = json.loads(request.body or '{}')
+    except Exception:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+    miembro_id = body.get('miembro_id')
+    if not miembro_id:
+        return JsonResponse({'error': 'Falta miembro_id'}, status=400)
+
+    # no puedes quitar al creador
+    if int(miembro_id) == conv.creador_id:
+        return JsonResponse({'error': 'No puedes quitar al autor del grupo'}, status=400)
+
+    # si es admin y es el único admin, impide dejar al grupo sin admins
+    part = ParticipanteConversacion.objects.filter(conversacion=conv, usuario_id=miembro_id).first()
+    if not part:
+        return JsonResponse({'ok': True, 'removido': miembro_id})  # ya no estaba
+
+    if part.rol == ParticipanteConversacion.Rol.ADMIN:
+        admins = ParticipanteConversacion.objects.filter(
+            conversacion=conv, rol=ParticipanteConversacion.Rol.ADMIN
+        ).exclude(usuario_id=miembro_id)
+        if not admins.exists():
+            return JsonResponse({'error': 'No puedes dejar el grupo sin administradores'}, status=400)
+
+    part.delete()
+    return JsonResponse({'ok': True, 'removido': int(miembro_id)})
+
+# === Eliminar grupo (solo autor) ===
+@login_required
+@require_http_methods(["POST"])
+def grupos_delete(request, pk: int):
+    conv = _get_group_or_403(request, pk)
+    if not conv:
+        return HttpResponseForbidden("No tienes acceso a este grupo")
+    # Solo el autor puede eliminar el grupo
+    if conv.creador_id != request.user.id:
+        return JsonResponse({'error': 'Solo el autor puede eliminar el grupo'}, status=403)
+
+    deleted_id = conv.conversacion_id
+    conv.delete()
+    return JsonResponse({'ok': True, 'deleted_id': deleted_id})
+
+def _get_group_or_403(request, pk: int):
+    """
+    Devuelve la conversación de tipo GRUPO si el usuario es participante.
+    Si no es participante, devuelve None para que la vista responda 403.
+    """
+    conv = get_object_or_404(
+        Conversacion,
+        conversacion_id=pk,
+        tipo=Conversacion.Tipo.GRUPO,
+    )
+    # Debe pertenecer al grupo
+    if not ParticipanteConversacion.objects.filter(conversacion=conv, usuario=request.user).exists():
+        return None
+    return conv
+
+def _is_group_admin(user: User, conv: Conversacion) -> bool:
+    """
+    True si el usuario es el creador del grupo o si tiene rol ADMIN en ese grupo.
+    """
+    if conv.creador_id == user.id:
+        return True
+    return ParticipanteConversacion.objects.filter(
+        conversacion=conv, usuario=user, rol=ParticipanteConversacion.Rol.ADMIN
+    ).exists()
+
+@login_required
+def sugerencias_regalo_ia(request, amigo_username):
+    """
+    Genera sugerencias de regalo para un amigo usando OpenAI GPT.
+    """
+    amigo = get_object_or_404(User, nombre_usuario=amigo_username)
+    perfil_amigo = getattr(amigo, 'perfil', None)
+
+    # 1. Recolectar datos del amigo (¡Puedes mejorar esto!)
+    datos_amigo = f"Nombre: {amigo.nombre} {amigo.apellido}\n"
+    if perfil_amigo and perfil_amigo.bio:
+        datos_amigo += f"Biografía: {perfil_amigo.bio}\n"
+
+    try:
+        # Asume una wishlist por usuario
+        wl = Wishlist.objects.get(usuario=amigo)
+        items = ItemEnWishlist.objects.filter(
+            id_wishlist=wl,
+            fecha_comprado__isnull=True # Solo items no comprados
+        ).select_related('id_producto')[:5] # Limita a 5 items para no exceder tokens
+
+        nombres_items = [item.id_producto.nombre_producto for item in items]
+        if nombres_items:
+            datos_amigo += f"Algunos items que quiere: {', '.join(nombres_items)}\n"
+        else:
+             datos_amigo += "No tiene items visibles en su wishlist.\n"
+    except Wishlist.DoesNotExist:
+        datos_amigo += "No tiene items visibles en su wishlist.\n"
+
+    # Podrías añadir intereses, posts recientes, etc. si los tienes modelados
+
+    # 2. Diseñar el Prompt para GPT
+    prompt = (
+        f"Eres GifterAI, un experto en encontrar el regalo perfecto.\n"
+        f"Mi amigo se llama {amigo.nombre}. Aquí hay algo de información sobre él/ella:\n{datos_amigo}\n"
+        f"Basado en esto, sugiere 5 ideas de regalos creativas y personalizadas. "
+        f"Para cada idea, explica brevemente por qué sería un buen regalo para {amigo.nombre}. "
+        f"Formato deseado:\n"
+        f"- **[Idea de Regalo]:** [Explicación breve]."
+    )
+
+    sugerencias_texto = "Lo siento, no pude generar sugerencias en este momento. Intenta más tarde."
+    sugerencias_lista = []
+
+    
+    if openai.api_key:
+        try:
+            print(f"Enviando prompt a OpenAI para {amigo_username}...") 
+            # Usa la nueva forma de llamar a la API v1.x.x
+            client = openai.OpenAI(api_key=settings.OPENAI_API_KEY) # Crea un cliente
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo", # Modelo económico y rápido
+                messages=[
+                    {"role": "system", "content": "Eres GifterAI, un asistente experto en regalos."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=200, # Ajusta según necesites más o menos texto
+                n=1, # Solo queremos una respuesta
+                stop=None, # No necesitamos parar la generación antes
+                temperature=0.7, # Un poco creativo pero no demasiado loco
+            )
+
+            print("Respuesta recibida de OpenAI.") # Log para depurar
+            # 4. Procesar la respuesta
+            if response.choices:
+                sugerencias_texto = response.choices[0].message.content.strip()
+                # Intenta separar las sugerencias en una lista para el template
+                sugerencias_lista = [s.strip() for s in sugerencias_texto.split('\n') if s.strip().startswith('-')]
+            else:
+                sugerencias_texto = "OpenAI no devolvió sugerencias."
+
+        except openai.APIError as e:
+            print(f"Error de API OpenAI: {e.status_code} - {e.response}")
+            sugerencias_texto = f"Error al contactar OpenAI ({e.status_code}). Intenta más tarde."
+        except Exception as e:
+            print(f"Error inesperado llamando a OpenAI: {e}")
+            sugerencias_texto = "Ocurrió un error inesperado al generar sugerencias."
+    else:
+         sugerencias_texto = "La API Key de OpenAI no está configurada en el servidor."
+
+
+    # 5. Mostrar al usuario en una plantilla
+    context = {
+        'amigo': amigo,
+        'sugerencias_raw': sugerencias_texto, # El texto completo por si falla el split
+        'sugerencias_lista': sugerencias_lista # La lista para el template
+    }
+    # Asegúrate que la ruta a tu plantilla sea correcta
+    return render(request, 'core/sugerencias_regalo_ia.html', context)
+
+
+@login_required
+@require_POST
+def grupos_leave(request, pk):
+    # 1) traer la conversación
+    conv = get_object_or_404(Conversacion, pk=pk, is_group=True)
+
+    # 2) el autor no puede "salir"; debe eliminar o transferir admin
+    if getattr(conv, "creador_id", None) == request.user.id:
+        return JsonResponse(
+            {"ok": False, "error": "El autor no puede abandonar el grupo."},
+            status=400
+        )
+
+    # 3) buscar la membresía
+    try:
+        miembro = ConversacionMiembro.objects.get(conversacion=conv, usuario=request.user)
+    except ConversacionMiembro.DoesNotExist:
+        return JsonResponse(
+            {"ok": False, "error": "No eres miembro de este grupo."},
+            status=404
+        )
+
+    # 4) borrar membresía
+    miembro.delete()
+
+    # (opcional) si no quedan miembros, podés cerrar/eliminar el grupo
+    # if not ConversacionMiembro.objects.filter(conversacion=conv).exists():
+    #     conv.delete()
+
+    return JsonResponse({"ok": True})

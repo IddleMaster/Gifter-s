@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import *
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-
+# from .models import ResenaSitio
 @admin.register(Pais)
 class PaisAdmin(admin.ModelAdmin):
     list_display = ['id_pais', 'nombre_pais']
@@ -127,3 +127,9 @@ class ProductoAdmin(admin.ModelAdmin):
     list_filter = ['activo', 'id_categoria', 'id_marca']
     search_fields = ['nombre_producto', 'descripcion']
     list_editable = ['precio', 'activo']
+
+# @admin.register(ResenaSitio)
+# class ResenaSitioAdmin(admin.ModelAdmin):
+#     list_display = ('id_usuario', 'calificacion', 'fecha_resena')
+#     list_filter = ('calificacion', 'fecha_resena')
+#     search_fields = ('id_usuario__username', 'comentario')

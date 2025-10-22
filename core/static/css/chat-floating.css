@@ -119,6 +119,7 @@
   overflow: auto;
   padding: 12px;
   background: linear-gradient(180deg, #fafbff 0%, #fff 60%);
+  overflow-anchor: none;
 }
 
 .msg {
@@ -711,3 +712,7 @@
 /* Cuando NO mostramos avatar, damos espacio para que el bloque no “salte” */
 .msg.other.compact .bubble{ margin-left:36px; }   /* 28px avatar + 8px gap */
 .msg.me.compact    .bubble{ margin-right:36px; }  /* lado derecho */
+
+.phone-header { position: relative; z-index: 30; }
+.phone-header .dropdown-menu { z-index: 4000; }
+
