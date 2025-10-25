@@ -30,11 +30,8 @@
 
 
 
-
-
-
   <style>
-    /* Poppins global */
+    
     body,
     h1,
     h2,
@@ -239,7 +236,7 @@
       color: #9ca3af;
     }
 
-    /* Burbujas (respetando tus IDs/estructura) */
+    
     .msg {
       display: flex;
       gap: 8px;
@@ -312,7 +309,7 @@
       font-weight: 700;
     }
 
-    /* Bottom nav (móvil) */
+    
     .phone-bottom-nav {
       display: none;
       border-top: 1px solid #eef1f5;
@@ -1096,10 +1093,19 @@
       // Cache liviana del preview por conversación
       const previewCache = new Map(); // convId -> {text, time}
       function setPreview(convId, text, timeISO) {
-        previewCache.set(String(convId), { text: text || '', time: timeISO || null });
+        const key = String(convId);
+        const next = { text: text || '', time: timeISO || null };
+        const prev = previewCache.get(key);
 
-        // parchea las filas visibles y sube la fila al tope (sin repintar todo)
-        patchAnyRow(convId);
+        const changed =
+          !prev ||
+          prev.text !== next.text ||
+          String(prev.time || '') !== String(next.time || '');
+
+        previewCache.set(key, next);
+
+        // 👇 Sólo reordenamos/parchamos si cambió el contenido mostrado
+        if (changed) patchAnyRow(convId);
       }
       function getPreview(convId) {
         return previewCache.get(String(convId)) || { text: '', time: null };
@@ -1112,21 +1118,35 @@
 
       function patchAnyRow(convId) {
         const prev = getPreview(convId);
-        const lists = [document.getElementById('chatList'), document.getElementById('groupsList')];
 
-        lists.forEach(list => {
-          if (!list) return;
-          const row = Array.from(list.children).find(x => String(x.dataset.convId) === String(convId));
-          if (!row) return;
+        // contenedores “externos”
+        const containers = [
+          document.getElementById('chatList'),
+          document.getElementById('groupsList')
+        ];
 
+        containers.forEach(container => {
+          if (!container) return;
+
+          // En grupos, las filas viven dentro del “inner”
+          const list = (container.id === 'groupsList')
+            ? (container.querySelector('[data-role="groups-inner"], .px-2') || container)
+            : container;
+
+          // OJO: buscamos en los hijos reales (las filas)
+          let row = Array.from(list.children).find(
+            el => String(el?.dataset?.convId) === String(convId)
+          );
+          if (!row) return; // No inventamos filas: si no existe, salimos.
+
+          // parcheo de texto/hora
           const l2 = row.querySelector('.line2'); if (l2) l2.textContent = prev.text || '';
           const t = row.querySelector('.chat-time'); if (t && prev.time) t.textContent = formatTime(prev.time);
 
-          // solo si no está en primer lugar
+          // mover al tope si no lo está
           if (list.firstElementChild !== row) list.prepend(row);
         });
       }
-
 
       // Pide sólo el último mensaje del hilo, hidrata cache y parcha la fila
       async function hydratePreview(convId) {
@@ -1174,6 +1194,14 @@
         Promise.resolve(loadConversations()).finally(() => {
           try { refreshGlobalUnreadDot(); } catch { }
         });
+
+        if (typeof loadGroups === 'function') {
+          // solo la primera vez
+          window.__groupsPreloaded ||= false;
+          if (!window.__groupsPreloaded) {
+            loadGroups().finally(() => { window.__groupsPreloaded = true; });
+          }
+        }
         if (window.unreadLightPoll) { clearInterval(window.unreadLightPoll); window.unreadLightPoll = null; }
       }
       function closeDrawer() {
@@ -2372,6 +2400,7 @@
 
           const list = document.createElement('div');
           list.className = 'px-2';
+          list.setAttribute('data-role', 'groups-inner');
           if (!grupos.length) {
             list.innerHTML = '<div class="p-3 text-muted">Aún no tienes grupos.</div>';
           } else {
@@ -3284,7 +3313,7 @@
           headers: { "X-CSRFToken": (window.CSRF_TOKEN || "") },
           credentials: "same-origin"
         });
-        if (!r.ok) { console.warn("mark-read failed", r.status); return; } // ⬅️ importante
+        if (!r.ok) { console.warn("mark-read failed", r.status); return; } 
         window.Chat.clearUnreadDot(convId);
         refreshGlobalUnreadDot();
       } catch (e) { console.error("mark-read failed", e); }
@@ -3293,7 +3322,7 @@
 
     // Estado inicial
     document.addEventListener("DOMContentLoaded", refreshGlobalUnreadDot);
-  </script>
+  </script>  
 
 </body>
 

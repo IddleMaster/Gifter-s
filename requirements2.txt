@@ -28,4 +28,7 @@ openai>=1.46.0
 pyinstaller
 pandas
 openpyxl
+xhtml2pdf
+pycairo
+
 

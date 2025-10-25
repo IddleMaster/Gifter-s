@@ -333,48 +333,95 @@ class ApiClient:
                 return False, f"Error al borrar producto: {response.status_code} - {error_detail}"
         except requests.exceptions.RequestException as e:
             return False, f"Error de conexión al borrar: {e}"    
-    def download_product_report(self): # Quitamos el parámetro report_format
+    def download_product_report(self, report_format='csv'):  
         """
-        Descarga el reporte CSV de productos activos desde la API.
-        (Versión solo CSV)
-        Devuelve el contenido CSV crudo (bytes) o None si hay error.
+        Descarga el reporte CSV o PDF de productos activos desde la API.
+        Devuelve el contenido crudo (bytes) o None si hay error.
+        """
+        if not self.token:  
+            return None, "No autenticado."  
+
+        report_url = f"{self.base_url}/reports/products/download/?format={report_format}"  
+
+        try:
+            temp_headers = self.headers.copy()  
+            if 'Content-Type' in temp_headers: del temp_headers['Content-Type']  
+            if 'Accept' in temp_headers: del temp_headers['Accept']  
+
+            response = requests.get(report_url, headers=temp_headers, stream=True)  
+            response.raise_for_status()  
+
+            # Verificar Content-Type esperado (CSV o PDF)
+            content_type = response.headers.get('content-type', '').lower()  
+            expected_content_type = 'csv' if report_format == 'csv' else 'pdf' # Solo CSV o PDF  
+
+            if expected_content_type not in content_type:  
+                 try:  
+                     error_data = response.json()  
+                     error_detail = error_data.get("error", f"Respuesta inesperada (esperaba {report_format.upper()}).")  
+                 except json.JSONDecodeError:  
+                     error_detail = f"Respuesta inesperada (esperaba {report_format.upper()})."  
+                 return None, error_detail  
+
+            return response.content, None  
+
+        except requests.exceptions.HTTPError as http_err:  
+             error_detail = http_err.response.text  
+             try:  
+                 error_data = http_err.response.json()  
+                 error_detail = error_data.get("error", error_data.get("detail", http_err.response.text))  
+             except json.JSONDecodeError:  
+                 pass  
+             return None, f"Error del servidor ({http_err.response.status_code}): {error_detail}"  
+        except requests.exceptions.RequestException as e:  
+            return None, f"Error de conexión: {e}"  
+        except Exception as e:  
+             return None, f"Error inesperado: {str(e)}"  
+    
+
+    def create_product(self, product_data):
+        """
+        Envía una petición POST para crear un nuevo producto.
+        product_data debe ser un diccionario con los campos:
+        'nombre_producto', 'descripcion', 'precio', 'id_categoria', 'id_marca'
         """
         if not self.token:
             return None, "No autenticado."
     
-        # URL SIN el parámetro ?format=
-        report_url = f"{self.base_url}/reports/products/download/"
+        create_url = f"{self.base_url}/productos/" # URL de la lista/creación
+    
+        # Validar y convertir tipos (similar a update_product)
+        try:
+            if 'precio' in product_data and product_data['precio'] is not None:
+                product_data['precio'] = float(str(product_data['precio']).replace(',', '.'))
+            if 'id_categoria' in product_data:
+                product_data['id_categoria'] = int(product_data['id_categoria'])
+            if 'id_marca' in product_data:
+                product_data['id_marca'] = int(product_data['id_marca'])
+        except (ValueError, TypeError) as e:
+            return None, f"Datos inválidos para crear producto: {e}"
     
         try:
-            temp_headers = self.headers.copy()
-            if 'Content-Type' in temp_headers: del temp_headers['Content-Type']
-            if 'Accept' in temp_headers: del temp_headers['Accept']
+            response = requests.post(create_url, json=product_data, headers=self.headers)
     
-            response = requests.get(report_url, headers=temp_headers, stream=True)
-            response.raise_for_status()
+            # POST exitoso usualmente devuelve 201 Created
+            if response.status_code == 201:
+                new_product_info = response.json() # La API devuelve los datos del producto creado
+                return new_product_info, "Producto creado exitosamente."
+            else:
+                # Intentar obtener mensaje de error detallado
+                error_detail = response.text
+                try:
+                    error_data = response.json()
+                    if isinstance(error_data, dict):
+                         # Errores por campo de DRF
+                         error_detail = "; ".join([f"{k}: {v[0]}" for k, v in error_data.items()])
+                    elif isinstance(error_data.get('detail'), str):
+                         error_detail = error_data['detail']
+                except json.JSONDecodeError:
+                    pass
+                return None, f"Error al crear producto: {response.status_code} - {error_detail}"
     
-            # Verificamos que sea CSV
-            content_type = response.headers.get('content-type', '').lower()
-            if 'csv' not in content_type:
-                 try:
-                     error_data = response.json()
-                     error_detail = error_data.get("error", "Respuesta inesperada (no es CSV).")
-                 except json.JSONDecodeError:
-                     error_detail = "Respuesta inesperada (no es CSV)."
-                 return None, error_detail
-    
-            return response.content, None
-    
-        except requests.exceptions.HTTPError as http_err:
-             # ... (manejo de errores igual que antes) ...
-             error_detail = http_err.response.text
-             try:
-                 error_data = http_err.response.json()
-                 error_detail = error_data.get("error", error_data.get("detail", http_err.response.text))
-             except json.JSONDecodeError:
-                 pass
-             return None, f"Error del servidor ({http_err.response.status_code}): {error_detail}"
         except requests.exceptions.RequestException as e:
-            return None, f"Error de conexión: {e}"
-        except Exception as e:
-             return None, f"Error inesperado: {str(e)}"
+            return None, f"Error de conexión al crear producto: {e}"
+    # Puedes añadir más métodos según las necesidades de tu aplicación

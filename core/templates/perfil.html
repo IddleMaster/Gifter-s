@@ -324,6 +324,7 @@
   <!-- Wishlist -->
   <section id="wishlist" class="tab-content active">
     <h3>Tu WishList</h3>
+    <hr class="my-3">
 
     {# Placeholder de vacío (se oculta si hay items) #}
     <p id="empty-wishlist" class="text-muted" {% if wishlist_items %}hidden{% endif %}>
@@ -377,6 +378,7 @@
   <!-- Regalos recibidos -->
   <section id="recibidos" class="tab-content">
     <h3>Tus Regalos Recibidos</h3>
+     <hr class="my-3">
 
     {# Placeholder de vacío (se oculta si hay items) #}
     <p id="empty-recibidos" class="text-muted" {% if recibidos_items %}hidden{% endif %}>
@@ -425,9 +427,12 @@
   <section id="eventos" class="tab-content">
     <div class="events-header">
       <h3>Tus eventos</h3>
+
       <button id="btn-toggle-nuevo-evento" class="btn btn-primary btn-rounded-sm" type="button" aria-expanded="false"
         aria-controls="panel-nuevo-evento" title="Agregar evento">＋</button>
+        
     </div>
+     <hr class="my-3">
 
     <!-- Panel colapsable (contenido del formulario de nuevo evento) -->
     <div id="panel-nuevo-evento" class="collapse-panel" hidden>
@@ -492,6 +497,7 @@
   <!-- Solicitudes -->
   <section id="solicitudes" class="tab-content">
     <h3>Solicitudes de amistad</h3>
+     <hr class="my-3">
 
     {% if solicitudes_recibidas %}
 
@@ -582,6 +588,7 @@
   <!-- Amigos -->
   <section id="amigos" class="tab-content">
     <h3>Tus amigos</h3>
+     <hr class="my-3">
 
     {% if amigos %}
     <div class="friends-grid">

@@ -77,6 +77,7 @@
 
   <section id="actividad" class="tab-content">
     <h3>Actividad de “{{ usuario_publico.nombre_usuario }}”</h3>
+     <hr class="my-3">
     {% if not es_amigo %}
     <p class="text-muted">Solo los amigos pueden ver la actividad.</p>
     {% else %}
@@ -115,7 +116,9 @@
   <section id="eventos" class="tab-content">
     <div class="events-header">
       <h3>Eventos importantes de “{{ usuario_publico.nombre_usuario }}”</h3>
+       
     </div>
+     <hr class="my-3">
     {% if not es_amigo %}
     <p class="text-muted">Solo los amigos pueden ver los eventos.</p>
     {% else %}
@@ -148,6 +151,7 @@
 
 <section id="wishlist" class="tab-content active">
   <h3>Wishlist de “{{ usuario_publico.nombre_usuario }}”</h3>
+   <hr class="my-3">
 
   {# --- NUEVA LÓGICA DE PRIVACIDAD --- #}
   {% if usuario_publico.is_private and not es_amigo %}
@@ -205,6 +209,7 @@
 
   <section id="recibidos" class="tab-content">
     <h3>Regalos recibidos por “{{ usuario_publico.nombre_usuario }}”</h3>
+     <hr class="my-3">
 
     {% if not recibidos_publicos %}
     <p class="text-muted">Aún no registra regalos recibidos.</p>

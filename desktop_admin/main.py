@@ -4,7 +4,7 @@ import os
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QMessageBox, QDialog, QFormLayout, QFileDialog, QStatusBar,
-    QStackedWidget, QTableWidget, QTableWidgetItem, QHeaderView,QAbstractItemView
+    QStackedWidget, QTableWidget, QTableWidgetItem, QHeaderView,QAbstractItemView,QComboBox, QSpinBox, QDoubleSpinBox
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
@@ -54,6 +54,60 @@ class LoginDialog(QDialog):
             QMessageBox.critical(self, "Login Fallido", message)
 
 
+class CreateProductDialog(QDialog):
+    """Diálogo para ingresar datos de un nuevo producto."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Crear Nuevo Producto")
+
+        # --- Widgets de Entrada ---
+        self.name_input = QLineEdit()
+        self.desc_input = QLineEdit()
+        # Usar QDoubleSpinBox para precios decimales
+        self.price_input = QDoubleSpinBox()
+        self.price_input.setRange(0.0, 99999999.99) # Rango de precios
+        self.price_input.setDecimals(2) # Dos decimales
+        self.price_input.setPrefix("$ ") # Prefijo opcional
+        # Usar QSpinBox para IDs enteros
+        self.category_id_input = QSpinBox()
+        self.category_id_input.setRange(1, 99999) # Rango de IDs
+        self.brand_id_input = QSpinBox()
+        self.brand_id_input.setRange(1, 99999) # Rango de IDs
+
+        # --- Botones ---
+        self.save_button = QPushButton("Guardar Producto")
+        self.cancel_button = QPushButton("Cancelar")
+
+        self.save_button.clicked.connect(self.accept) # Cierra con éxito si se guarda
+        self.cancel_button.clicked.connect(self.reject) # Cierra cancelando
+
+        # --- Layout ---
+        layout = QVBoxLayout(self)
+        form_layout = QFormLayout()
+
+        form_layout.addRow("Nombre:", self.name_input)
+        form_layout.addRow("Descripción:", self.desc_input)
+        form_layout.addRow("Precio:", self.price_input)
+        form_layout.addRow("ID Categoría:", self.category_id_input)
+        form_layout.addRow("ID Marca:", self.brand_id_input)
+
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        button_layout.addWidget(self.cancel_button)
+        button_layout.addWidget(self.save_button)
+
+        layout.addLayout(form_layout)
+        layout.addLayout(button_layout)
+
+    def get_data(self):
+        """Devuelve los datos ingresados en un diccionario."""
+        return {
+            'nombre_producto': self.name_input.text().strip(),
+            'descripcion': self.desc_input.text().strip(),
+            'precio': self.price_input.value(), # Obtiene el valor numérico
+            'id_categoria': self.category_id_input.value(), # Obtiene el valor numérico
+            'id_marca': self.brand_id_input.value() # Obtiene el valor numérico
+        }
 class MainWindow(QMainWindow):
     """
     Ventana principal de la aplicación de administración.
@@ -187,6 +241,8 @@ class MainWindow(QMainWindow):
         layout.addStretch() # Empuja el botón de descarga al fondo
 
         # Botón Descargar (conectado a handle_download_report)
+        self.combo_report_format = QComboBox()
+        self.combo_report_format.addItems(["CSV", "PDF"]) 
         self.btn_download_report = QPushButton("Descargar Reporte CSV de Productos Activos") # Texto ajustado
         self.btn_download_report.setStyleSheet("background-color: #28a745; color: white; padding: 10px; font-size: 14px;")
         self.btn_download_report.clicked.connect(self.handle_download_report)
@@ -248,6 +304,15 @@ class MainWindow(QMainWindow):
         self.table_products.itemChanged.connect(self.handle_product_change)
         # --------------------    
         layout.addWidget(self.table_products)
+        
+        button_row_layout = QHBoxLayout() # Layout horizontal para botones
+
+    # Botón Crear
+        self.btn_create_product = QPushButton("Crear Nuevo Producto")
+        self.btn_create_product.setStyleSheet("background-color: #007bff; color: white; padding: 10px; font-size: 14px;") # Estilo azul
+        self.btn_create_product.clicked.connect(self.handle_create_product) # Conectar
+        button_row_layout.addWidget(self.btn_create_product)
+        button_row_layout.addStretch() # Espacio entre botones
         
         # --- BOTÓN BORRAR ---
         self.btn_delete_product = QPushButton("Borrar Producto Seleccionado")
@@ -483,49 +548,64 @@ class MainWindow(QMainWindow):
 
     def handle_download_report(self):
         """
-        Descarga el reporte CSV y pide al usuario dónde guardarlo.
-        (Versión solo CSV)
+        Descarga el reporte en el formato seleccionado (CSV o PDF).
         """
-        self.statusBar.showMessage("Generando reporte CSV de productos...")
-        QApplication.processEvents()
+        # Asegúrate de tener estas importaciones al principio de main.py
+        import datetime    
+        import os    
+        from PyQt6.QtWidgets import QApplication, QMessageBox, QFileDialog    
 
-        # Llama a la función simple del api_client
-        csv_content_bytes, error = self.api_client.download_product_report()
+        # --- Determinar el formato ---
+        selected_text = self.combo_report_format.currentText()    
+        report_format = 'csv' # Default    
+        file_extension = '.csv'    
+        file_filter = "CSV Files (*.csv)"    
 
-        if error:
-            QMessageBox.critical(self, "Error al Descargar Reporte", error)
-            self.statusBar.showMessage("Error al descargar reporte.", 5000)
-            return
+        if "PDF" in selected_text:    
+            report_format = 'pdf'    
+            file_extension = '.pdf'    
+            file_filter = "PDF Files (*.pdf)"    
 
-        if not csv_content_bytes:
-            QMessageBox.warning(self, "Descargar Reporte", "No se recibió contenido para el reporte.")
-            self.statusBar.showMessage("No se recibió contenido del reporte.", 3000)
-            return
+        # --- Llamada a la API ---
+        self.statusBar.showMessage(f"Generando reporte de productos ({report_format.upper()})...")    
+        QApplication.processEvents() # Actualiza la interfaz gráfica    
 
-        # Pide dónde guardar, sugiriendo .csv
-        default_filename = f"productos_activos_{datetime.date.today()}.csv"
-        save_path, _ = QFileDialog.getSaveFileName(
+        content_bytes, error = self.api_client.download_product_report(report_format)    
+
+        # --- Manejar Errores de la API ---
+        if error:    
+            QMessageBox.critical(self, "Error al Descargar Reporte", error)    
+            self.statusBar.showMessage("Error al descargar reporte.", 5000)    
+            return    
+
+        if not content_bytes:    
+            QMessageBox.warning(self, "Descargar Reporte", "No se recibió contenido para el reporte.")    
+            self.statusBar.showMessage("No se recibió contenido del reporte.", 3000)    
+            return    
+
+        # --- Diálogo para Guardar Archivo ---
+        default_filename = f"productos_activos_{datetime.date.today()}{file_extension}"    
+        save_path, _ = QFileDialog.getSaveFileName(    
             self,
-            "Guardar Reporte CSV", # Título ajustado
-            os.path.join(os.path.expanduser("~"), default_filename),
-            "CSV Files (*.csv)" # Filtro CSV
+            f"Guardar Reporte {report_format.upper()}",    
+            os.path.join(os.path.expanduser("~"), default_filename),    
+            file_filter    
         )
 
-        if save_path:
-            # Asegurar extensión .csv
-            if not save_path.lower().endswith('.csv'):
-                 save_path += '.csv'
-
+        # --- Guardar el Archivo ---
+        if save_path:    
+            if not save_path.lower().endswith(file_extension):    
+                 save_path += file_extension    
             try:
-                with open(save_path, 'wb') as f:
-                    f.write(csv_content_bytes)
-                self.statusBar.showMessage(f"Reporte CSV guardado en {save_path}", 5000)
-                QMessageBox.information(self, "Reporte Guardado", f"El reporte CSV se guardó en:\n{save_path}")
-            except Exception as e:
-                QMessageBox.critical(self, "Error al Guardar Archivo", f"No se pudo guardar el archivo:\n{e}")
-                self.statusBar.showMessage("Error al guardar el archivo.", 5000)
+                with open(save_path, 'wb') as f:    
+                    f.write(content_bytes)    
+                self.statusBar.showMessage(f"Reporte {report_format.upper()} guardado en {save_path}", 5000)    
+                QMessageBox.information(self, "Reporte Guardado", f"El reporte ({report_format.upper()}) se guardó en:\n{save_path}")    
+            except Exception as e:    
+                QMessageBox.critical(self, "Error al Guardar Archivo", f"No se pudo guardar el archivo:\n{e}")    
+                self.statusBar.showMessage("Error al guardar el archivo.", 5000)    
         else:
-            self.statusBar.showMessage("Descarga cancelada.", 3000)
+            self.statusBar.showMessage("Descarga cancelada.", 3000)    
     def handle_user_change(self, item):
         """
         Se llama cuando el contenido de una celda en la tabla de usuarios cambia.
@@ -566,6 +646,36 @@ class MainWindow(QMainWindow):
             self.statusBar.showMessage(f"Error al guardar Usuario {user_id}.", 5000)
             # Recargar la tabla para deshacer el cambio visual si falla
             self.load_users()
+    def handle_create_product(self):
+        """Abre el diálogo para crear un producto y envía los datos a la API."""
+        dialog = CreateProductDialog(self)
+    
+        # Si el usuario hace clic en "Guardar Producto" (dialog.accept() es llamado)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            product_data = dialog.get_data()
+    
+            # Validación simple (nombre no vacío)
+            if not product_data['nombre_producto']:
+                QMessageBox.warning(self, "Datos Incompletos", "El nombre del producto es obligatorio.")
+                return # Podrías reabrir el diálogo o simplemente no hacer nada
+    
+            self.statusBar.showMessage("Creando nuevo producto...")
+            QApplication.processEvents()
+    
+            # --- Llamar a la API ---
+            new_product, message = self.api_client.create_product(product_data)
+            # ---------------------
+    
+            if new_product:
+                self.statusBar.showMessage(f"Producto '{new_product.get('nombre_producto')}' creado (ID: {new_product.get('id_producto')}).", 5000)
+                QMessageBox.information(self, "Producto Creado", message)
+                # Recargar la lista de productos para ver el nuevo
+                self.load_products()
+            else:
+                QMessageBox.critical(self, "Error al Crear Producto", message)
+                self.statusBar.showMessage("Error al crear el producto.", 5000)
+        else:
+            self.statusBar.showMessage("Creación de producto cancelada.", 3000)
 
 
 if __name__ == '__main__':
@@ -588,3 +698,5 @@ if __name__ == '__main__':
     else:
         # Si el usuario cierra el diálogo de login, la aplicación termina
         sys.exit(0)
+        
+        

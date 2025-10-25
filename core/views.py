@@ -68,6 +68,11 @@ from django.contrib import messages
 from django.shortcuts import redirect
 from .forms import ResenaSitioForm
 from .models import ResenaSitio
+#PDFS
+from django.template.loader import get_template
+from xhtml2pdf import pisa
+from io import BytesIO
+
 #########################
 
 from django.shortcuts import render, redirect
@@ -2791,18 +2796,22 @@ def upload_csv_view(request):
 
         return Response({"error": f"Error durante la importación: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
-class ProductoListAPIView(generics.ListAPIView):
+class ProductoListAPIView(generics.ListCreateAPIView): # <-- CAMBIO AQUÍ
     """
-    Vista de API para listar todos los productos (con paginación).
+    Vista de API para listar (GET) y crear (POST) productos.
     Accesible en /api/productos/
     """
-    queryset = Producto.objects.filter(activo=True) # Solo muestra productos activos
+    queryset = Producto.objects.filter(activo=True)
     serializer_class = ProductoSerializer
+    # Mantenemos IsAuthenticated, pero podrías cambiar a IsAdminUser si solo admins pueden crear
     permission_classes = [IsAuthenticated]
-    # DRF maneja la paginación automáticamente si está configurada en settings.py
-    # Si no, puedes añadirla aquí:
-    # from rest_framework.pagination import PageNumberPagination
-    # pagination_class = PageNumberPagination
+    # pagination_class = ... (si usas paginación)
+
+    # Opcional: Para asegurar que al crear se asignen bien categoría/marca por ID
+    # def perform_create(self, serializer):
+    #     # Aquí podrías añadir lógica extra si fuera necesario antes de guardar
+    #     # por ejemplo, validar IDs de categoría/marca, pero el serializer ya lo hace.
+    #     serializer.save()
     
 class ProductoDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     """
@@ -3207,55 +3216,65 @@ def chat_unread_summary(request):
     return JsonResponse({"total": total, "per_conversation": per_conv})
 
 
-@api_view(['GET'])
-@permission_classes([IsAdminUser])
-def download_active_products_csv(request):
+def download_active_products_csv(request): # Puedes renombrar la función si quieres # cite: Sex.txt
     """
-    Genera y devuelve un archivo CSV con todos los productos activos.
-    (Versión solo CSV)
+    Genera y devuelve un archivo CSV o PDF con productos activos.
+    Acepta ?format=csv (default) o ?format=pdf
     """
+    requested_format = request.GET.get('format', 'csv').lower() # cite: Sex.txt
+
     try:
-        response = HttpResponse(
-            content_type='text/csv',
-            headers={'Content-Disposition': f'attachment; filename="productos_activos_{datetime.date.today()}.csv"'},
-        )
-        response.write('\ufeff'.encode('utf8')) # BOM para Excel Windows
+        productos = Producto.objects.filter(activo=True).select_related('id_categoria', 'id_marca').order_by('id_producto') # cite: Sex.txt
 
-        writer = csv.writer(response, delimiter=';')
+        filename_base = f"productos_activos_{datetime.date.today()}" # cite: Sex.txt
 
-        writer.writerow([ # Encabezados originales
-            'ID Producto',
-            'Nombre',
-            'Descripcion',
-            'Precio',
-            'Categoria ID',
-            'Categoria Nombre',
-            'Marca ID',
-            'Marca Nombre',
-            'URL Imagen'
-        ])
+        # --- Generación de PDF ---
+        if requested_format == 'pdf': # cite: Sex.txt
+            template = get_template('reports/product_report_pdf.html') # cite: Sex.txt
+            context = { # cite: Sex.txt
+                'productos': productos, # cite: Sex.txt
+                'generation_date': timezone.now() # cite: Sex.txt
+            }
+            html = template.render(context) # cite: Sex.txt
+            result = BytesIO() # cite: Sex.txt
+            pdf = pisa.pisaDocument(BytesIO(html.encode("UTF-8")), result) # cite: Sex.txt
 
-        productos = Producto.objects.filter(activo=True).select_related('id_categoria', 'id_marca').order_by('id_producto')
+            if not pdf.err: # cite: Sex.txt
+                response = HttpResponse(result.getvalue(), content_type='application/pdf') # cite: Sex.txt
+                response['Content-Disposition'] = f'attachment; filename="{filename_base}.pdf"' # cite: Sex.txt
+                return response # cite: Sex.txt
+            else: # Error al generar PDF
+                print(f"Error generando PDF: {pdf.err}") # cite: Sex.txt
+                return Response({"error": "No se pudo generar el reporte PDF."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) # cite: Sex.txt
 
-        for producto in productos:
-            writer.writerow([
-                producto.id_producto,
-                producto.nombre_producto,
-                producto.descripcion,
-                producto.precio,
-                producto.id_categoria_id,
-                producto.id_categoria.nombre_categoria if producto.id_categoria else '',
-                producto.id_marca_id,
-                producto.id_marca.nombre_marca if producto.id_marca else '',
-                request.build_absolute_uri(producto.imagen.url) if producto.imagen else ''
+        # --- Generación de CSV (Default) ---
+        else: # Default a CSV # cite: Sex.txt
+            response = HttpResponse( # cite: Sex.txt
+                content_type='text/csv',
+                headers={'Content-Disposition': f'attachment; filename="{filename_base}.csv"'},
+            )
+            response.write('\ufeff'.encode('utf8')) # BOM para Excel Windows # cite: Sex.txt
+            writer = csv.writer(response, delimiter=';') # cite: Sex.txt
+
+            # Encabezado CSV
+            writer.writerow([ # cite: Sex.txt
+                'ID Producto', 'Nombre', 'Descripcion', 'Precio',
+                'Categoria ID', 'Categoria Nombre', 'Marca ID', 'Marca Nombre', 'URL Imagen'
             ])
 
-        return response
+            # Filas CSV
+            for producto in productos: # cite: Sex.txt
+                writer.writerow([ # cite: Sex.txt
+                    producto.id_producto, producto.nombre_producto, producto.descripcion, producto.precio,
+                    producto.id_categoria_id, producto.id_categoria.nombre_categoria if producto.id_categoria else '',
+                    producto.id_marca_id, producto.id_marca.nombre_marca if producto.id_marca else '',
+                    request.build_absolute_uri(producto.imagen.url) if producto.imagen else ''
+                ])
+            return response # cite: Sex.txt
 
     except Exception as e:
-        print(f"Error generando CSV de productos: {e}")
-        # Devolver error JSON es más amigable para la API
-        return Response({"error": f"No se pudo generar el reporte CSV: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        print(f"Error generando reporte ({requested_format}): {e}") # cite: Sex.txt
+        return Response({"error": f"No se pudo generar el reporte {requested_format.upper()}: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) # cite: Sex.txt
     
 def producto_detalle(request, id_producto=None, pk=None):
     """
