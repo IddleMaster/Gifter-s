@@ -151,7 +151,7 @@ class ProductoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Producto
         fields = (
-            'id_producto', 
+            
             'nombre_producto', 
             'descripcion', 
             'precio', 
@@ -222,3 +222,8 @@ class PreferenciasSerializer(serializers.ModelSerializer):
             "accepts_marketing_emails",
             "allow_push_web",
         ]
+
+class NotificacionUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notificacion
+        fields = ["leida"]  # solo esto se puede modificar vía PATCH/PUT

@@ -1,2 +1,29 @@
 # Credenciales de Firebase/Google
 config/firebase/service-account.json
+# Python / Django
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+.env.*
+*.sqlite3
+/media/
+staticfiles/
+static/
+*.log
+
+# Node
+node_modules/
+dist/
+build/
+
+# IDE/OS
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Docker
+*.pid
+logs/
