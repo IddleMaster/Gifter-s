@@ -1,3 +1,4 @@
+import datetime
 import sys
 import os
 from PyQt6.QtWidgets import (
@@ -171,21 +172,26 @@ class MainWindow(QMainWindow):
         return sidebar_widget
 
     def create_reportes_page(self):
-        """Crea la página de Reportes (Mockup 2)."""
+        """Crea la página de Reportes (Versión solo CSV)."""
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(20, 20, 20, 20)
-        
+
         title = QLabel("Reportes")
         title.setFont(QFont("Arial", 24, QFont.Weight.Bold))
         layout.addWidget(title)
-        
-        layout.addWidget(QPushButton("Categoría"))
-        
+
+        # Puedes dejar el botón de categoría como placeholder o quitarlo
+        layout.addWidget(QPushButton("Categoría (Aún no implementado)"))
+
         layout.addStretch() # Empuja el botón de descarga al fondo
-        
-        layout.addWidget(QPushButton("Descargar"))
-        
+
+        # Botón Descargar (conectado a handle_download_report)
+        self.btn_download_report = QPushButton("Descargar Reporte CSV de Productos Activos") # Texto ajustado
+        self.btn_download_report.setStyleSheet("background-color: #28a745; color: white; padding: 10px; font-size: 14px;")
+        self.btn_download_report.clicked.connect(self.handle_download_report)
+        layout.addWidget(self.btn_download_report)
+
         return page
 
     def create_admin_page(self):
@@ -474,7 +480,52 @@ class MainWindow(QMainWindow):
 
         self.statusBar.showMessage(f"Se cargaron {len(users)} usuarios.")
         self.table_users.blockSignals(False) # Desbloquear señales
-        
+
+    def handle_download_report(self):
+        """
+        Descarga el reporte CSV y pide al usuario dónde guardarlo.
+        (Versión solo CSV)
+        """
+        self.statusBar.showMessage("Generando reporte CSV de productos...")
+        QApplication.processEvents()
+
+        # Llama a la función simple del api_client
+        csv_content_bytes, error = self.api_client.download_product_report()
+
+        if error:
+            QMessageBox.critical(self, "Error al Descargar Reporte", error)
+            self.statusBar.showMessage("Error al descargar reporte.", 5000)
+            return
+
+        if not csv_content_bytes:
+            QMessageBox.warning(self, "Descargar Reporte", "No se recibió contenido para el reporte.")
+            self.statusBar.showMessage("No se recibió contenido del reporte.", 3000)
+            return
+
+        # Pide dónde guardar, sugiriendo .csv
+        default_filename = f"productos_activos_{datetime.date.today()}.csv"
+        save_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Guardar Reporte CSV", # Título ajustado
+            os.path.join(os.path.expanduser("~"), default_filename),
+            "CSV Files (*.csv)" # Filtro CSV
+        )
+
+        if save_path:
+            # Asegurar extensión .csv
+            if not save_path.lower().endswith('.csv'):
+                 save_path += '.csv'
+
+            try:
+                with open(save_path, 'wb') as f:
+                    f.write(csv_content_bytes)
+                self.statusBar.showMessage(f"Reporte CSV guardado en {save_path}", 5000)
+                QMessageBox.information(self, "Reporte Guardado", f"El reporte CSV se guardó en:\n{save_path}")
+            except Exception as e:
+                QMessageBox.critical(self, "Error al Guardar Archivo", f"No se pudo guardar el archivo:\n{e}")
+                self.statusBar.showMessage("Error al guardar el archivo.", 5000)
+        else:
+            self.statusBar.showMessage("Descarga cancelada.", 3000)
     def handle_user_change(self, item):
         """
         Se llama cuando el contenido de una celda en la tabla de usuarios cambia.

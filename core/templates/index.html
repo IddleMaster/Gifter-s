@@ -7,11 +7,11 @@
 {% block content %}
 
 {% if messages %}
-  <div class="container mt-2">
-    {% for message in messages %}
-      <div class="alert alert-{{ message.tags }} mb-2">{{ message }}</div>
-    {% endfor %}
-  </div>
+<div class="container mt-2">
+  {% for message in messages %}
+  <div class="alert alert-{{ message.tags }} mb-2">{{ message }}</div>
+  {% endfor %}
+</div>
 {% endif %}
 
 {% if not user.is_authenticated %}
@@ -88,7 +88,20 @@
 
 <div class="container section-title" data-aos="fade-up">
   <h2>Bienvenido</h2>
-  <p><span>&nbsp;</span> <span class="description-title">¡</span><span class="brand">Comienza a buscar regalos</span><span class="description-title">!</span></p>
+  {% if is_admin %}
+  <div class="admin-download-section"
+    style="margin-top: 20px; padding: 15px; border: 1px solid #ccc; background-color: #f9f9f9;">
+    <h4>Descarga para Administradores</h4>
+    <p>Descarga la aplicación de escritorio para administrar Gifter's:</p>
+    {% load static %} {# Asegúrate de tener esta línea al principio del archivo si no la tienes #}
+    <a href="{% static 'downloads/main.exe' %}" download class="btn btn-primary">
+      Descargar Gifter's Admin
+    </a>
+
+  </div>
+  {% endif %}
+  <p><span>&nbsp;</span> <span class="description-title">¡</span><span class="brand">Comienza a buscar
+      regalos</span><span class="description-title">!</span></p>
 </div>
 
 <!-- Clients Section - CATEGORÍAS DINÁMICAS CON FLECHAS -->
@@ -167,6 +180,96 @@
   </div>
 </section>
 
+
+{# === Recomendado para ti (IA sobre catálogo) === #}
+{% if request.user.is_authenticated %}
+<section id="ai-reco" class="portfolio section">
+  <div class="container section-title" data-aos="fade-up">
+    <h2>Recomendado para ti</h2>
+    <p><span>&nbsp;</span> <span class="description-title">Basado en tu actividad</span></p>
+  </div>
+
+  <div class="container">
+    {% if ai_reco and ai_reco|length > 0 %}
+    <div class="row gy-4" data-aos="fade-up" data-aos-delay="100">
+      {% for producto in ai_reco %}
+      <div class="col-lg-4 col-md-6">
+        <div class="portfolio-item">
+          <div class="product-image-container" style="height: 250px; overflow: hidden; border-radius: 8px;">
+            <a href="#"
+              class="wishlist-badge wishlist-btn {% if producto.id_producto in favoritos_ids %}is-fav{% endif %}"
+              data-product-id="{{ producto.id_producto }}"
+              title="{% if producto.id_producto in favoritos_ids %}Quitar de wishlist{% else %}Agregar a wishlist{% endif %}"
+              aria-pressed="{% if producto.id_producto in favoritos_ids %}true{% else %}false{% endif %}">
+              {% if producto.id_producto in favoritos_ids %}
+              <i class="bi bi-heart-fill text-danger"></i>
+              {% else %}
+              <i class="bi bi-heart"></i>
+              {% endif %}
+            </a>
+
+            {% if producto.imagen and producto.imagen.url %}
+            <img src="{{ producto.imagen.url }}" class="img-fluid" alt="{{ producto.nombre_producto }}"
+              style="width: 100%; height: 100%; object-fit: cover;">
+            {% else %}
+            <img src="{% static 'img/Gifters/favicongift.png' %}" class="img-fluid" alt="{{ producto.nombre_producto }}"
+              style="width: 100%; height: 100%; object-fit: cover;">
+            {% endif %}
+          </div>
+
+          <div class="portfolio-info">
+            <h4>{{ producto.nombre_producto }}</h4>
+            {% if producto.id_marca %}
+            <p class="text-primary">{{ producto.id_marca.nombre_marca }}</p>
+            {% endif %}
+            {% if producto.precio %}
+
+            {% endif %}
+
+            <div class="product-actions">
+              {% if producto.imagen and producto.imagen.url %}
+              <a href="{{ producto.imagen.url }}" class="glightbox preview-link"
+                data-gallery="gal-reco-{{ producto.id_producto }}">
+                <i class="bi bi-zoom-in"></i>
+              </a>
+              {% else %}
+              <a href="{% static 'img/Gifters/favicongift.png' %}" class="glightbox preview-link"
+                data-gallery="gal-reco-{{ producto.id_producto }}">
+                <i class="bi bi-zoom-in"></i>
+              </a>
+              {% endif %}
+
+              {% with producto.urls_tienda_activas.first as url_tienda %}
+              <!-- OJO: siempre al detalle -->
+              <a href="{% url 'producto_detalle' producto.id_producto %}" class="details-link">
+                <i class="bi bi-eye"></i>
+              </a>
+              <!-- CADENA: a la tienda si existe -->
+              {% if url_tienda %}
+              <a href="{{ url_tienda.url }}" target="_blank" rel="noopener" class="details-link">
+                <i class="bi bi-link-45deg"></i>
+              </a>
+              {% endif %}
+              {% endwith %}
+
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center text-muted mt-4">
+      <p>
+        Aún no tengo suficientes señales para recomendarte productos.<br>
+        Agrega algunos a tu wishlist o marca recibidos, y vuelve 😉
+      </p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
 <section id="portfolio" class="portfolio section">
   <div class="container section-title" data-aos="fade-up">
     <h2>Tendencias</h2>
@@ -209,7 +312,7 @@
             <p class="text-primary">{{ producto.id_marca.nombre_marca }}</p>
 
             {% if producto.precio %}
-            <p class="h5 text-success">${{ producto.precio }}</p>
+
             {% endif %}
 
             <!-- Botones -->
@@ -228,16 +331,16 @@
                 {% endif %}
 
                 {% with producto.urls_tienda_activas.first as url_tienda %}
+                <a href="{% url 'producto_detalle' producto.id_producto %}" class="details-link">
+                  <i class="bi bi-eye"></i>
+                </a>
                 {% if url_tienda %}
                 <a href="{{ url_tienda.url }}" target="_blank" rel="noopener" class="details-link">
                   <i class="bi bi-link-45deg"></i>
                 </a>
-                {% else %}
-                <a href="{% url 'producto_detalle' producto.id_producto %}" class="details-link">
-                  <i class="bi bi-eye"></i>
-                </a>
                 {% endif %}
                 {% endwith %}
+
             </div>
 
           </div>
@@ -256,6 +359,7 @@
     </div>
 
 
+
     <!-- Botón para ver más productos -->
     {% if productos_destacados %}
     <div class="text-center mt-4">
@@ -266,52 +370,50 @@
 </section>
 
 
+
 <section id="services" class="services section">
   <div class="container section-title" data-aos="fade-up">
     <h2>Conecta en Gifter’s</h2>
 
-    {# >>>>>>>>>>> Mantenemos este texto tal cual <<<<<<<<<<< #}
     <p><span>Personas que quizás conozcas</span> <span class="description-title"></span></p>
   </div>
 
   <div class="container">
     {% if request.user.is_authenticated %}
 
-      {# =================== BLOQUE DE AMIGOS (REMOVIDO) =================== #}
-      {# Antes aquí estaba: {% if amigos %} ... {% endif %} #}
-
-      {# ============== SOLO SUGERENCIAS (lo de abajo) ============== #}
-      {% if sugerencias %}
-        <div class="row gy-4">
-          {% for u in sugerencias %}
-          <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="{{ forloop.counter0|add:1 }}00">
-            <div class="service-item position-relative">
-              <div>
-                {% if u.perfil and u.perfil.profile_picture %}
-                  <img src="{{ u.perfil.profile_picture.url }}" alt="{{ u.nombre }} {{ u.apellido }}" height="100" width="100" style="object-fit:cover;border-radius:50%;">
-                {% else %}
-                  <img src="{% static 'img/Gifters/favicongift.png' %}" alt="{{ u.nombre }} {{ u.apellido }}" height="100" width="100" style="object-fit:cover;border-radius:50%;">
-                {% endif %}
-              </div>
-
-              <a href="{% url 'perfil_detalle' u.nombre_usuario %}" class="stretched-link">
-                <h3>{{ u.nombre }} {{ u.apellido }}</h3>
-              </a>
-              <p class="text-muted">@{{ u.nombre_usuario }}</p>
-            </div>
+    {% if sugerencias %}
+    <div class="row gy-4">
+      {% for u in sugerencias %}
+      <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="{{ forloop.counter0|add:1 }}00">
+        <div class="service-item position-relative">
+          <div>
+            {% if u.perfil and u.perfil.profile_picture %}
+            <img src="{{ u.perfil.profile_picture.url }}" alt="{{ u.nombre }} {{ u.apellido }}" height="100" width="100"
+              style="object-fit:cover;border-radius:50%;">
+            {% else %}
+            <img src="{% static 'img/Gifters/favicongift.png' %}" alt="{{ u.nombre }} {{ u.apellido }}" height="100"
+              width="100" style="object-fit:cover;border-radius:50%;">
+            {% endif %}
           </div>
-          {% endfor %}
+
+          <a href="{% url 'perfil_detalle' u.nombre_usuario %}" class="stretched-link">
+            <h3>{{ u.nombre }} {{ u.apellido }}</h3>
+          </a>
+          <p class="text-muted">@{{ u.nombre_usuario }}</p>
         </div>
-      {% else %}
-        <div class="text-center py-3">
-          <p class="text-muted">No hay sugerencias por ahora. Explora más perfiles para obtener mejores recomendaciones.</p>
-        </div>
-      {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-3">
+      <p class="text-muted">No hay sugerencias por ahora. Explora más perfiles para obtener mejores recomendaciones.</p>
+    </div>
+    {% endif %}
 
     {% else %}
-      <div class="text-center py-3">
-        <p class="text-muted">Inicia sesión para ver a tus amigos y sugerencias de personas que podrías conocer.</p>
-      </div>
+    <div class="text-center py-3">
+      <p class="text-muted">Inicia sesión para ver a tus amigos y sugerencias de personas que podrías conocer.</p>
+    </div>
     {% endif %}
   </div>
 </section>
@@ -334,119 +436,175 @@
 
     {# --- Form (crear/editar) solo logueados --- #}
     {% if user.is_authenticated %}
-      {% if own_resena %}
-        {# ---- EDITAR reseña existente ---- #}
-        <form action="{% url 'resena_sitio_editar' %}" method="post" class="mb-3" id="form-editar-resena">
-          {% csrf_token %}
-          <div class="row g-2 align-items-start">
-            <div class="col-auto">
-              <label for="id_calificacion_edit" class="form-label mb-1">Calificación</label>
-              <input id="id_calificacion_edit" type="number" name="calificacion"
-                     min="1" max="5" value="{{ own_resena.calificacion }}"
-                     class="form-control" style="width:90px;" required>
-            </div>
-            <div class="col">
-              <label for="id_comentario_edit" class="form-label mb-1">Comentario</label>
-              <textarea id="id_comentario_edit" name="comentario" rows="2"
-                        class="form-control"
-                        placeholder="Actualiza tu reseña...">{{ own_resena.comentario }}</textarea>
-            </div>
-            <div class="col-auto" style="margin-top:30px;">
-              <button class="btn btn-primary" type="submit">Editar reseña</button>
-            </div>
-          </div>
-        </form>
+    {% if own_resena %}
+    {# ---- EDITAR reseña existente ---- #}
+    <form action="{% url 'resena_sitio_editar' %}" method="post" class="mb-3" id="form-editar-resena">
+      {% csrf_token %}
+      <div class="row g-2 align-items-start">
+        <div class="col-auto">
+          <label class="form-label mb-1">Calificación</label>
 
-        {# ---- ELIMINAR reseña ---- #}
-        <form action="{% url 'resena_sitio_eliminar' %}" method="post" class="mb-4">
-          {% csrf_token %}
-          <button class="btn btn-outline-danger btn-sm"
-                  onclick="return confirm('¿Eliminar tu reseña? Esta acción no se puede deshacer.')">
-            Eliminar reseña
-          </button>
-        </form>
-      {% else %}
-        {# ---- CREAR reseña (si no tienes) ---- #}
-        <form action="{% url 'resena_sitio_crear' %}" method="post" class="mb-4" id="form-crear-resena">
-          {% csrf_token %}
-          <div class="row g-2 align-items-start">
-            <div class="col-auto">
-              <label for="id_calificacion" class="form-label mb-1">Calificación</label>
-              <input id="id_calificacion" type="number" name="calificacion"
-                     min="1" max="5" value="5"
-                     class="form-control" style="width:90px;" required>
-            </div>
-            <div class="col">
-              <label for="id_comentario" class="form-label mb-1">Comentario</label>
-              <textarea id="id_comentario" name="comentario" rows="2"
-                        class="form-control"
-                        placeholder="¿Qué te pareció la página? (opcional)"></textarea>
-            </div>
-            <div class="col-auto" style="margin-top:30px;">
-              <button class="btn btn-primary" type="submit">Enviar reseña</button>
-            </div>
+          {# valor real que se envía 1..5 #}
+          <input type="hidden" name="calificacion" value="{{ own_resena.calificacion|default:'5' }}"
+            class="js-rating-input">
+
+          {# estrellas clicables #}
+          <div class="js-rating-stars" role="radiogroup" aria-label="Calificación 1 a 5">
+            {% for i in "12345"|make_list %}
+            {% with n=forloop.counter %}
+            <button type="button" class="btn btn-link p-0 me-1 rating-star" data-value="{{ n }}"
+              aria-label="{{ n }} estrellas"
+              aria-pressed="{% if n <= own_resena.calificacion %}true{% else %}false{% endif %}">
+              <i class="bi {% if n <= own_resena.calificacion %}bi-star-fill{% else %}bi-star{% endif %} fs-4"></i>
+            </button>
+            {% endwith %}
+            {% endfor %}
           </div>
-        </form>
-      {% endif %}
+        </div>
+
+        <div class="col">
+          <label for="id_comentario_edit" class="form-label mb-1">Comentario</label>
+          <textarea id="id_comentario_edit" name="comentario" rows="2" class="form-control"
+            placeholder="Actualiza tu reseña...">{{ own_resena.comentario }}</textarea>
+        </div>
+        <div class="col-auto" style="margin-top:30px;">
+          <button class="btn btn-primary" type="submit">Editar reseña</button>
+        </div>
+      </div>
+    </form>
+
     {% else %}
-      <p class="text-muted">Inicia sesión para dejar tu reseña.</p>
+    {# ---- CREAR reseña (si no tienes) ---- #}
+    <form action="{% url 'resena_sitio_crear' %}" method="post" class="mb-4" id="form-crear-resena">
+      {% csrf_token %}
+      <div class="row g-2 align-items-start">
+        <div class="col-auto">
+          <label class="form-label mb-1">Calificación</label>
+
+          {# valor real que se envía 1..5 #}
+          <input type="hidden" name="calificacion" value="5" class="js-rating-input">
+
+          {# estrellas clicables (por defecto 5) #}
+          <div class="js-rating-stars" role="radiogroup" aria-label="Calificación 1 a 5">
+            {% for i in "12345"|make_list %}
+            {% with n=forloop.counter %}
+            <button type="button" class="btn btn-link p-0 me-1 rating-star" data-value="{{ n }}"
+              aria-label="{{ n }} estrellas" aria-pressed="{% if n <= 5 %}true{% else %}false{% endif %}">
+              <i class="bi {% if n <= 5 %}bi-star-fill{% else %}bi-star{% endif %} fs-4"></i>
+            </button>
+            {% endwith %}
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="col">
+          <label for="id_comentario" class="form-label mb-1">Comentario</label>
+          <textarea id="id_comentario" name="comentario" rows="2" class="form-control"
+            placeholder="¿Qué te pareció la página? (opcional)"></textarea>
+        </div>
+        <div class="col-auto" style="margin-top:30px;">
+          <button class="btn btn-primary" type="submit">Enviar reseña</button>
+        </div>
+      </div>
+    </form>
+    {% endif %}
+    {% else %}
+    <p class="text-muted">Inicia sesión para dejar tu reseña.</p>
     {% endif %}
 
     {# --- Lista de reseñas reales --- #}
     {% if resenas %}
-      <div class="row g-4">
-        {% for r in resenas %}
-          <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0">
-              <div class="card-body text-center">
-                {% if r.id_usuario.perfil and r.id_usuario.perfil.profile_picture %}
-                  <img src="{{ r.id_usuario.perfil.profile_picture.url }}"
-                       alt="@{{ r.id_usuario.nombre_usuario|default:r.id_usuario.username }}"
-                       width="72" height="72" class="rounded-circle mb-3"
-                       style="object-fit:cover;" loading="lazy">
-                {% else %}
-                  <img src="{% static 'img/Gifters/favicongift.png' %}"
-                       alt="@{{ r.id_usuario.nombre_usuario|default:r.id_usuario.username }}"
-                       width="72" height="72" class="rounded-circle mb-3"
-                       style="object-fit:cover;" loading="lazy">
-                {% endif %}
+    <div class="row g-4">
+      {% for r in resenas %}
+      <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0">
+          <div class="card-body text-center">
 
-                <h5 class="mb-0">
-                  @{{ r.id_usuario.nombre_usuario|default:r.id_usuario.username }}
-                </h5>
-                <small class="text-muted">{{ r.fecha_resena|date:"d/m/Y" }}</small>
+            {# Foto de perfil a prueba de faltantes #}
+            {% with pf=r.id_usuario.perfil %}
+            {% if pf and pf.profile_picture %}
+            <img src="{{ pf.profile_picture.url }}"
+              alt="@{% firstof r.id_usuario.nombre_usuario r.id_usuario.get_username r.id_usuario.email 'usuario' %}"
+              width="72" height="72" class="rounded-circle mb-3" style="object-fit:cover;" loading="lazy">
+            {% else %}
+            <img src="{% static 'img/Gifters/favicongift.png' %}"
+              alt="@{% firstof r.id_usuario.nombre_usuario r.id_usuario.get_username r.id_usuario.email 'usuario' %}"
+              width="72" height="72" class="rounded-circle mb-3" style="object-fit:cover;" loading="lazy">
+            {% endif %}
+            {% endwith %}
 
-                <div class="mt-2" aria-label="{{ r.calificacion }} de 5">
-                  {% for i in "12345"|make_list %}
-                    <i class="bi {% if forloop.counter <= r.calificacion %}bi-star-fill{% else %}bi-star{% endif %}"></i>
-                  {% endfor %}
-                </div>
+            <h5 class="mb-0">
+              @{% firstof r.id_usuario.nombre_usuario r.id_usuario.get_username r.id_usuario.email 'usuario' %}
+            </h5>
+            <small class="text-muted">{{ r.fecha_resena|date:"d/m/Y" }}</small>
 
-                <p class="mt-3 mb-0">{{ r.comentario|default:"(Sin comentario)" }}</p>
-
-                {# Botoncitos también en la tarjeta (solo si es tu reseña) #}
-                {% if user.is_authenticated and r.id_usuario_id == user.id %}
-                  <div class="mt-2">
-                    <a href="#form-editar-resena" class="btn btn-outline-secondary btn-sm">Editar</a>
-                    <form action="{% url 'resena_sitio_eliminar' %}" method="post" style="display:inline;">
-                      {% csrf_token %}
-                      <button class="btn btn-outline-danger btn-sm"
-                              onclick="return confirm('¿Eliminar tu reseña?')">
-                        Eliminar
-                      </button>
-                    </form>
-                  </div>
-                {% endif %}
-              </div>
+            <div class="mt-2" aria-label="{{ r.calificacion }} de 5">
+              {% for i in "12345"|make_list %}
+              <i class="bi {% if forloop.counter <= r.calificacion %}bi-star-fill{% else %}bi-star{% endif %}"></i>
+              {% endfor %}
             </div>
+
+            <p class="mt-3 mb-0">{{ r.comentario|default:"(Sin comentario)" }}</p>
+
+            {# Botones dentro de la tarjeta si es tuya #}
+            {% if user.is_authenticated and r.id_usuario_id == user.id %}
+            <div class="mt-2">
+              <a href="#form-editar-resena" class="btn btn-outline-secondary btn-sm">Editar</a>
+              <form action="{% url 'resena_sitio_eliminar' %}" method="post" style="display:inline;">
+                {% csrf_token %}
+                <button class="btn btn-outline-danger btn-sm" onclick="return confirm('¿Eliminar tu reseña?')">
+                  Eliminar
+                </button>
+              </form>
+            </div>
+            {% endif %}
           </div>
-        {% endfor %}
+        </div>
       </div>
+      {% endfor %}
+    </div>
     {% else %}
-      <div class="text-center text-muted">Aún no hay reseñas. ¡Sé el primero en opinar!</div>
+    <div class="text-center text-muted">Aún no hay reseñas. ¡Sé el primero en opinar!</div>
     {% endif %}
   </div>
 </section>
+
+{# ====== CSS/JS del widget de estrellas (ligero) ====== #}
+<style>
+  .rating-star {
+    text-decoration: none;
+  }
+
+  .rating-star:focus-visible {
+    outline: 2px solid #6c63ff;
+    border-radius: .4rem;
+  }
+
+  .rating-star:hover i {
+    transform: scale(1.08);
+  }
+</style>
+
+<script>
+  // Widget de estrellas compartido por ambos formularios
+  document.addEventListener('click', function (e) {
+    const btn = e.target.closest('.rating-star');
+    if (!btn) return;
+
+    const group = btn.closest('.js-rating-stars');
+    const hidden = group?.parentElement?.querySelector('.js-rating-input');
+    if (!group || !hidden) return;
+
+    const val = parseInt(btn.getAttribute('data-value'), 10) || 5;
+    const clamped = Math.max(1, Math.min(5, val));
+    hidden.value = clamped;
+
+    const stars = group.querySelectorAll('.rating-star i');
+    stars.forEach((icon, idx) => {
+      icon.className = (idx + 1) <= clamped ? 'bi bi-star-fill fs-4' : 'bi bi-star fs-4';
+    });
+  });
+</script>
 
 
 <!-- Fin reseñitas nuevas-->

@@ -343,7 +343,7 @@
         <div class="gift-info">
           <h4>{{ p.nombre_producto }}</h4>
           <p>{{ p.id_marca.nombre_marca }}</p>
-          {% if p.precio %}<div class="price">${{ p.precio }}</div>{% endif %}
+          
         </div>
 
         <div class="gift-actions">
@@ -395,7 +395,7 @@
         <div class="gift-info">
           <h4>{{ p.nombre_producto }}</h4>
           <p>{{ p.id_marca.nombre_marca }}</p>
-          {% if p.precio %}<div class="price">${{ p.precio }}</div>{% endif %}
+          
           <div class="text-muted" style="font-size:.85rem">
             Recibido el {{ it.fecha_comprado|date:"d/m/Y H:i" }}
           </div>

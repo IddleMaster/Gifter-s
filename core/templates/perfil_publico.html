@@ -14,7 +14,7 @@
 
     {# Avatar banner - FIX del static roto #}
     <div class="g-avatar g-avatar--banner"
-         style="background-image:url('{% if perfil_publico and perfil_publico.profile_picture %}{{ perfil_publico.profile_picture.url }}{% else %}{% static 'img/avatar-placeholder.png' %}{% endif %}');">
+      style="background-image:url('{% if perfil_publico and perfil_publico.profile_picture %}{{ perfil_publico.profile_picture.url }}{% else %}{% static 'img/avatar-placeholder.png' %}{% endif %}');">
     </div>
 
     <div class="user-details">
@@ -26,34 +26,37 @@
     <div class="edit-profile">
       {# --- Acciones de relación / chat --- #}
       {% if request.user.is_authenticated %}
-        {% if es_amigo %}
-          <a href="#" id="btnChatPerfilPublico" class="btn-edit" data-username="{{ usuario_publico.nombre_usuario }}">
-            <i class="bi bi-chat-dots"></i> Chatear
-          </a>
-        {% elif pendiente_enviada %}
-          <form method="post" action="{% url 'amistad_cancelar' usuario_publico.nombre_usuario %}" class="js-amistad-cancelar">
-            {% csrf_token %}
-            <button class="btn-edit" style="background:#f44336;">Cancelar solicitud</button>
-          </form>
-        {% elif pendiente_recibida %}
-          <div class="d-flex gap-2">
-            <form method="post" action="{% url 'amistad_aceptar' usuario_publico.nombre_usuario %}" class="js-amistad-aceptar">
-              {% csrf_token %}
-              <button type="submit" class="btn btn-sm btn-success">Aceptar</button>
-            </form>
-            <form method="post" action="{% url 'amistad_rechazar' usuario_publico.nombre_usuario %}" class="js-amistad-rechazar">
-              {% csrf_token %}
-              <button type="submit" class="btn btn-sm btn-danger">Rechazar</button>
-            </form>
-          </div>
-        {% else %}
-          <form method="post" action="{% url 'amistad_enviar' usuario_publico.nombre_usuario %}" class="js-amistad-enviar">
-            {% csrf_token %}
-            <button class="btn-edit">➕ Agregar amigo</button>
-          </form>
-        {% endif %}
+      {% if es_amigo %}
+      <a href="#" id="btnChatPerfilPublico" class="btn-edit" data-username="{{ usuario_publico.nombre_usuario }}">
+        <i class="bi bi-chat-dots"></i> Chatear
+      </a>
+      {% elif pendiente_enviada %}
+      <form method="post" action="{% url 'amistad_cancelar' usuario_publico.nombre_usuario %}"
+        class="js-amistad-cancelar">
+        {% csrf_token %}
+        <button class="btn-edit" style="background:#f44336;">Cancelar solicitud</button>
+      </form>
+      {% elif pendiente_recibida %}
+      <div class="d-flex gap-2">
+        <form method="post" action="{% url 'amistad_aceptar' usuario_publico.nombre_usuario %}"
+          class="js-amistad-aceptar">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-success">Aceptar</button>
+        </form>
+        <form method="post" action="{% url 'amistad_rechazar' usuario_publico.nombre_usuario %}"
+          class="js-amistad-rechazar">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-danger">Rechazar</button>
+        </form>
+      </div>
       {% else %}
-        <a href="{% url 'login' %}?next={{ request.path }}" class="btn-edit">Inicia sesión</a>
+      <form method="post" action="{% url 'amistad_enviar' usuario_publico.nombre_usuario %}" class="js-amistad-enviar">
+        {% csrf_token %}
+        <button class="btn-edit">➕ Agregar amigo</button>
+      </form>
+      {% endif %}
+      {% else %}
+      <a href="{% url 'login' %}?next={{ request.path }}" class="btn-edit">Inicia sesión</a>
       {% endif %}
     </div>
 
@@ -75,36 +78,37 @@
   <section id="actividad" class="tab-content">
     <h3>Actividad de “{{ usuario_publico.nombre_usuario }}”</h3>
     {% if not es_amigo %}
-      <p class="text-muted">Solo los amigos pueden ver la actividad.</p>
+    <p class="text-muted">Solo los amigos pueden ver la actividad.</p>
     {% else %}
-      {% if ultimos_posts %}
-        <div class="gift-grid">
-          {% for p in ultimos_posts %}
-            <div class="gift-card">
-              <div class="gift-info">
-                <h4>
-                  {% if p.tipo_post == 'texto' %}Publicación{% else %}{{ p.tipo_post|capfirst }}{% endif %}
-                  · <small>{{ p.fecha_publicacion|date:"d/m/Y H:i" }}</small>
-                </h4>
-                {% if p.tipo_post == 'texto' %}
-                  <p>{{ p.contenido|default:"(sin contenido)"|truncatechars:160|linebreaksbr }}</p>
-                {% else %}
-                  {% if p.imagen %}
-                    <img src="{{ p.imagen.url }}" alt="Imagen del post" style="max-width: 100%; height: auto; margin-top: 10px; border-radius: 4px;">
-                  {% endif %}
-                  {% if p.contenido %}
-                    <p style="margin-top: 5px;">{{ p.contenido|urlizetrunc:50|linebreaksbr }}</p>
-                  {% elif not p.imagen %}
-                    <p class="text-muted">(Contenido multimedia sin descripción)</p>
-                  {% endif %}
-                {% endif %}
-              </div>
-            </div>
-          {% endfor %}
+    {% if ultimos_posts %}
+    <div class="gift-grid">
+      {% for p in ultimos_posts %}
+      <div class="gift-card">
+        <div class="gift-info">
+          <h4>
+            {% if p.tipo_post == 'texto' %}Publicación{% else %}{{ p.tipo_post|capfirst }}{% endif %}
+            · <small>{{ p.fecha_publicacion|date:"d/m/Y H:i" }}</small>
+          </h4>
+          {% if p.tipo_post == 'texto' %}
+          <p>{{ p.contenido|default:"(sin contenido)"|truncatechars:160|linebreaksbr }}</p>
+          {% else %}
+          {% if p.imagen %}
+          <img src="{{ p.imagen.url }}" alt="Imagen del post"
+            style="max-width: 100%; height: auto; margin-top: 10px; border-radius: 4px;">
+          {% endif %}
+          {% if p.contenido %}
+          <p style="margin-top: 5px;">{{ p.contenido|urlizetrunc:50|linebreaksbr }}</p>
+          {% elif not p.imagen %}
+          <p class="text-muted">(Contenido multimedia sin descripción)</p>
+          {% endif %}
+          {% endif %}
         </div>
-      {% else %}
-        <p class="text-muted">Aún no hay actividad.</p>
-      {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted">Aún no hay actividad.</p>
+    {% endif %}
     {% endif %}
   </section>
 
@@ -113,139 +117,60 @@
       <h3>Eventos importantes de “{{ usuario_publico.nombre_usuario }}”</h3>
     </div>
     {% if not es_amigo %}
-      <p class="text-muted">Solo los amigos pueden ver los eventos.</p>
+    <p class="text-muted">Solo los amigos pueden ver los eventos.</p>
     {% else %}
-      <div class="events-list">
-        {% if eventos_publicos %}
-          {% for ev in eventos_publicos %}
-            <div class="event-item" data-event-id="{{ ev.pk }}">
-              <div class="left event-toggle" role="button" tabindex="0" aria-expanded="false" aria-controls="desc-{{ ev.pk }}">
-                <span class="badge">
-                  {% language 'es' %}
-                    {{ ev.fecha_evento|date:"j" }} de {{ ev.fecha_evento|date:"F" }}
-                  {% endlanguage %}
-                </span>
-                <div class="name">{{ ev.titulo }}</div>
-              </div>
-              {% if ev.descripcion %}
-                <div id="desc-{{ ev.pk }}" class="event-desc" hidden>
-                  <p>{{ ev.descripcion|linebreaksbr }}</p>
-                </div>
-              {% endif %}
-            </div>
-          {% endfor %}
-        {% else %}
-          <p class="text-muted">Este usuario aún no registra eventos.</p>
+    <div class="events-list">
+      {% if eventos_publicos %}
+      {% for ev in eventos_publicos %}
+      <div class="event-item" data-event-id="{{ ev.pk }}">
+        <div class="left event-toggle" role="button" tabindex="0" aria-expanded="false"
+          aria-controls="desc-{{ ev.pk }}">
+          <span class="badge">
+            {% language 'es' %}
+            {{ ev.fecha_evento|date:"j" }} de {{ ev.fecha_evento|date:"F" }}
+            {% endlanguage %}
+          </span>
+          <div class="name">{{ ev.titulo }}</div>
+        </div>
+        {% if ev.descripcion %}
+        <div id="desc-{{ ev.pk }}" class="event-desc" hidden>
+          <p>{{ ev.descripcion|linebreaksbr }}</p>
+        </div>
         {% endif %}
       </div>
-    {% endif %}
-  </section>
-
-  <section id="wishlist" class="tab-content active">
-    <h3>Wishlist de “{{ usuario_publico.nombre_usuario }}”</h3>
-
-    {% if not es_amigo %}
-      <p class="text-muted">Solo los amigos pueden ver la wishlist.</p>
-    {% else %}
-
-      {% if wishlist_items_publicos and wishlist_items_publicos|length > 0 %}
-        {# --- Muestra la wishlist si tiene items --- #}
-        <div class="gift-grid">
-          {% for it in wishlist_items_publicos %}
-            {% with p=it.id_producto %}
-              <div class="gift-card">
-                <img src="{% if p.imagen and p.imagen.url %}{{ p.imagen.url }}{% else %}{% static 'img/Gifters/favicongift.png' %}{% endif %}"
-                     alt="{{ p.nombre_producto }}">
-                <div class="gift-info">
-                  <h4>{{ p.nombre_producto }}</h4>
-                  <p>{{ p.id_marca.nombre_marca|default:"" }}</p>
-                </div>
-                <div class="gift-actions">
-                  <a class="btn btn-sm btn-outline-primary" href="{% url 'producto_detalle' p.id_producto %}" title="Ver detalle">Ver</a>
-                  {% with url_tienda=p.url_tienda_principal|default:p.urls_tienda.first %}
-                    {% if url_tienda %}
-                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_tienda.url }}" target="_blank" rel="noopener"
-                         title="Ver en tienda {{ url_tienda.nombre_tienda }}">Tienda</a>
-                    {% endif %}
-                  {% endwith %}
-                </div>
-              </div>
-            {% endwith %}
-          {% endfor %}
-        </div>
-
+      {% endfor %}
       {% else %}
-        {# --- SI LA WISHLIST ESTÁ VACÍA: primero Recomendados, luego IA como fallback --- #}
-
-        {% if recomendados and recomendados|length > 0 %}
-          <div class="card mt-4">
-            <div class="card-header fw-bold">Recomendados para {{ usuario_publico.nombre }}</div>
-            <div class="row g-3 p-3">
-              {% for p in recomendados %}
-                <div class="col-12 col-md-4">
-                  <div class="border rounded p-3 h-100">
-                    <div class="mb-2 fw-semibold">{{ p.nombre_producto }}</div>
-                    {% if p.id_marca %}<div class="text-muted small mb-1">{{ p.id_marca.nombre_marca }}</div>{% endif %}
-                    {% if p.imagen %}<img src="{{ p.imagen.url }}" alt="{{ p.nombre_producto }}" class="img-fluid mb-2" style="object-fit:cover;">{% endif %}
-                    {% with link=p.url_tienda_principal|default:p.urls_tienda.first %}
-                      {% if link %}
-                        <a href="{{ link.url }}" target="_blank" class="btn btn-sm btn-primary mt-2">Ver en tienda</a>
-                      {% endif %}
-                    {% endwith %}
-                  </div>
-                </div>
-              {% endfor %}
-            </div>
-          </div>
-
-        {% elif sugerencias_ia and sugerencias_ia|length > 0 %}
-          <div class="alert alert-info mt-3" role="alert">
-            <h4 class="alert-heading">💡 ¡Ideas de Regalo!</h4>
-            <p>Como la wishlist de {{ usuario_publico.nombre }} está vacía, GifterAI sugiere:</p>
-            <hr>
-            <ul class="mb-0 ps-3">
-              {% for sug in sugerencias_ia %}
-                <li class="mb-1">
-                  <strong>{{ sug.idea }}</strong>{% if sug.explicacion %}: {{ sug.explicacion }}{% endif %}
-                </li>
-              {% endfor %}
-            </ul>
-          </div>
-
-        {% else %}
-          <p class="text-muted mt-3">No tiene productos visibles en su wishlist.</p>
-        {% endif %}
-
+      <p class="text-muted">Este usuario aún no registra eventos.</p>
       {% endif %}
+    </div>
     {% endif %}
   </section>
 
-  <section id="recibidos" class="tab-content">
-    <h3>Regalos recibidos por “{{ usuario_publico.nombre_usuario }}”</h3>
-    {% if not recibidos_publicos %}
-      <p class="text-muted">Aún no registra regalos recibidos.</p>
-    {% else %}
+<section id="wishlist" class="tab-content active">
+  <h3>Wishlist de “{{ usuario_publico.nombre_usuario }}”</h3>
+
+  {# --- NUEVA LÓGICA DE PRIVACIDAD --- #}
+  {% if usuario_publico.is_private and not es_amigo %}
+    <p class="text-muted">🔒 Este perfil es privado. Solo los amigos pueden ver la wishlist.</p>
+  {% else %}
+
+    {# --- Wishlist: SIEMPRE lo no comprado --- #}
+    {% if wishlist_items_publicos and wishlist_items_publicos|length > 0 %}
       <div class="gift-grid">
-        {% for it in recibidos_publicos %}
+        {% for it in wishlist_items_publicos %}
           {% with p=it.id_producto %}
-            <div class="gift-card received-gift" id="recibido-{{ it.id_item }}" data-product-id="{{ p.id_producto }}">
+            <div class="gift-card">
               <img src="{% if p.imagen and p.imagen.url %}{{ p.imagen.url }}{% else %}{% static 'img/Gifters/favicongift.png' %}{% endif %}"
                    alt="{{ p.nombre_producto }}">
               <div class="gift-info">
                 <h4>{{ p.nombre_producto }}</h4>
-                <p>{{ p.id_marca.nombre_marca|default:"" }}</p>
-                {% if it.fecha_comprado %}
-                  <div class="text-muted received-date">
-                    Recibido el {{ it.fecha_comprado|date:"d/m/Y" }}
-                  </div>
-                {% endif %}
+                <p>{{ p.id_marca.nombre_marca|default:'' }}</p>
               </div>
               <div class="gift-actions">
-                <a class="btn btn-sm btn-outline-primary" href="{% url 'producto_detalle' p.id_producto %}" title="Ver detalle">Ver</a>
+                <a class="btn btn-sm btn-outline-primary" href="{% url 'producto_detalle' p.id_producto %}">Ver</a>
                 {% with url_tienda=p.url_tienda_principal|default:p.urls_tienda.first %}
                   {% if url_tienda %}
-                    <a class="btn btn-sm btn-outline-secondary" href="{{ url_tienda.url }}" target="_blank" rel="noopener"
-                       title="Ver en tienda {{ url_tienda.nombre_tienda }}">Tienda</a>
+                    <a class="btn btn-sm btn-outline-secondary" href="{{ url_tienda.url }}" target="_blank" rel="noopener">Tienda</a>
                   {% endif %}
                 {% endwith %}
               </div>
@@ -253,6 +178,67 @@
           {% endwith %}
         {% endfor %}
       </div>
+    {% else %}
+      <p class="text-muted mt-3">No tiene productos visibles en su wishlist.</p>
+    {% endif %}
+
+    {# --- IA 100% (texto): ideas debajo de la wishlist --- #}
+    {% if sugerencias_ia and sugerencias_ia|length > 0 %}
+      <div class="card mt-4">
+        <div class="card-header fw-bold">💡 Ideas de regalo</div>
+        <div class="card-body">
+          <ul class="mb-0 ps-3">
+            {% for sug in sugerencias_ia %}
+              <li class="mb-1">
+                <strong>{{ sug.idea }}</strong>{% if sug.explicacion %}: {{ sug.explicacion }}{% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    {% endif %}
+
+  {% endif %}
+</section>
+
+
+
+  <section id="recibidos" class="tab-content">
+    <h3>Regalos recibidos por “{{ usuario_publico.nombre_usuario }}”</h3>
+
+    {% if not recibidos_publicos %}
+    <p class="text-muted">Aún no registra regalos recibidos.</p>
+    {% else %}
+    <div class="gift-grid">
+      {% for it in recibidos_publicos %}
+      {% with p=it.id_producto %}
+      <div class="gift-card received-gift" id="recibido-{{ it.id_item }}" data-product-id="{{ p.id_producto }}">
+        <img
+          src="{% if p.imagen and p.imagen.url %}{{ p.imagen.url }}{% else %}{% static 'img/Gifters/favicongift.png' %}{% endif %}"
+          alt="{{ p.nombre_producto }}">
+        <div class="gift-info">
+          <h4>{{ p.nombre_producto }}</h4>
+          <p>{{ p.id_marca.nombre_marca|default:"" }}</p>
+          {% if it.fecha_comprado %}
+          <div class="text-muted received-date">
+            Recibido el {{ it.fecha_comprado|date:"d/m/Y" }}
+          </div>
+          {% endif %}
+        </div>
+        <div class="gift-actions">
+          <a class="btn btn-sm btn-outline-primary" href="{% url 'producto_detalle' p.id_producto %}"
+            title="Ver detalle">Ver</a>
+          {% with url_tienda=p.url_tienda_principal|default:p.urls_tienda.first %}
+          {% if url_tienda %}
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_tienda.url }}" target="_blank" rel="noopener"
+            title="Ver en tienda {{ url_tienda.nombre_tienda }}">Tienda</a>
+          {% endif %}
+          {% endwith %}
+        </div>
+      </div>
+      {% endwith %}
+      {% endfor %}
+    </div>
     {% endif %}
   </section>
 

@@ -3,7 +3,7 @@ from allauth.account.adapter import DefaultAccountAdapter
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from django.utils.text import slugify
 from django.db.models import Q
-
+from django.template.loader import render_to_string 
 # Importa tu modelo de usuario
 from core.models import User
 
@@ -34,6 +34,23 @@ class CustomAccountAdapter(DefaultAccountAdapter):
     """
     Para flujos de email/password (si los usas).
     """
+    def render_mail(self, template_prefix, email, context):
+        """
+        Sobrescribe el método de renderizado para forzar el uso de 
+        nuestras plantillas HTML personalizadas.
+        """
+        # Renderiza el asunto desde tu archivo de texto
+        subject = render_to_string(f"{template_prefix}_subject.txt", context)
+        subject = " ".join(subject.splitlines()).strip()
+
+        # Deja que allauth haga el trabajo pesado de encontrar los .txt y .html del cuerpo
+        message = super().render_mail(template_prefix, email, context)
+        
+        # Asigna nuestro asunto personalizado al correo final
+        message.subject = subject
+
+        return message
+    
     def populate_username(self, request, user):
         # No usamos username estándar; allauth no debe rellenarlo.
         return
@@ -43,6 +60,7 @@ class CustomAccountAdapter(DefaultAccountAdapter):
     def generate_unique_username(self, txts, regex=None):
         base = "-".join([t for t in txts if t]) or "user"
         return ensure_unique_username(base)
+    
 
 
 class CustomSocialAccountAdapter(DefaultSocialAccountAdapter):

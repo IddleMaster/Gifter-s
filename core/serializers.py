@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from core.models import User, SolicitudAmistad, Conversacion, Mensaje, ParticipanteConversacion, Producto
+from core.models import User, SolicitudAmistad, Conversacion, Mensaje, ParticipanteConversacion, Producto, Notificacion, NotificationDevice, PreferenciasUsuario
 
 
 
@@ -182,3 +182,43 @@ class AdminUserSerializer(serializers.ModelSerializer):
         # Define campos que solo se pueden leer (como el ID)
         read_only_fields = ('id', 'correo') # No permitimos cambiar ID ni correo directamente aquí
         # IMPORTANTE: NO incluimos 'password
+
+
+
+
+# ---- Notificaciones NavBar ----
+class NotificacionSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(source="notificacion_id", read_only=True)
+
+    class Meta:
+        model = Notificacion
+        fields = [
+            "id", "notificacion_id", "tipo", "titulo", "mensaje",
+            "payload", "leida", "creada_en", "leida_en"
+        ]
+        read_only_fields = ["notificacion_id", "leida", "creada_en", "leida_en"]
+
+class NotificacionCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notificacion
+        fields = ["tipo", "titulo", "mensaje", "payload"]
+
+class DeviceSerializer(serializers.ModelSerializer):
+    """
+    Para WebPush guardaremos el objeto de suscripción completo (JSON) en 'token'.
+    """
+    class Meta:
+        model = NotificationDevice
+        fields = ["id", "token", "platform", "user_agent", "active"]
+        read_only_fields = ["id", "platform", "user_agent", "active"]
+
+class PreferenciasSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PreferenciasUsuario
+        fields = [
+            "email_on_new_follower",
+            "email_on_event_invite",
+            "email_on_birthday_reminder",
+            "accepts_marketing_emails",
+            "allow_push_web",
+        ]

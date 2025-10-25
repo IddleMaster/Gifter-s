@@ -41,6 +41,16 @@ ALLOWED_HOSTS = []
 
 
 
+
+LOGGING = {
+  "version": 1,
+  "disable_existing_loggers": False,
+  "handlers": {"console": {"class": "logging.StreamHandler"}},
+  "loggers": {
+    "gifters.health": {"handlers": ["console"], "level": "INFO", "propagate": False},
+  },
+}
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -59,8 +69,8 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.google',  
     'channels',
     'rest_framework', 
-    'core',
     'django_bootstrap5',
+    'core.apps.CoreConfig',
 
 ]
 
@@ -168,7 +178,7 @@ SITE_URL = os.getenv("SITE_URL", "http://localhost:8000")
 # Internationalization
 # https://docs.djangoproject.com/en/3.1/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'es-cl'
 
 TIME_ZONE =  "America/Santiago"   
 
@@ -263,3 +273,13 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     )
 }
+
+
+# Activa o desactiva IA (fallback local funciona igual si no hay clave)
+USE_GIFTER_AI = env.bool("USE_GIFTER_AI", default=True)
+
+# Modelo a usar (GPT-4o-mini recomendado)
+GIFTER_AI_MODEL = "gpt-4o-mini"
+
+# Tiempo de caché para sugerencias IA (30 minutos)
+GIFTER_AI_CACHE_TTL = 60 * 30

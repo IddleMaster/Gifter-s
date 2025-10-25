@@ -1,6 +1,5 @@
 from itertools import count
 from django.templatetags.static import static
-from django.http import JsonResponse, HttpResponseForbidden
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login
 from django.contrib import messages
@@ -9,6 +8,10 @@ from core.services.gifter_ai import generar_sugerencias_regalo
 from core.services.recommendations import recommend_when_wishlist_empty
 from .forms import PostForm, RegisterForm, PerfilForm, PreferenciasUsuarioForm, EventoForm
 from .models import *
+
+# views.py
+from core.services.recommendations import recommend_products_for_user as ai_recommend_products
+from core.services.social import amigos_qs, sugerencias_qs
 from .emails import send_verification_email, send_welcome_email
 from django.core.paginator import Paginator
 from django.db.models import Q, Avg
@@ -24,10 +27,11 @@ import uuid
 from django.shortcuts import get_object_or_404
 from .models import User, Post, Like  # ajusta si necesitas más
 from core.forms import ProfileEditForm
-from .utils import get_default_wishlist
+from .utils import get_default_wishlist, _push_inbox
 from django.db.models import Q, Avg, Case, When
 import openai
 from django.db.models import Prefetch, Q
+from core.utils import get_default_wishlist
 from core.models import Wishlist, ItemEnWishlist
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
@@ -44,7 +48,7 @@ from core.models import Evento, Post, Seguidor, SolicitudAmistad
 from rest_framework.pagination import PageNumberPagination
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from core.models import Wishlist, ItemEnWishlist
+from core.models import Wishlist, ItemEnWishlist, ResenaSitio
 from core.models import Conversacion, Mensaje, ParticipanteConversacion
 from core.models import NotificationDevice, PreferenciasUsuario, Perfil
 from .serializers import ConversacionLiteSerializer, MensajeSerializer
@@ -55,7 +59,6 @@ from core.models import Post, Comentario
 from django.utils.html import escape
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
-from django.http import JsonResponse, HttpResponseForbidden
 from django.urls import reverse  # puedes dejarlo, pero ya no dependemos de reverse en el fallback
 from django.views.decorators.http import require_GET
 from django.core.cache import cache
@@ -79,11 +82,13 @@ import os, uuid
 import json
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse, HttpResponseBadRequest, HttpResponseForbidden
+from django.http import JsonResponse, HttpResponseBadRequest, HttpResponseForbidden, HttpResponse
 from django.views.decorators.http import require_http_methods
 from django.shortcuts import get_object_or_404
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET
+import datetime
+import csv
 
 # Decoradores/permissions DRF
 from rest_framework.decorators import api_view, permission_classes
@@ -92,10 +97,12 @@ from rest_framework.permissions import IsAdminUser,IsAuthenticated
 # Utilidades Django
 from django.core.management import call_command
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
-
+import hashlib
 
 from django.db import transaction
 from .models import Conversacion
+from core.services.ai_recommender import rerank_products_with_embeddings
+
 
 
 # Stdlib
@@ -104,6 +111,15 @@ import traceback
 # Formularios locales (solo si tienes una vista de contacto que lo use)
 from .forms import ContactForm
 User = get_user_model()
+
+
+##########
+import logging
+from django.db import connection
+log = logging.getLogger("gifters.health")  # salus de los gifters
+##########
+
+
 
 
 if hasattr(settings, 'OPENAI_API_KEY') and settings.OPENAI_API_KEY:
@@ -296,78 +312,175 @@ def _people_matches(request, query, limit_friends=8, limit_others=8):
 
 
 def home(request):
+    is_admin_flag = request.user.is_authenticated and (request.user.is_staff or getattr(request.user, 'es_admin', False))
+
+    # ===================== CATÁLOGO =====================
+    # Productos destacados: intenta por fecha_creacion, si falla usa -pk
     try:
-        productos_destacados = Producto.objects.filter(activo=True).order_by('-fecha_creacion')[:9]
-        categorias = (Categoria.objects
-                      .filter(producto__activo=True)
-                      .distinct()
-                      .order_by('nombre_categoria')[:12])
+        productos_destacados = (
+            Producto.objects.filter(activo=True).order_by('-fecha_creacion')[:9]
+        )
+    except Exception:
+        productos_destacados = (
+            Producto.objects.filter(activo=True).order_by('-pk')[:9]
+        )
 
-        amigos = []
-        sugerencias = []
-        recibidas = []
-        enviadas = []
-        favoritos_ids = set()
+    # Categorías: intenta con distintos related_name
+    categorias = []
+    try:
+        categorias = (Categoria.objects.filter(productos__activo=True).distinct().order_by('nombre_categoria')[:12])
+    except Exception:
+        try:
+            categorias = (Categoria.objects.filter(producto__activo=True).distinct().order_by('nombre_categoria')[:12])
+        except Exception:
+            try:
+                categorias = (Categoria.objects.filter(producto_set__activo=True).distinct().order_by('nombre_categoria')[:12])
+            except Exception:
+                categorias = []
 
-        if request.user.is_authenticated:
+    # ===================== SOCIAL =====================
+    amigos = []
+    sugerencias = []
+    recibidas = []
+    enviadas = []
+    favoritos_ids = set()
+    ai_reco = []
+
+    if request.user.is_authenticated:
+        # Amigos / sugerencias (no romper si falla)
+        try:
             amigos = amigos_qs(request.user)
-            sugerencias = sugerencias_qs(request.user, limit=9)
-            recibidas = (SolicitudAmistad.objects
-                         .filter(receptor=request.user, estado=SolicitudAmistad.Estado.PENDIENTE)
-                         .select_related('emisor')
-                         .order_by('-creada_en')[:10])
-            enviadas = (SolicitudAmistad.objects
-                        .filter(emisor=request.user, estado=SolicitudAmistad.Estado.PENDIENTE)
-                        .select_related('receptor')
-                        .order_by('-creada_en')[:10])
+        except Exception:
+            amigos = []
 
+        try:
+            sugerencias = sugerencias_qs(request.user, limit=9)
+        except Exception:
+            sugerencias = []
+
+        try:
+            recibidas = (
+                SolicitudAmistad.objects
+                .filter(receptor=request.user, estado=SolicitudAmistad.Estado.PENDIENTE)
+                .select_related('emisor')
+                .order_by('-creada_en')[:10]
+            )
+            enviadas = (
+                SolicitudAmistad.objects
+                .filter(emisor=request.user, estado=SolicitudAmistad.Estado.PENDIENTE)
+                .select_related('receptor')
+                .order_by('-creada_en')[:10]
+            )
+        except Exception:
+            recibidas, enviadas = [], []
+
+        # Wishlist / favoritos
+        wl = None
+        try:
             wl = get_default_wishlist(request.user)
             favoritos_ids = set(
                 ItemEnWishlist.objects
                 .filter(id_wishlist=wl)
                 .values_list('id_producto', flat=True)
             )
-
-        # === Reseñas del sitio (últimas 6) ===
-        try:
-            # Si tienes Perfil (OneToOne) y quieres evitar N+1, descomenta la siguiente línea:
-            # resenas = (ResenaSitio.objects.select_related('id_usuario', 'id_usuario__perfil')
-            resenas = (ResenaSitio.objects
-                       .select_related('id_usuario')
-                       .order_by('-fecha_resena')[:6])
         except Exception:
-            resenas = []
+            favoritos_ids = set()
 
-        # === Tu reseña (para mostrar botones y prellenar el form) ===
-        own_resena = None
-        if request.user.is_authenticated:
-            own_resena = ResenaSitio.objects.filter(id_usuario=request.user).first()
+        # ===================== RECO (IA SOBRE CATÁLOGO) =====================
+        try:
+            ai_reco = ai_recommend_products(request.user, limit=6)
+        except Exception:
+            ai_reco = []
 
-        context = {
-            'productos_destacados': productos_destacados,
-            'categorias': categorias,
-            'amigos': amigos,
-            'sugerencias': sugerencias,
-            'solicitudes_recibidas': recibidas,
-            'solicitudes_enviadas': enviadas,
-            'favoritos_ids': favoritos_ids,
-            'resenas': resenas,
-            'own_resena': own_resena,  # <- nuevo
-        }
-        return render(request, 'index.html', context)
+        # Fallback 1: por marcas de wishlist si vacío
+        if not ai_reco:
+            try:
+                if wl is None:
+                    wl = get_default_wishlist(request.user)
+                wl_items = (
+                    ItemEnWishlist.objects
+                    .filter(id_wishlist=wl, fecha_comprado__isnull=True)
+                    .select_related('id_producto', 'id_producto__id_marca')[:5]
+                )
+                marcas_ids = [
+                    it.id_producto.id_marca_id
+                    for it in wl_items
+                    if it.id_producto and it.id_producto.id_marca_id
+                ]
+                qs = Producto.objects.filter(activo=True)
+                if marcas_ids:
+                    qs = qs.filter(id_marca_id__in=marcas_ids)
+                # excluir ya vistos
+                ai_reco = list(
+                    qs.exclude(pk__in=favoritos_ids)
+                      .order_by('-pk')[:6]
+                )
+            except Exception:
+                ai_reco = []
 
+        # Fallback 2: últimos del catálogo, excluyendo vistos
+        if not ai_reco:
+            try:
+                ai_reco = list(
+                    Producto.objects
+                    .filter(activo=True)
+                    .exclude(pk__in=favoritos_ids)
+                    .order_by('-pk')[:6]
+                )
+            except Exception:
+                ai_reco = []
+    else:
+        ai_reco = []  # no logueados no ven “para ti”
+
+    # ===================== RESEÑAS DEL SITIO =====================
+    try:
+        resenas_qs = (
+            ResenaSitio.objects
+            .select_related('id_usuario', 'id_usuario__perfil')
+            .order_by('-fecha_resena')[:6]
+        )
     except Exception:
-        return render(request, 'index.html', {
-            'productos_destacados': [],
-            'categorias': [],
-            'amigos': [],
-            'sugerencias': [],
-            'solicitudes_recibidas': [],
-            'solicitudes_enviadas': [],
-            'favoritos_ids': set(),
-            'resenas': [],
-            'own_resena': None,  # <- nuevo en fallback
-        })
+        resenas_qs = []
+
+    own_resena = None
+    if request.user.is_authenticated:
+        try:
+            own_resena = (
+                ResenaSitio.objects
+                .filter(id_usuario=request.user)
+                .order_by('-fecha_resena')
+                .first()
+            )
+        except Exception:
+            own_resena = None
+
+
+    # --------- DEBUG útil en terminal ----------
+    try:
+        print("DEBUG home():",
+              "destacados=", len(productos_destacados),
+              "categorias=", len(categorias),
+              "ai_reco=", len(ai_reco),
+              "favoritos_ids=", len(favoritos_ids))
+    except Exception:
+        pass
+    # ------------------------------------------
+
+    context = {
+        'productos_destacados': productos_destacados,
+        'categorias': categorias,
+        'amigos': amigos,
+        'sugerencias': sugerencias,
+        'solicitudes_recibidas': recibidas,
+        'solicitudes_enviadas': enviadas,
+        'favoritos_ids': favoritos_ids,
+        'resenas': resenas_qs,
+        'own_resena': own_resena,
+        'is_admin': is_admin_flag,
+        'ai_reco': ai_reco,
+    }
+    return render(request, 'index.html', context)
+
 
 
 def register_view(request):
@@ -1545,6 +1658,12 @@ def profile_edit(request):
             u_form.save()
             p_form.save()
             pref_form.save()
+
+            # Lee el estado del interruptor 'is_private' del formulario.
+            user.is_private = 'is_private' in request.POST
+            user.save(update_fields=['is_private'])
+            # ------------------------------------
+
             messages.success(request, 'Perfil actualizado correctamente.')
             return redirect('perfil')
         else:
@@ -1789,7 +1908,32 @@ class ConversacionesList(APIView):
 
         # ✅ pasa request en context (evita 500 cuando el serializer lo necesita)
         data = ConversacionLiteSerializer(qs, many=True, context={"request": request}).data
+        # === Inyectar unread_count por conversación (sin tocar el serializer) ===
+        # Un no-leído = EntregaMensaje con estado ENTREGADO para este usuario, dentro de esa conversación
+        from core.models import EntregaMensaje  # ya lo tienes en tu models.py
+
+        # Creamos un índice para mutar rápido los dicts del serializer:
+        conv_map = {c["conversacion_id"]: c for c in data}
+
+        # Traemos counts agrupados por conversación:
+        unread_qs = (EntregaMensaje.objects
+                     .filter(usuario=request.user, estado=EntregaMensaje.Estado.ENTREGADO,
+                             mensaje__conversacion__in=qs)
+                     .values("mensaje__conversacion_id")
+                     .annotate(cnt=Count("entrega_id")))
+
+        for row in unread_qs:
+            cid = row["mensaje__conversacion_id"]
+            if cid in conv_map:
+                conv_map[cid]["unread_count"] = row["cnt"]
+
+        # Default en 0 si alguna conversación no vino en el QS de no leídos
+        for c in data:
+            if "unread_count" not in c:
+                c["unread_count"] = 0
+
         return Response(data)
+
 
 class MensajesListCreate(APIView):
     authentication_classes = (SessionAuthentication, BasicAuthentication)
@@ -1820,6 +1964,7 @@ class MensajesListCreate(APIView):
         ser = MensajeSerializer(page, many=True)
         return paginator.get_paginated_response(ser.data)
 
+
     def post(self, request, conv_id):
         conv = self.get_conv(request, conv_id)
         if not conv:
@@ -1828,13 +1973,11 @@ class MensajesListCreate(APIView):
         tipo = (request.data.get("tipo") or "texto").strip()
         contenido = (request.data.get("contenido") or "").strip()
 
-        # MENSAJE DE IMAGEN
         if tipo == Mensaje.Tipo.IMAGEN:
             up = request.FILES.get("archivo")
             if not up:
                 return Response({"detail": "archivo es requerido"}, status=400)
 
-            # guarda en /media/chat/
             orig = get_valid_filename(up.name or "image")
             ext = os.path.splitext(orig)[1].lower() or ".jpg"
             name = f"chat/{uuid.uuid4().hex}{ext}"
@@ -1845,11 +1988,10 @@ class MensajesListCreate(APIView):
                 conversacion=conv,
                 remitente=request.user,
                 tipo=Mensaje.Tipo.IMAGEN,
-                contenido=contenido,                # pie de foto opcional
+                contenido=contenido,
                 metadatos={"archivo_url": url},
             )
         else:
-            # TEXTO (default)
             if not contenido:
                 return Response({"detail": "contenido es requerido"}, status=400)
             msg = Mensaje.objects.create(
@@ -1859,11 +2001,30 @@ class MensajesListCreate(APIView):
                 contenido=contenido,
             )
 
-        # actualizar puntero de la conversación
+        # puntero conversación
         conv.ultimo_mensaje = msg
         conv.save(update_fields=["ultimo_mensaje", "actualizada_en"])
 
+        # entregas ENTREGADO (no el remitente)
+        dest_ids = list(
+            ParticipanteConversacion.objects
+            .filter(conversacion=conv)
+            .exclude(usuario=request.user)
+            .values_list("usuario_id", flat=True)
+        )
+        if dest_ids:
+            EntregaMensaje.objects.bulk_create([
+                EntregaMensaje(mensaje=msg, usuario_id=uid, estado=EntregaMensaje.Estado.ENTREGADO)
+                for uid in dest_ids
+            ])
+            _push_inbox(dest_ids, {
+                "kind": "new_message",
+                "conversacion_id": conv.conversacion_id,
+                "mensaje_id": msg.mensaje_id,
+            })
+
         return Response(MensajeSerializer(msg).data, status=201)
+
 
 
 ##nuevas funciones hoy 1 del 10 (abajo):
@@ -1997,10 +2158,11 @@ def chat_con_usuario(request, username):
     return redirect('chat_room', conversacion_id=conv.conversacion_id)        
 
 
-
+@login_required
 def perfil_publico(request, username):
     usuario = get_object_or_404(User, nombre_usuario=username)
 
+    # Si es tu propio perfil, redirige a la vista de perfil personal
     if request.user.is_authenticated and request.user.id == usuario.id:
         return redirect('perfil')
 
@@ -2027,73 +2189,84 @@ def perfil_publico(request, username):
         pendiente_enviada = solicitudes.filter(emisor=request.user).first()
         pendiente_recibida = solicitudes.filter(emisor=usuario).first()
 
+    # Lógica de privacidad principal: si es privado y no son amigos, bloquea.
+    if usuario.is_private and not es_amigo:
+        context = {
+            'usuario_publico': usuario,
+            'perfil_publico': perfil,
+            'es_amigo': es_amigo,
+            'pendiente_enviada': pendiente_enviada,
+            'pendiente_recibida': pendiente_recibida,
+            'puede_chatear': puede_chatear,
+        }
+        return render(request, 'perfil_privado.html', context)
+
+    # Si llegamos aquí, el visitante tiene permiso para ver el contenido.
+    # Cargamos toda la información.
+
     eventos_publicos = Evento.objects.filter(id_usuario=usuario).order_by('fecha_evento')
     ultimos_posts = Post.objects.filter(id_usuario=usuario, es_publico=True).order_by('-fecha_publicacion')[:6]
 
     wl = Wishlist.objects.filter(usuario=usuario).first()
     wishlist_items_publicos = ItemEnWishlist.objects.none()
     recibidos_publicos = ItemEnWishlist.objects.none()
-
-    # NUEVO: contenedores
     sugerencias_ia_lista = []
-    recomendados = []
-
-    print(f"[DEBUG] perfil_publico para {username}. Es amigo: {es_amigo}. Wishlist encontrada: {'Sí' if wl else 'No'}")
 
     if wl:
+        # Los regalos recibidos se cargan siempre si se tiene acceso al perfil.
         recibidos_publicos = (
             ItemEnWishlist.objects
             .filter(id_wishlist=wl, fecha_comprado__isnull=False)
             .select_related('id_producto', 'id_producto__id_marca')
-            .prefetch_related(Prefetch('id_producto__urls_tienda', queryset=UrlTienda.objects.filter(activo=True)))
+            .prefetch_related(Prefetch('id_producto__urls_tienda',
+                                       queryset=UrlTienda.objects.filter(activo=True)))
             .order_by('-fecha_comprado', '-pk')
         )
 
-        if es_amigo:
-            wishlist_items_publicos = (
-                ItemEnWishlist.objects
-                .filter(id_wishlist=wl, fecha_comprado__isnull=True)
-                .filter(id_producto__activo=True)
-                .select_related('id_producto', 'id_producto__id_marca')
-                .prefetch_related(Prefetch('id_producto__urls_tienda', queryset=UrlTienda.objects.filter(activo=True)))
-                .order_by('-pk')
-            )
+        # --- 👇 ESTA ES LA CORRECCIÓN 👇 ---
+        # Se elimina la condición "if es_amigo". Ahora la wishlist se carga si el perfil es público
+        # O si es privado y son amigos (porque ya pasamos el filtro de arriba).
+        wishlist_items_publicos = (
+            ItemEnWishlist.objects
+            .filter(id_wishlist=wl, fecha_comprado__isnull=True)
+            .select_related('id_producto', 'id_producto__id_marca')
+            .prefetch_related(Prefetch('id_producto__urls_tienda',
+                                       queryset=UrlTienda.objects.filter(activo=True)))
+            .order_by('-pk')
+        )
 
-            wishlist_count = wishlist_items_publicos.count()
-            print(f"[DEBUG] Conteo de wishlist_items_publicos (activos): {wishlist_count}")
-
-            # --- RECOMENDADOR: si la wishlist activa está vacía ---
-            if wishlist_count == 0:
-                # 1) Productos REALES recomendados (según recibidos/wishlist histórica)
-                cache_key_rec = f"reco_user_{usuario.id}"
-                recomendados = cache.get(cache_key_rec, [])
-                if not recomendados:
-                    recomendados = recommend_when_wishlist_empty(usuario, limit=3)
-                    cache.set(cache_key_rec, recomendados, 60 * 30)  # 30 min
-                print(f"[RECO] Recomendados generados: {len(recomendados)}")
-
-                # 2) (Opcional) IA como fallback SOLO si no encontramos candidatos
-                if not recomendados:
-                    datos_para_ia = ""
-                    nombres_recibidos = [item.id_producto.nombre_producto for item in recibidos_publicos[:3]]
-                    if nombres_recibidos:
-                        datos_para_ia += f"Regalos que ha recibido antes: {', '.join(nombres_recibidos)}.\n"
-                        print(f"[IA] Usando regalos recibidos: {nombres_recibidos}")
-                    elif perfil and getattr(perfil, "bio", ""):
-                        datos_para_ia += f"Su biografía: {perfil.bio}\n"
-                        print(f"[IA] Usando biografía.")
-
-                    if datos_para_ia:
-                        cache_key_ia = f"ia_sugg_user_{usuario.id}"
-                        sugerencias_ia_lista = cache.get(cache_key_ia, [])
-                        if not sugerencias_ia_lista:
-                            sugerencias_ia_lista = generar_sugerencias_regalo(usuario.nombre, datos_para_ia)
-                            cache.set(cache_key_ia, sugerencias_ia_lista, 60 * 60)  # 1 hora
-                        print(f"[IA] Sugerencias IA: {len(sugerencias_ia_lista)}")
+        # La lógica de IA ahora se ejecuta para amigos (en perfiles privados)
+        # y para todos (en perfiles públicos).
+        if es_amigo: # Mantenemos la IA solo para amigos para no gastar recursos innecesariamente
+            nombres_wishlist = [
+                it.id_producto.nombre_producto
+                for it in wishlist_items_publicos[:5] if it.id_producto
+            ]
+            datos_para_ia = ""
+            if nombres_wishlist:
+                datos_para_ia = f"Artículos que tiene en su wishlist: {', '.join(nombres_wishlist)}.\n"
             else:
-                print(f"[DEBUG] La wishlist NO está vacía ({wishlist_count} items activos), saltando recomendaciones/IA.")
+                nombres_recibidos = [
+                    it.id_producto.nombre_producto
+                    for it in recibidos_publicos[:5] if it.id_producto
+                ]
+                if nombres_recibidos:
+                    datos_para_ia = f"Regalos que ha recibido antes: {', '.join(nombres_recibidos)}.\n"
+                elif perfil and getattr(perfil, 'bio', ''):
+                    datos_para_ia = f"Biografía: {perfil.bio}\n"
+            
+            if datos_para_ia:
+                hctx = hashlib.sha1(datos_para_ia.encode('utf-8')).hexdigest()
+                cache_key_ia = f"ia_text_user_{usuario.id}_{hctx}"
+                sugerencias_ia_lista = cache.get(cache_key_ia, [])
+                if not sugerencias_ia_lista:
+                    try:
+                        sugerencias_ia_lista = generar_sugerencias_regalo(usuario.nombre, datos_para_ia)
+                    except Exception:
+                        sugerencias_ia_lista = []
+                    cache.set(cache_key_ia, sugerencias_ia_lista, 60 * 30)
 
-    # --- Contexto Final ---
+    # Contexto final para la plantilla
     context = {
         'usuario_publico': usuario,
         'perfil_publico': perfil,
@@ -2105,10 +2278,10 @@ def perfil_publico(request, username):
         'eventos_publicos': eventos_publicos,
         'wishlist_items_publicos': wishlist_items_publicos,
         'recibidos_publicos': recibidos_publicos,
-        'recomendados': recomendados,          # NUEVO: productos reales sugeridos
-        'sugerencias_ia': sugerencias_ia_lista # IA solo si no hubo recomendados
+        'sugerencias_ia': sugerencias_ia_lista,
     }
     return render(request, 'perfil_publico.html', context)
+
 
 
 
@@ -2361,35 +2534,37 @@ class TypingSummaryView(APIView):
 #####################################################################
 
 @login_required
+@require_POST
 def resena_sitio_crear(request):
-    if request.method != "POST":
-        return redirect("home")
-
-    # bloquea duplicados: si ya tiene, pide usar editar
+    # Bloquea duplicados (pide usar editar)
     if ResenaSitio.objects.filter(id_usuario=request.user).exists():
         messages.warning(request, "Ya tienes una reseña. Usa el botón Editar para actualizarla.")
-        return redirect("home")
+        return redirect(f"{reverse('home')}#testimonials")  # vuelve al bloque de reseñas
 
     form = ResenaSitioForm(request.POST)
     if form.is_valid():
-        r = form.save(commit=False)
-        r.id_usuario = request.user
-        r.save()
-        messages.success(request, "¡Gracias por tu reseña!")
+        try:
+            r = form.save(commit=False)
+            r.id_usuario = request.user
+            r.save()
+            messages.success(request, "¡Gracias por tu reseña!")
+        except IntegrityError:
+            # Por si luego agregas UniqueConstraint en BD
+            messages.warning(request, "Ya tienes una reseña. Usa Editar para actualizarla.")
     else:
         messages.error(request, "Revisa la calificación (1–5) y/o tu comentario.")
     return redirect(f"{reverse('home')}#testimonials")
 
+
 @login_required
 def resena_sitio_editar(request):
     if request.method != "POST":
-        return redirect("home")
+        return redirect(f"{reverse('home')}#testimonials")
 
-    # solo edita la reseña del usuario actual
     instancia = ResenaSitio.objects.filter(id_usuario=request.user).first()
     if not instancia:
         messages.warning(request, "Aún no tienes reseña para editar.")
-        return redirect("home")
+        return redirect(f"{reverse('home')}#testimonials")
 
     form = ResenaSitioForm(request.POST, instance=instancia)
     if form.is_valid():
@@ -2401,14 +2576,12 @@ def resena_sitio_editar(request):
 
 
 @login_required
+@require_POST
 def resena_sitio_eliminar(request):
-    if request.method != "POST":
-        return redirect("home")
-
     instancia = ResenaSitio.objects.filter(id_usuario=request.user).first()
     if not instancia:
         messages.warning(request, "No tienes reseña para eliminar.")
-        return redirect("home")
+        return redirect(f"{reverse('home')}#testimonials")
 
     instancia.delete()
     messages.success(request, "Reseña eliminada.")
@@ -2726,13 +2899,11 @@ def grupos_add_members(request, pk: int):
     if not isinstance(ids, list):
         return JsonResponse({'error': "'miembros' debe ser lista de enteros"}, status=400)
 
-    # normaliza y evita duplicados / self-joins existentes
     try:
         ids = [int(x) for x in ids]
     except Exception:
         return JsonResponse({'error': 'IDs inválidos'}, status=400)
 
-    # ya participantes:
     ya = set(ParticipanteConversacion.objects
              .filter(conversacion=conv)
              .values_list("usuario_id", flat=True))
@@ -2751,7 +2922,9 @@ def grupos_add_members(request, pk: int):
             ) for u in users
         ])
 
-    return JsonResponse({"ok": True, "agregados": [u.id for u in users]})
+    agregados_ids = [u.id for u in users]
+
+    return JsonResponse({"ok": True, "agregados": agregados_ids})
 # === Quitar miembro (solo autor) ===
 @login_required
 @require_http_methods(["POST"])
@@ -2788,7 +2961,37 @@ def grupos_remove_member(request, pk: int):
             return JsonResponse({'error': 'No puedes dejar el grupo sin administradores'}, status=400)
 
     part.delete()
+    # Sube la conversación para reordenar bandeja
+    conv.actualizada_en = timezone.now()
+    conv.save(update_fields=["actualizada_en"])
+
+    # Avisar al usuario removido (para que desaparezca la conversación)
+    _push_inbox(
+        [int(miembro_id)],
+        {
+            "kind": "group_removed",
+            "conversacion_id": conv.conversacion_id,
+        }
+    )
+
+    # Avisar al resto de miembros para refrescar su bandeja/miembros
+    resto_ids = list(
+        ParticipanteConversacion.objects
+        .filter(conversacion=conv)
+        .values_list("usuario_id", flat=True)
+    )
+    _push_inbox(
+        resto_ids,
+        {
+            "kind": "inbox_refresh",
+            "conversacion_id": conv.conversacion_id,
+            "reason": "group_member_removed",
+            "removed_id": int(miembro_id),
+        }
+    )
+
     return JsonResponse({'ok': True, 'removido': int(miembro_id)})
+    
 
 # === Eliminar grupo (solo autor) ===
 @login_required
@@ -2923,31 +3126,196 @@ def sugerencias_regalo_ia(request, amigo_username):
 
 @login_required
 @require_POST
-def grupos_leave(request, pk):
-    # 1) traer la conversación
-    conv = get_object_or_404(Conversacion, pk=pk, is_group=True)
+def grupos_leave(request, pk: int):
+    # 1) Traer el grupo por conversacion_id y tipo GRUPO
+    conv = get_object_or_404(
+        Conversacion,
+        conversacion_id=pk,
+        tipo=Conversacion.Tipo.GRUPO
+    )
 
-    # 2) el autor no puede "salir"; debe eliminar o transferir admin
+    # 2) El autor no puede salir (debe eliminar o transferir admin)
     if getattr(conv, "creador_id", None) == request.user.id:
         return JsonResponse(
             {"ok": False, "error": "El autor no puede abandonar el grupo."},
             status=400
         )
 
-    # 3) buscar la membresía
-    try:
-        miembro = ConversacionMiembro.objects.get(conversacion=conv, usuario=request.user)
-    except ConversacionMiembro.DoesNotExist:
+    # 3) Borrar la membresía del usuario en ParticipanteConversacion
+    deleted, _ = ParticipanteConversacion.objects.filter(
+        conversacion=conv,
+        usuario=request.user
+    ).delete()
+
+    if deleted == 0:
         return JsonResponse(
             {"ok": False, "error": "No eres miembro de este grupo."},
             status=404
         )
 
-    # 4) borrar membresía
-    miembro.delete()
+    _push_inbox([request.user.id], {"kind": "group_left", "conversacion_id": conv.conversacion_id})
 
-    # (opcional) si no quedan miembros, podés cerrar/eliminar el grupo
-    # if not ConversacionMiembro.objects.filter(conversacion=conv).exists():
-    #     conv.delete()
+    conv.actualizada_en = timezone.now()
+    conv.save(update_fields=["actualizada_en"])
 
+    resto_ids = list(
+        ParticipanteConversacion.objects
+        .filter(conversacion=conv)
+        .values_list("usuario_id", flat=True)
+    )
+    _push_inbox(resto_ids, {
+        "kind": "inbox_refresh",
+        "conversacion_id": conv.conversacion_id,
+        "reason": "group_left",
+        "left_id": request.user.id,
+    })
     return JsonResponse({"ok": True})
+
+
+@login_required
+@require_http_methods(["POST"])
+def conversacion_mark_read(request, conv_id: int):
+    from core.models import EntregaMensaje
+    updated = (EntregaMensaje.objects
+               .filter(
+                   usuario=request.user,
+                   estado=EntregaMensaje.Estado.ENTREGADO,
+                   mensaje__conversacion_id=conv_id
+               )
+               .update(estado=EntregaMensaje.Estado.LEIDO, timestamp=timezone.now()))
+    # Push local para refrescar la bandeja del mismo usuario
+    from .utils import _push_inbox
+    _push_inbox([request.user.id], {
+        "kind": "inbox_refresh",
+        "conversacion_id": conv_id,
+        "reason": "mark_read"
+    })
+    return JsonResponse({"ok": True, "updated": updated})
+
+
+@login_required
+@require_http_methods(["GET"])
+def chat_unread_summary(request):
+    from core.models import EntregaMensaje
+    qs = (EntregaMensaje.objects
+          .filter(usuario=request.user, estado=EntregaMensaje.Estado.ENTREGADO)
+          .values("mensaje__conversacion_id")
+          .annotate(cnt=Count("entrega_id")))
+
+    per_conv = {str(r["mensaje__conversacion_id"]): r["cnt"] for r in qs}
+    total = sum(per_conv.values())
+    return JsonResponse({"total": total, "per_conversation": per_conv})
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def download_active_products_csv(request):
+    """
+    Genera y devuelve un archivo CSV con todos los productos activos.
+    (Versión solo CSV)
+    """
+    try:
+        response = HttpResponse(
+            content_type='text/csv',
+            headers={'Content-Disposition': f'attachment; filename="productos_activos_{datetime.date.today()}.csv"'},
+        )
+        response.write('\ufeff'.encode('utf8')) # BOM para Excel Windows
+
+        writer = csv.writer(response, delimiter=';')
+
+        writer.writerow([ # Encabezados originales
+            'ID Producto',
+            'Nombre',
+            'Descripcion',
+            'Precio',
+            'Categoria ID',
+            'Categoria Nombre',
+            'Marca ID',
+            'Marca Nombre',
+            'URL Imagen'
+        ])
+
+        productos = Producto.objects.filter(activo=True).select_related('id_categoria', 'id_marca').order_by('id_producto')
+
+        for producto in productos:
+            writer.writerow([
+                producto.id_producto,
+                producto.nombre_producto,
+                producto.descripcion,
+                producto.precio,
+                producto.id_categoria_id,
+                producto.id_categoria.nombre_categoria if producto.id_categoria else '',
+                producto.id_marca_id,
+                producto.id_marca.nombre_marca if producto.id_marca else '',
+                request.build_absolute_uri(producto.imagen.url) if producto.imagen else ''
+            ])
+
+        return response
+
+    except Exception as e:
+        print(f"Error generando CSV de productos: {e}")
+        # Devolver error JSON es más amigable para la API
+        return Response({"error": f"No se pudo generar el reporte CSV: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+def producto_detalle(request, id_producto=None, pk=None):
+    """
+    Vista de detalle del producto.
+    Acepta tanto `id_producto` como `pk` (por compatibilidad con URLs o templates).
+    """
+    producto_id = id_producto or pk
+
+    # Producto + relaciones necesarias
+    producto = get_object_or_404(
+        Producto.objects
+        .select_related("id_marca", "id_categoria")
+        .prefetch_related(
+            Prefetch(
+                "urls_tienda",
+                queryset=UrlTienda.objects.filter(activo=True).order_by("-es_principal", "-pk"),
+                to_attr="urls_tienda_activas_qs",
+            )
+        ),
+        pk=producto_id,
+    )
+
+    # URL principal de tienda (propiedad del modelo o fallback)
+    url_principal = producto.url_tienda_principal or producto.url or None
+
+    # IDs de productos en wishlist (para el corazón)
+    favoritos_ids = set()
+    if request.user.is_authenticated:
+        try:
+            wl = get_default_wishlist(request.user)
+            favoritos_ids = set(
+                ItemEnWishlist.objects
+                .filter(id_wishlist=wl)
+                .values_list("id_producto", flat=True)
+            )
+        except Exception:
+            favoritos_ids = set()
+
+    # Productos similares (por marca o categoría)
+    similares = list(
+        Producto.objects
+        .filter(activo=True, id_marca=producto.id_marca)
+        .exclude(pk=producto.pk)
+        .select_related("id_marca", "id_categoria")
+        .prefetch_related("urls_tienda")[:6]
+    )
+
+    if not similares:
+        similares = list(
+            Producto.objects
+            .filter(activo=True, id_categoria=producto.id_categoria)
+            .exclude(pk=producto.pk)
+            .select_related("id_marca", "id_categoria")
+            .prefetch_related("urls_tienda")[:6]
+        )
+
+    context = {
+        "producto": producto,
+        "url_principal": url_principal,
+        "favoritos_ids": favoritos_ids,
+        "similares": similares,
+    }
+    return render(request, "producto_detalle.html", context)

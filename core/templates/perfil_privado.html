@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% load static i18n %}
+
+{% block title %}Perfil Privado - Gifter’s{% endblock %}
+{% block body_class %}index-page{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/perfil.css' %}">
+{% endblock %}
+
+{% block content %}
+{# --- ENCABEZADO DEL PERFIL (SE MANTIENE IGUAL) --- #}
+<div class="profile-header">
+  <div class="profile-info">
+    <div class="g-avatar g-avatar--banner"
+      style="background-image:url('{% if perfil_publico and perfil_publico.profile_picture %}{{ perfil_publico.profile_picture.url }}{% else %}{% static 'img/avatar-placeholder.png' %}{% endif %}');">
+    </div>
+
+    <div class="user-details">
+      <h2>{{ usuario_publico.nombre }} {{ usuario_publico.apellido }}</h2>
+      <p class="text-muted">@{{ usuario_publico.nombre_usuario }}</p>
+      <p class="description">{{ perfil_publico.bio|default:"Sin biografía aún." }}</p>
+    </div>
+
+    <div class="edit-profile">
+      {# Se mantienen las acciones para poder enviar solicitud de amistad #}
+      {% if request.user.is_authenticated %}
+        {% if es_amigo %}
+          {# Este caso no debería ocurrir en esta página, pero lo dejamos por si acaso #}
+          <a href="#" id="btnChatPerfilPublico" class="btn-edit" data-username="{{ usuario_publico.nombre_usuario }}">
+            <i class="bi bi-chat-dots"></i> Chatear
+          </a>
+        {% elif pendiente_enviada %}
+          <form method="post" action="{% url 'amistad_cancelar' usuario_publico.nombre_usuario %}">
+            {% csrf_token %}
+            <button class="btn-edit" style="background:#f44336;">Cancelar solicitud</button>
+          </form>
+        {% elif pendiente_recibida %}
+          <div class="d-flex gap-2">
+            <form method="post" action="{% url 'amistad_aceptar' usuario_publico.nombre_usuario %}">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm btn-success">Aceptar</button>
+            </form>
+            <form method="post" action="{% url 'amistad_rechazar' usuario_publico.nombre_usuario %}">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm btn-danger">Rechazar</button>
+            </form>
+          </div>
+        {% else %}
+          <form method="post" action="{% url 'amistad_enviar' usuario_publico.nombre_usuario %}">
+            {% csrf_token %}
+            <button class="btn-edit">➕ Agregar amigo</button>
+          </form>
+        {% endif %}
+      {% else %}
+        <a href="{% url 'login' %}?next={{ request.path }}" class="btn-edit">Inicia sesión</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <nav class="profile-nav">
+    <ul>
+      <li><a href="#" data-tab="wishlist" class="active">Wishlist</a></li>
+      <li><a href="#" data-tab="recibidos">Regalos recibidos</a></li>
+      <li><a href="#" data-tab="actividad">Actividad pública</a></li>
+      <li><a href="#" data-tab="eventos">Eventos importantes</a></li>
+    </ul>
+  </nav>
+</div>
+
+{# --- CONTENIDO DEL PERFIL (AQUÍ ESTÁ EL CAMBIO) --- #}
+<div class="profile-content">
+    <div class="container text-center" data-aos="fade-up">
+        <div class="container section-title mt-4">
+            <h2>🔒 Perfil Privado</h2>
+        </div>
+        <p class="lead">
+            El perfil de <strong>{{ usuario_publico.nombre_usuario }}</strong> es privado.
+        </p>
+        <p>
+            Debes ser su amigo para poder ver sus listas de regalos, eventos y actividad.
+        </p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{# No necesitamos el JavaScript de las pestañas ni de las acciones, ya que no se muestra contenido dinámico #}
+{% endblock %}

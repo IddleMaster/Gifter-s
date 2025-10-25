@@ -110,6 +110,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(default=False)
     is_verified = models.BooleanField(default=False)  # <-- NUEVO
 
+    is_private = models.BooleanField(default=False, verbose_name="Perfil Privado")
+
     verification_token = models.UUIDField(default=uuid.uuid4, editable=False, null=True, blank=True)
     token_created_at = models.DateTimeField(default=timezone.now)
 
@@ -972,6 +974,7 @@ class Marca(models.Model):
 
     def __str__(self):
         return self.nombre_marca
+    
 class Producto(models.Model):
     id_producto = models.AutoField(primary_key=True)
     nombre_producto = models.CharField(max_length=255)
@@ -980,6 +983,11 @@ class Producto(models.Model):
     id_categoria = models.ForeignKey(Categoria, on_delete=models.CASCADE)
     id_marca = models.ForeignKey(Marca, on_delete=models.CASCADE)
     precio = models.IntegerField(null=True, blank=True)
+    
+    # Nuevo campo URL
+    url = models.URLField(max_length=1000, verbose_name='URL del producto', default='mystore.com')
+    
+    embedding = models.JSONField(null=True, blank=True)
     
     # Campos de control
     activo = models.BooleanField(default=True, verbose_name='¿Activo?')

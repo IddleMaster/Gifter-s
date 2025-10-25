@@ -27,83 +27,9 @@
   <link href="{% static 'css/main.css' %}" rel="stylesheet" />
   <link href="{% static 'css/gifters.css' %}" rel="stylesheet" />
   <link rel="stylesheet" href="{% static 'css/chat-floating.css' %}" />
-  <!-- Firebase SDK (compat) -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging-compat.js"></script>
 
-  <!-- (opcional) Config desde Django: si no tienes FIREBASE_CFG, igual queda '{}' y NO rompe -->
-  <script id="fb-config" type="application/json">
-  {{ FIREBASE_CFG|default:'{}'|safe }}
-</script>
 
-  <script>
-    // VAPID desde Django si existe (si no, queda cadena vacía y tampoco rompe)
-    window.FB_VAPID = "{{ FIREBASE_VAPID_KEY|default:''|escapejs }}";
 
-    // Singleton seguro de messaging()
-    window.getFirebaseMessaging = (function () {
-      let messaging = null;
-
-      function readCfg() {
-        // 1) <script id="fb-config"> in base.html
-        try {
-          const el = document.getElementById('fb-config');
-          if (el && el.textContent.trim()) {
-            const cfg = JSON.parse(el.textContent);
-            if (cfg && Object.keys(cfg).length) return cfg;
-          }
-        } catch (e) { console.warn('[push] fb-config inválido:', e); }
-
-        // 2) <script id="fb-web-config"> (json_script en perfil_editar.html)
-        try {
-          const el2 = document.getElementById('fb-web-config');
-          if (el2 && el2.textContent.trim()) {
-            const cfg = JSON.parse(el2.textContent);
-            if (cfg && Object.keys(cfg).length) return cfg;
-          }
-        } catch (e) { console.warn('[push] fb-web-config inválido:', e); }
-
-        // 3) window.FB.WEB_CONFIG (si la vista lo expone)
-        if (window.FB && window.FB.WEB_CONFIG) return window.FB.WEB_CONFIG;
-
-        return {};
-      }
-
-      function valid(cfg) {
-        return !!(cfg.apiKey && cfg.projectId && cfg.messagingSenderId && cfg.appId);
-      }
-
-      return function () {
-        if (messaging) return messaging;
-
-        const cfg = readCfg();
-        if (!valid(cfg)) {
-          console.error('[push] Config Firebase ausente o incompleta:', cfg);
-          return null; // ← tu JS de perfil ya maneja este caso mostrando el alert
-        }
-
-        try {
-          if (!firebase.apps || !firebase.apps.length) firebase.initializeApp(cfg);
-          messaging = firebase.messaging();
-          return messaging;
-        } catch (err) {
-          console.error('[push] No se pudo inicializar Firebase:', err);
-          return null;
-        }
-      };
-    })();
-
-    // (opcional) helper para registrar el SW
-    window.registerFirebaseSW = async function () {
-      try {
-        if (!('serviceWorker' in navigator)) return null;
-        return await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-      } catch (e) {
-        console.error('[push] Error registrando SW:', e);
-        return null;
-      }
-    };
-  </script>
 
 
 
@@ -708,6 +634,20 @@
       border-bottom-left-radius: 0;
       border-bottom-right-radius: 0;
     }
+
+    .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ff3b30;
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+
+    .dot.hidden {
+      display: none;
+    }
   </style>
 
 
@@ -777,6 +717,60 @@
 
 
         {% if user.is_authenticated %}
+
+        <!-- 🔔 Campanita de notificaciones (hermana del menú de usuario) -->
+        <div class="nav-item dropdown me-2">
+          <a class="nav-link position-relative" href="#" id="notifDropdown" role="button" data-bs-toggle="dropdown"
+            aria-expanded="false" aria-label="Notificaciones">
+            <i class="bi bi-bell" style="font-size:1.3rem;"></i>
+            {% if notif_unread_count and notif_unread_count > 0 %}
+            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+              id="notifBadge" style="font-size:.7rem;">
+              {{ notif_unread_count }}
+              <span class="visually-hidden">unread</span>
+            </span>
+            {% endif %}
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="notifDropdown"
+            style="min-width:320px;max-height:70vh;overflow:auto;">
+            <li class="px-3 py-2 d-flex justify-content-between align-items-center">
+              <span class="fw-semibold">Notificaciones</span>
+              {% if notif_unread_count and notif_unread_count > 0 %}
+              <button class="btn btn-sm btn-outline-secondary" id="markAllBtn">Marcar todo leído</button>
+              {% endif %}
+            </li>
+            <li>
+              <hr class="dropdown-divider">
+            </li>
+
+            {% if notif_latest %}
+            {% for n in notif_latest %}
+            <li>
+              <a class="dropdown-item d-flex gap-2 align-items-start notif-item {% if not n.leida %}fw-semibold{% endif %}"
+                href="{{ n.url|default:'#' }}" data-id="{{ n.id }}">
+                <span class="mt-1">
+                  {% if n.tipo == 'alerta' %}<i class="bi bi-exclamation-triangle"></i>
+                  {% elif n.tipo == 'evento' %}<i class="bi bi-calendar-event"></i>
+                  {% else %}<i class="bi bi-info-circle"></i>{% endif %}
+                </span>
+                <span class="flex-grow-1">
+                  <span class="d-block">{{ n.titulo }}</span>
+                  {% if n.mensaje %}<small class="text-muted">{{ n.mensaje|truncatechars:90 }}</small>{% endif %}
+                  <small class="d-block text-muted">{{ n.creada_en|timesince }} atrás</small>
+                </span>
+                {% if not n.leida %}
+                <span class="badge bg-primary rounded-pill">nuevo</span>
+                {% endif %}
+              </a>
+            </li>
+            {% endfor %}
+            {% else %}
+            <li><span class="dropdown-item text-muted">Sin notificaciones</span></li>
+            {% endif %}
+          </ul>
+        </div>
+
+
         <div class="nav-item dropdown">
           <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" role="button"
             data-bs-toggle="dropdown" aria-expanded="false">
@@ -955,7 +949,14 @@
 
   {% if user.is_authenticated %}
   <!-- Floating launcher -->
-  <button id="chatFab" class="chat-fab" title="Mensajes">💬</button>
+  <!-- <style>
+
+  </style>-->
+  <button id="chatFab" class="chat-fab">
+    <span class="chat-emoji">💬
+      <span id="chatGlobalDot" class="chat-global-dot hidden"></span>
+    </span>
+  </button>
 
   <!-- Drawer (interfaz clásica simple) -->
   <div id="chatDrawer" class="chat-drawer phone-ui" aria-hidden="true">
@@ -1001,8 +1002,14 @@
 
     <div class="phone-tabs" role="tablist">
       <button class="tab-btn" data-tab="amigos"><i class="bi bi-people"></i> Amigos</button>
-      <button class="tab-btn active" data-tab="chats"><i class="bi bi-chat-left-dots"></i> Chats</button>
-      <button class="tab-btn" data-tab="grupos"><i class="bi bi-collection"></i> Grupos</button>
+      <button class="tab-btn active" data-tab="chats">
+        <i class="bi bi-chat-left-dots"></i> Chats
+        <span class="dot hidden" id="tabDotChats"></span>
+      </button>
+      <button class="tab-btn" data-tab="grupos">
+        <i class="bi bi-collection"></i> Grupos
+        <span class="dot hidden" id="tabDotGrupos"></span>
+      </button>
     </div>
 
     <div class="chat-head" hidden></div>
@@ -1067,6 +1074,8 @@
   {% if user.is_authenticated %}
   <script>
     (function () {
+
+      window.unreadLightPoll ??= null;
       const MEDIA_PREFIX = ("{% get_media_prefix %}" || "/media/");
       const fab = document.getElementById('chatFab');
       const drawer = document.getElementById('chatDrawer');
@@ -1099,6 +1108,7 @@
       // === Typing: estado previo por conversación (para detectar flanco "dejó de escribir")
       const wasTypingMap = new Map(); // convId -> boolean
 
+      window.CHAT_INDEX = window.CHAT_INDEX || { direct: new Set(), groups: new Set() };
 
       function patchAnyRow(convId) {
         const prev = getPreview(convId);
@@ -1155,18 +1165,28 @@
         if (parts.length === 2) return decodeURIComponent(parts.pop().split(';').shift());
       }
       const CSRFTOKEN = getCookie('csrftoken');
+      window.CSRF_TOKEN = CSRFTOKEN;
 
       function openDrawer() {
         drawer.classList.add('open');
         drawer.setAttribute('aria-hidden', 'false');
         fab.style.display = 'none';
-        loadConversations();
+        Promise.resolve(loadConversations()).finally(() => {
+          try { refreshGlobalUnreadDot(); } catch { }
+        });
+        if (window.unreadLightPoll) { clearInterval(window.unreadLightPoll); window.unreadLightPoll = null; }
       }
       function closeDrawer() {
         drawer.classList.remove('open');
         drawer.setAttribute('aria-hidden', 'true');
         fab.style.display = '';
         stopPolling();
+        if (!unreadLightPoll) {
+          unreadLightPoll = setInterval(() => {
+            try { refreshGlobalUnreadDot(); } catch { }
+          }, 30000); // 30s
+        }
+
       }
       const __openDrawer = openDrawer;
       openDrawer = function () {
@@ -1215,6 +1235,13 @@
 
           if (!res.ok) throw new Error('HTTP ' + res.status);
           const data = await res.json();
+          // refresca índice de directos con data real
+          (function updateDirectIndex(list) {
+            try {
+              const direct = (list || []).filter(c => !(c.is_group || String(c.tipo || '').toLowerCase() === 'grupo'));
+              window.CHAT_INDEX.direct = new Set(direct.map(c => String(c.conversacion_id)));
+            } catch { }
+          })(data);
 
           // NEW: llenar/actualizar cache con el último mensaje de cada conversación
           (data || []).forEach(c => {
@@ -1224,9 +1251,11 @@
           });
 
           renderConversationList(data, typingMap);  // ← pasamos typingMap al renderer
+          try { refreshGlobalUnreadDot(); } catch { }
         } catch (e) {
           listEl.innerHTML = '<div class="p-3 text-danger">No se pudieron cargar tus chats.</div>';
           console.error('[chats] Error cargando conversaciones:', e);
+          try { refreshGlobalUnreadDot(); } catch { }
         }
       }
       // Rellena/actualiza cache con el último mensaje de cada conversación
@@ -1311,22 +1340,26 @@
 
           const row = document.createElement('div');
           row.className = 'chat-list-item' + (conv.conversacion_id === window.currentConvId ? ' active' : '');
-          row.dataset.convId = conv.conversacion_id;
+          row.dataset.convId = conv.conversacion_id;      // data-conv-id
+          row.setAttribute('data-conv', conv.conversacion_id); // data-conv 
 
           // ✅ Si hay typing muéstralo; si no, usa SIEMPRE el cache (no last.contenido)
           const tUsers = typingMap[String(conv.conversacion_id)] || [];
           const line2 = tUsers.length ? prettyTyping(tUsers) : getPreview(conv.conversacion_id).text;
 
           row.innerHTML = `
-      <img class="chat-avatar" src="${p.avatar}" alt=""
-           onerror="this.onerror=null;this.src='{{ STATIC_URL }}img/Gifters/favicongift.png'">
-      <div class="chat-names">
-        <div class="line1">${p.name}</div>
-        <div class="line2">${line2}</div>
-      </div>
-      <div class="chat-time">${last.creado_en ? formatTime(last.creado_en) : ''}</div>
-    `;
-          row.addEventListener('click', () => openConversation(conv.conversacion_id));
+              <img class="chat-avatar" src="${p.avatar}" alt=""
+                  onerror="this.onerror=null;this.src='{{ STATIC_URL }}img/Gifters/favicongift.png'">
+              <div class="chat-names">
+                <div class="line1">
+                  ${p.name}
+                  <span class="dot hidden" data-dot></span>
+                </div>
+                <div class="line2">${line2}</div>
+              </div>
+              <div class="chat-time">${last.creado_en ? formatTime(last.creado_en) : ''}</div>
+            `;
+          row.addEventListener('click', () => window.openConversation && window.openConversation(conv.conversacion_id));
           listEl.appendChild(row);
         });
       }
@@ -1359,7 +1392,9 @@
               } else {
                 if (wasTyping) {
                   // ⚡ Flanco: antes estaba escribiendo y ahora no → probablemente envió mensaje
-                  hydratePreview(convId).catch(() => { });
+                  hydratePreview(convId)
+                    .then(() => { try { refreshGlobalUnreadDot(); } catch { } })
+                    .catch(() => { });
                 } else {
                   // Restaurar desde cache sin pegar a red
                   const prev = getPreview(convId);
@@ -1387,21 +1422,25 @@
           if (!res.ok) return;
 
           const data = await res.json();
-          (data || [])
+          const onlyGroups = (data || [])
             .filter(c => c.is_group || String(c.tipo || '').toLowerCase() === 'grupo')
-            .forEach(c => {
-              const last = c.ultimo_mensaje || {};
-              const isImg = (last.tipo === 'imagen') || !!last.archivo_url || !!(last.metadatos && last.metadatos.archivo_url);
-              const prevText = isImg ? '📷 Imagen' : slicePreview(last.contenido);
-              // 👉 esto actualiza cache + texto/tiempo y mueve la fila al tope en #groupsList si ya existe
-              setPreview(c.conversacion_id, prevText, last.creado_en);
-            });
+          window.CHAT_INDEX.groups = new Set(onlyGroups.map(c => String(c.conversacion_id)));
+          onlyGroups.forEach(c => {
+            const last = c.ultimo_mensaje || {};
+            const isImg = (last.tipo === 'imagen') || !!last.archivo_url || !!(last.metadatos && last.metadatos.archivo_url);
+            const prevText = isImg ? '📷 Imagen' : slicePreview(last.contenido);
+            // 👉 esto actualiza cache + texto/tiempo y mueve la fila al tope en #groupsList si ya existe
+            setPreview(c.conversacion_id, prevText, last.creado_en);
+          });
         } catch { /* noop */ }
       }
 
       function startGroupPreviewPoll() {
         stopGroupPreviewPoll();
-        groupsPreviewTimer = setInterval(pollGroupPreviews, 2500);
+        groupsPreviewTimer = setInterval(async () => {
+          await pollGroupPreviews();
+          try { refreshGlobalUnreadDot(); } catch { }
+        }, 2500);
       }
       function stopGroupPreviewPoll() {
         if (groupsPreviewTimer) { clearInterval(groupsPreviewTimer); groupsPreviewTimer = null; }
@@ -1601,47 +1640,29 @@
       fileEl?.addEventListener('change', async () => {
         if (!fileEl.files || !fileEl.files.length || !window.currentConvId) return;
         const file = fileEl.files[0];
-
-        // Validaciones rápidas
-        if (!/^image\//i.test(file.type)) {
-          alert('Solo imágenes, por favor.');
-          fileEl.value = '';
-          return;
-        }
-        if (file.size > 8 * 1024 * 1024) { // 8 MB
-          alert('Imagen demasiado grande (máx 8MB).');
-          fileEl.value = '';
-          return;
-        }
+        if (!/^image\//i.test(file.type)) { alert('Solo imágenes'); fileEl.value = ''; return; }
+        if (file.size > 8 * 1024 * 1024) { alert('Imagen demasiado grande (máx 8MB)'); fileEl.value = ''; return; }
 
         try {
           const url = "{% url 'mensajes_list_create' 0 %}".replace('/0/', `/${window.currentConvId}/`);
           const fd = new FormData();
           fd.append('tipo', 'imagen');
           fd.append('archivo', file);
-          // opcional: un pie de foto
-          // fd.append('contenido', '');
 
           const res = await fetch(url, {
             method: 'POST',
             credentials: 'same-origin',
-            headers: { 'X-CSRFToken': CSRFTOKEN }, // ¡no pongas Content-Type aquí!
+            headers: { 'X-CSRFToken': CSRFTOKEN },
             body: fd
           });
           if (!res.ok) throw new Error('Upload failed');
 
-          // refresca mensajes y preview
           await loadMessagesOnce();
           scrollToBottom();
+
+          // 👉 Esto actualiza texto/tiempo y además mueve la fila al tope en ambas listas
           setPreview(window.currentConvId, '📷 Imagen', new Date().toISOString());
           patchAnyRow(window.currentConvId);
-          loadConversations();
-          const row = Array.from(listEl.children).find(x => String(x.dataset.convId) === String(window.currentConvId));
-          if (row) {
-            const l2 = row.querySelector('.line2'); if (l2) l2.textContent = getPreview(window.currentConvId).text;
-            const t = row.querySelector('.chat-time'); if (t) t.textContent = formatTime(getPreview(window.currentConvId).time);
-          }
-          loadConversations();
         } catch (e) {
           console.error(e);
           alert('No se pudo enviar la imagen.');
@@ -1791,7 +1812,8 @@
         startPolling,
         stopPolling,
         loadConversations,
-        pollTyping
+        pollTyping,
+        hydratePreview,
       });
     })();
   </script>
@@ -1857,13 +1879,17 @@
           console.error('[openConversation] No están los contenedores necesarios (msgsEl/emptyEl/formEl). Revisa los IDs/clases del drawer.');
           return;
         }
-        window.openConversation = openConversation;
+
         try {
           if (!convId) return;
           if (window.currentConvId === convId) { inputMsgEl?.focus(); return; }
 
           window.currentConvId = convId;
 
+          // === NUEVO: marcar como leído de inmediato al entrar ===
+          if (window.Chat?.markConversationAsRead) {
+            window.Chat.markConversationAsRead(convId);
+          }
           markActive(convId);
 
           // Estado UI inmediato (asegura que existen antes de setear)
@@ -2049,7 +2075,7 @@
       }
 
 
-
+      window.openConversation = openConversation;
       if (!drawer) return;
 
       // Columna izquierda
@@ -2357,11 +2383,14 @@
                 : '';
               const when = g.ultimo_mensaje?.creado_en ? new Date(g.ultimo_mensaje.creado_en).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
               return `
-            <div class="chat-list-item" data-conv-id="${g.conversacion_id}">
+            <div class="chat-list-item" data-conv-id="${g.conversacion_id}" data-conv="${g.conversacion_id}">
               <div class="d-flex align-items-center">
                 <div class="d-flex align-items-center" style="width:50px">${imgs}</div>
                 <div class="chat-names">
-                  <div class="line1">${g.titulo || 'Grupo'}</div>
+                  <div class="line1">
+                    ${g.titulo || 'Grupo'}
+                    <span class="dot hidden" data-dot></span>
+                    </div>
                   <div class="line2">${prev}</div>
                 </div>
                 <div class="chat-time">${when}</div>
@@ -2382,10 +2411,14 @@
               if (window.openConversation) window.openConversation(cid);
             });
           });
+
+          window.CHAT_INDEX.groups = new Set(grupos.map(g => String(g.conversacion_id)));
           groupsLoaded = true;
+          try { refreshGlobalUnreadDot(); } catch { }
         } catch (e) {
           console.error(e);
           groupsEl.innerHTML = '<div class="p-3 text-danger">No se pudieron cargar tus grupos.</div>';
+          try { refreshGlobalUnreadDot(); } catch { }
         }
         // Forzar refresco externo (lo usa el modal al crear un grupo)
         window.refreshGroups = async function () {
@@ -2424,14 +2457,16 @@
           chatsEl.style.visibility = 'visible';
           if (headerTitleEl) headerTitleEl.textContent = "Gifter’s";
           if (topKebab) topKebab.style.display = 'none';
-          if (typeof loadConversations === 'function') loadConversations();
+          if (typeof loadConversations === 'function') {
+            loadConversations().finally(() => { try { refreshGlobalUnreadDot(); } catch { } });
+          }
         } else { // grupos
           friendsEl.style.display = 'none';
           chatsEl.style.visibility = 'hidden';
           groupsEl.style.display = 'block';
           if (headerTitleEl) headerTitleEl.textContent = "Grupos"; // 👈 título fijo
           if (topKebab) topKebab.style.display = 'none';           // en la barra azul nunca
-          loadGroups();
+          loadGroups().finally(() => { try { refreshGlobalUnreadDot(); } catch { } });
         }
       }
 
@@ -2614,7 +2649,16 @@
     }
   </script>
 
-
+  <script>
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        try { refreshGlobalUnreadDot(); } catch { }
+      }
+    });
+    window.addEventListener("focus", () => {
+      try { refreshGlobalUnreadDot(); } catch { }
+    });
+  </script>
 
 
 
@@ -3102,8 +3146,155 @@
       };
       openBasicModal('modalLeaveGroup');
     }
-    
+
+    async function refreshInboxList(reason) {
+      try {
+        // TODO: reemplaza por tu fetch real de conversaciones y re-render
+        if (window.Chat && typeof window.Chat.reloadInbox === "function") {
+          window.Chat.reloadInbox({ reason });
+        } else if (typeof window.reloadInbox === "function") {
+          window.reloadInbox({ reason });
+        }
+        // como fallback, podrías disparar un CustomEvent que tu widget ya escuche
+        window.dispatchEvent(new CustomEvent("gifters:inbox:refresh", { detail: { reason } }));
+      } catch (e) { console.error("refreshInboxList failed", e); }
+    }
+
+    // Mensajes desde el Service Worker
+    navigator.serviceWorker && navigator.serviceWorker.addEventListener("message", (event) => {
+      const msg = event.data || {};
+      if (msg.__kind !== "inbox_push") return;
+      const payload = msg.payload || {};
+
+      switch (payload.kind) {
+        case "new_message": {
+          if (Number(payload.conversacion_id) === Number(window.currentConvId)) {
+            if (typeof window.loadMessagesOnce === "function") {
+              window.loadMessagesOnce().then(() => {
+                const el = document.getElementById("chatMessages");
+                if (el) el.scrollTop = el.scrollHeight;
+              });
+            }
+          } else {
+            if (typeof window.hydratePreview === "function") {
+              window.hydratePreview(payload.conversacion_id);
+            }
+          }
+          refreshGlobalUnreadDot();
+          break;
+        }
+        case "inbox_refresh":
+        case "group_member_added":
+        case "group_member_removed":
+        case "group_left":
+        case "group_removed":
+        case "group_deleted":
+          // Refresca la bandeja y/o la lista de miembros si la vista del grupo está abierta
+          refreshInboxList(payload.kind);
+          // Si estás parado en la sala de ese grupo, avisa para refrescar miembros:
+          if (payload.conversacion_id && window.location.href.includes(`/chat/${payload.conversacion_id}`)) {
+            window.dispatchEvent(new CustomEvent("gifters:group:members:refresh", {
+              detail: { conversacion_id: payload.conversacion_id, reason: payload.kind }
+            }));
+          }
+          break;
+        // otros tipos: new_dm, new_group_msg, typing, etc.
+        default:
+          // noop
+          break;
+      }
+    });
+
+
+
+    // === Puntitos ===
+    async function refreshGlobalUnreadDot() {
+      try {
+        const r = await fetch("/chat/unread-summary/", { credentials: "same-origin" });
+        if (!r.ok) return;
+        const { total, per_conversation } = await r.json();
+
+        // Puntito del botón
+        const dot = document.getElementById("chatGlobalDot");
+        if (dot) dot.classList.toggle("hidden", !(total > 0));
+
+        // Puntitos por conversación
+        if (window.Chat?.applyUnreadToInbox) {
+          window.Chat.applyUnreadToInbox(per_conversation || {});
+        }
+        // 👉 NUEVO: puntitos por pestaña (Chats vs Grupos)
+        const map = per_conversation || {};
+        let unreadChats = 0, unreadGroups = 0;
+        for (const [id, cnt] of Object.entries(map)) {
+          if (!(cnt > 0)) continue;
+          const sid = String(id);
+          // si está en el índice de grupos => cuenta para grupos; si no, va a chats
+          if (window.CHAT_INDEX?.groups?.has(sid)) unreadGroups += cnt;
+          else unreadChats += cnt;
+        }
+        // Apagar/encender dots de tabs
+        const tabChatsDot = document.getElementById("tabDotChats");
+        const tabGroupsDot = document.getElementById("tabDotGrupos");
+        if (tabChatsDot) tabChatsDot.classList.toggle("hidden", unreadChats === 0);
+        if (tabGroupsDot) tabGroupsDot.classList.toggle("hidden", unreadGroups === 0);
+      } catch (e) { console.error("unread-summary failed", e); }
+    }
+    // 🔔 Poll ligero global para el FAB (corre aunque nunca abras el cajón)
+    window.unreadLightPoll ??= null;
+    document.addEventListener("DOMContentLoaded", () => {
+      try { refreshGlobalUnreadDot(); } catch { }
+      if (!window.unreadLightPoll) {
+        window.unreadLightPoll = setInterval(() => {
+          try { refreshGlobalUnreadDot(); } catch { }
+        }, 3000); // 8s: rápido pero liviano
+      }
+    });
+
+    window.Chat = window.Chat || {};
+
+    // Aplica { conv_id: count } a cada ítem
+    window.Chat.applyUnreadToInbox = function (perMap) {
+      document.querySelectorAll(".chat-list-item").forEach(li => {
+        const id =
+          li.getAttribute("data-conv") ||
+          li.getAttribute("data-conv-id") ||
+          li.dataset.convId ||
+          li.dataset.cid ||
+          null;
+
+        const dot = li.querySelector("[data-dot]");
+        const cnt = id ? (perMap?.[String(id)] || 0) : 0;
+        if (dot) dot.classList.toggle("hidden", !(cnt > 0));
+      });
+    };
+
+    // Y actualiza clearUnreadDot para que funcione con ambos atributos
+    window.Chat.clearUnreadDot = function (convId) {
+      document
+        .querySelectorAll(
+          `.chat-list-item[data-conv="${convId}"], .chat-list-item[data-conv-id="${convId}"]`
+        )
+        .forEach(li => li.querySelector("[data-dot]")?.classList.add("hidden"));
+    };
+    // Marca como leído al ENTRAR a la sala
+    window.Chat.markConversationAsRead = async function (convId) {
+      try {
+        const r = await fetch(`/chat/${convId}/mark-read/`, {
+          method: "POST",
+          headers: { "X-CSRFToken": (window.CSRF_TOKEN || "") },
+          credentials: "same-origin"
+        });
+        if (!r.ok) { console.warn("mark-read failed", r.status); return; } // ⬅️ importante
+        window.Chat.clearUnreadDot(convId);
+        refreshGlobalUnreadDot();
+      } catch (e) { console.error("mark-read failed", e); }
+    };
+
+
+    // Estado inicial
+    document.addEventListener("DOMContentLoaded", refreshGlobalUnreadDot);
   </script>
+
 </body>
 
 </html>

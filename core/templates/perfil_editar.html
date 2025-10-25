@@ -69,18 +69,26 @@
     <div class="col-12 col-lg-6">
       <div class="card p-3 h-100">
         <h4 class="mb-3">Preferencias de Notificación (Email)</h4>
-        {# Aquí puedes añadir los campos de tu pref_form si los tenías #}
-        {# Ejemplo:
-        <div class="form-check form-switch mb-3">
-          {{ pref_form.email_on_new_follower }}
-          <label class="form-check-label" for="{{ pref_form.email_on_new_follower.id_for_label }}">
-            {{ pref_form.email_on_new_follower.label }}
-          </label>
-          <small class="form-text text-muted d-block">{{ pref_form.email_on_new_follower.help_text }}</small>
-        </div>
-        #}
         <p class="text-muted">Configura aquí cómo prefieres recibir notificaciones por correo.</p>
-      </div>
+        
+        <hr class="my-3">
+        <h4 class="mb-3">Configuración de Privacidad</h4>
+        <div class="form-check form-switch mb-3">
+          <input 
+            class="form-check-input" 
+            type="checkbox" 
+            role="switch" 
+            id="isPrivateSwitch" 
+            name="is_private" 
+            {% if user.is_private %}checked{% endif %}>
+          <label class="form-check-label" for="isPrivateSwitch">
+            <strong>Hacer mi perfil privado</strong>
+          </label>
+          <div class="form-text mt-1">
+            Si activas esta opción, solo tus amigos podrán ver los detalles de tu perfil, tus eventos y tus listas de regalos.
+          </div>
+        </div>
+        </div>
     </div>
 
 

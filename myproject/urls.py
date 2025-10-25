@@ -20,7 +20,6 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 
-# para las fakin reseñaaaaas
 
 
 
@@ -41,6 +40,9 @@ urlpatterns = [
     path('ayuda/', views.ayuda_view, name='ayuda'),
     path("usuarios/", views.usuarios_list, name="usuarios_list"),
     path("buscar/", views.buscar_router, name="buscar_router"),
+    path("producto/<int:id_producto>/", views.producto_detalle, name="producto_detalle"),
+
+    
     # Perfil
     path('perfil/', views.profile_view, name='perfil'),
     path('perfil/editar/', views.profile_edit, name='perfil_editar'),
@@ -93,6 +95,9 @@ urlpatterns = [
     path('api/admin/upload-csv/', views.upload_csv_view, name='api_upload_csv'),
     path('api/productos/', views.ProductoListAPIView.as_view(), name='api_producto_list'), 
     path('api/productos/<int:pk>/', views.ProductoDetailAPIView.as_view(), name='api_producto_detail'),
+    # --- Rutas API para Reportes ---
+    path('api/reports/products/download/', views.download_active_products_csv, name='api_report_products_download'), 
+    
     # --- Rutas API para Usuarios (Admin) --- # <-- NUEVA SECCIÓN
     path('api/users/', views.UserListAPIView.as_view(), name='api_user_list'),
     path('api/users/<int:pk>/', views.UserDetailAPIView.as_view(), name='api_user_detail'),
@@ -146,11 +151,20 @@ urlpatterns = [
     path('grupos/<int:pk>/quitar/', views.grupos_remove_member, name='grupos_remove_member'),
     path('grupos/<int:pk>/eliminar/', views.grupos_delete, name='grupos_delete'),
     path('grupos/<int:pk>/leave/', views.grupos_leave, name='grupos_leave'),
+    path('chat/<int:conv_id>/mark-read/', views.conversacion_mark_read, name='conversacion_mark_read'),
+    path('chat/unread-summary/', views.chat_unread_summary, name='chat_unread_summary'),
+    path("chat/unread-summary/", views.chat_unread_summary, name="chat_unread_summary"),
+    path("chat/<int:conv_id>/mark-read/", views.conversacion_mark_read, name="conversacion_mark_read"),
+ 
+   
     
     ##para resena jiji
     path("resena/", views.resena_sitio_crear, name="resena_sitio_crear"),
     path("resena/editar/", views.resena_sitio_editar, name="resena_sitio_editar"),
     path("resena/eliminar/", views.resena_sitio_eliminar, name="resena_sitio_eliminar"),
+
+
+
 
     # --- URLs PARA RESTABLECIMIENTO DE CONTRASEÑA (Flujo de Django) ---
     path('password_reset/',

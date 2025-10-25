@@ -705,14 +705,78 @@
 }
 
 /* Avatar siempre arriba */
-.msg{ align-items:flex-start; }
-.msg.me{ flex-direction:row-reverse; align-items:flex-start; }
-.msg .msg-avatar{ align-self:flex-start; margin-top:0; }
+.msg {
+  align-items: flex-start;
+}
+
+.msg.me {
+  flex-direction: row-reverse;
+  align-items: flex-start;
+}
+
+.msg .msg-avatar {
+  align-self: flex-start;
+  margin-top: 0;
+}
 
 /* Cuando NO mostramos avatar, damos espacio para que el bloque no “salte” */
-.msg.other.compact .bubble{ margin-left:36px; }   /* 28px avatar + 8px gap */
-.msg.me.compact    .bubble{ margin-right:36px; }  /* lado derecho */
+.msg.other.compact .bubble {
+  margin-left: 36px;
+}
 
-.phone-header { position: relative; z-index: 30; }
-.phone-header .dropdown-menu { z-index: 4000; }
+/* 28px avatar + 8px gap */
+.msg.me.compact .bubble {
+  margin-right: 36px;
+}
 
+/* lado derecho */
+
+.phone-header {
+  position: relative;
+  z-index: 30;
+}
+
+.phone-header .dropdown-menu {
+  z-index: 4000;
+}
+
+.chat-emoji {
+  position: relative;
+  display: inline-block;
+}
+
+.chat-global-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff3b30;
+  pointer-events: none;
+}
+
+.hidden {
+  display: none;
+}
+
+/* No tocar position del .chat-fab */
+.chat-emoji{ position:relative; display:inline-block; }
+
+.chat-global-dot{
+  position:absolute;
+  top:-2px;
+  right:-2px;
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  background:#ff3b30;
+  pointer-events:none;
+}
+
+/* Ya lo usas globalmente */
+.hidden{ display:none; }
+
+/* Si no tienes aún el puntito por conversación */
+.dot{ display:inline-block; width:8px; height:8px; border-radius:50%; background:#ff3b30; margin-left:6px; }
+.dot.hidden{ display:none; }

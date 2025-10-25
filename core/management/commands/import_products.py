@@ -243,30 +243,45 @@ class Command(BaseCommand):
                                     url=row[mapping['url_tienda']].strip(),
                                     defaults={'nombre_tienda': 'Tienda Principal', 'es_principal': True}
                                 )
-                            url_imagen = row.get(mapping.get('url_imagen')) # Obtener la ruta del CSV
+                            url_imagen = row.get(mapping.get('url_imagen')) # Usamos .get para que no falle si no existe
                             if url_imagen:
-                                # Construir la ruta completa del archivo DENTRO del contenedor
-                                # Asumimos que la ruta en el CSV es relativa a la raíz del proyecto (BASE_DIR)
-                                # Ej: si BASE_DIR es /app y CSV dice 'productos/img.jpg', buscará /app/productos/img.jpg
-                                # AJUSTA 'settings.BASE_DIR' si tus rutas son relativas a otra carpeta (ej: settings.MEDIA_ROOT)
-                                image_path_in_container = os.path.join(settings.BASE_DIR, url_imagen)
-
-                                if os.path.exists(image_path_in_container):
+                                url_imagen = url_imagen.strip() # Limpiar espacios
+                                if url_imagen: # Doble chequeo por si queda vacío después de strip()
                                     try:
-                                        # Abrir el archivo local
-                                        with open(image_path_in_container, 'rb') as img_file:
-                                            # Obtener el nombre del archivo
-                                            file_name = os.path.basename(url_imagen)
-                                            # Guardar el archivo en el campo ImageField del producto
-                                            # Usamos Django File wrapper
-                                            producto.imagen.save(file_name, File(img_file), save=True)
-                                            self.stdout.write(self.style.SUCCESS(f"  ✓ Imagen local asignada para {producto.nombre_producto} desde {url_imagen}"))
+                                        # Intentar descargar la imagen desde la URL
+                                        # Añadimos timeout y verificación de estado
+                                        response = requests.get(url_imagen, stream=True, timeout=15) # Aumentado timeout por si acaso
+                                        response.raise_for_status() # Lanza error para respuestas 4xx/5xx
+
+                                        # raise_for_status() ya verifica esto, pero doble chequeo por si acaso
+                                        #if response.status_code == 200: # Ya no es estrictamente necesario
+                                        # Obtener el nombre del archivo de la URL
+                                        # Limpiamos posibles parámetros como ?s=... o #...
+                                        file_name_from_url = url_imagen.split('/')[-1].split('?')[0].split('#')[0]
+                                        # Usamos os.path.basename para asegurar un nombre válido
+                                        file_name = os.path.basename(file_name_from_url)
+                                        if not file_name: # Si la URL termina en / o algo raro
+                                            file_name = f"image_{producto.id_producto_or_default}.jpg" # Nombre genérico
+
+                                        # Guardar la imagen descargada usando ContentFile
+                                        producto.imagen.save(file_name, ContentFile(response.content), save=True)
+                                        self.stdout.write(self.style.SUCCESS(f"  ✓ Imagen descargada para {producto.nombre_producto}"))
+                                        # else: # Esta parte ya no es necesaria por raise_for_status
+                                            # self.stdout.write(self.style.WARNING(f"  ! Código de estado inesperado..."))
+
+                                    except requests.exceptions.RequestException as req_e:
+                                        # Error de conexión, timeout, URL inválida, 404, etc.
+                                        self.stdout.write(self.style.WARNING(f"  ! No se pudo descargar la imagen para {producto.nombre_producto} desde {url_imagen}: {req_e}"))
+                                        # Opcional: Podrías añadir este error a import_errors.csv si quieres
+                                        # error_writer.writerow(list(row.values()) + [f"Error descarga imagen: {req_e}"])
                                     except Exception as img_e:
-                                        # Error al abrir o guardar el archivo
-                                        self.stdout.write(self.style.WARNING(f"  ! Error al procesar imagen local para {producto.nombre_producto}: {img_e}"))
+                                        # Otros errores (ej: al guardar en Django)
+                                        self.stdout.write(self.style.WARNING(f"  ! Error al procesar imagen descargada para {producto.nombre_producto}: {img_e}"))
+                                        # Opcional: Añadir a import_errors.csv
+                                        # error_writer.writerow(list(row.values()) + [f"Error procesando imagen: {img_e}"])
                                 else:
-                                    # El archivo no existe en la ruta esperada dentro del contenedor
-                                    self.stdout.write(self.style.WARNING(f"  ! Imagen local no encontrada para {producto.nombre_producto} en {image_path_in_container}")) 
+                                     self.stdout.write(self.style.NOTICE(f"  - Campo imagen_url vacío para {producto.nombre_producto}."))
+
                         except Exception as e:
                             error_msg = f'Fila {row_num}: {str(e)}'
                             errores.append(error_msg)

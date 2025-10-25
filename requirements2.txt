@@ -25,4 +25,7 @@ meilisearch==0.31.5
 django-environ
 djangorestframework-simplejwt
 openai>=1.46.0
+pyinstaller
+pandas
+openpyxl
 

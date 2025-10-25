@@ -333,4 +333,48 @@ class ApiClient:
                 return False, f"Error al borrar producto: {response.status_code} - {error_detail}"
         except requests.exceptions.RequestException as e:
             return False, f"Error de conexión al borrar: {e}"    
+    def download_product_report(self): # Quitamos el parámetro report_format
+        """
+        Descarga el reporte CSV de productos activos desde la API.
+        (Versión solo CSV)
+        Devuelve el contenido CSV crudo (bytes) o None si hay error.
+        """
+        if not self.token:
+            return None, "No autenticado."
     
+        # URL SIN el parámetro ?format=
+        report_url = f"{self.base_url}/reports/products/download/"
+    
+        try:
+            temp_headers = self.headers.copy()
+            if 'Content-Type' in temp_headers: del temp_headers['Content-Type']
+            if 'Accept' in temp_headers: del temp_headers['Accept']
+    
+            response = requests.get(report_url, headers=temp_headers, stream=True)
+            response.raise_for_status()
+    
+            # Verificamos que sea CSV
+            content_type = response.headers.get('content-type', '').lower()
+            if 'csv' not in content_type:
+                 try:
+                     error_data = response.json()
+                     error_detail = error_data.get("error", "Respuesta inesperada (no es CSV).")
+                 except json.JSONDecodeError:
+                     error_detail = "Respuesta inesperada (no es CSV)."
+                 return None, error_detail
+    
+            return response.content, None
+    
+        except requests.exceptions.HTTPError as http_err:
+             # ... (manejo de errores igual que antes) ...
+             error_detail = http_err.response.text
+             try:
+                 error_data = http_err.response.json()
+                 error_detail = error_data.get("error", error_data.get("detail", http_err.response.text))
+             except json.JSONDecodeError:
+                 pass
+             return None, f"Error del servidor ({http_err.response.status_code}): {error_detail}"
+        except requests.exceptions.RequestException as e:
+            return None, f"Error de conexión: {e}"
+        except Exception as e:
+             return None, f"Error inesperado: {str(e)}"
