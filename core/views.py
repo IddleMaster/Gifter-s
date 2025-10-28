@@ -26,7 +26,7 @@ from django.urls import reverse
 from django.db import IntegrityError, transaction
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-import uuid
+import uuid, base64
 import requests
 from django.shortcuts import get_object_or_404
 from .models import User, Post, Like 
@@ -3436,122 +3436,84 @@ def _bad(payload: dict):
     return HttpResponseBadRequest(json.dumps(payload), content_type="application/json")
 
 def _pollinations_url(prompt: str, w: int = 1024, h: int = 1024):
-    # Endpoint público, sin API key. No usamos 'seed' para no depender de 'random'.
+    # Endpoint público, sin API key ni seed aleatorio
     q = urllib.parse.quote(prompt)
     return f"https://image.pollinations.ai/prompt/{q}?width={w}&height={h}&nofeed=true"
 
-def _pollinations_bg_url(style_text: str, w: int = 1024, h: int = 1024) -> str:
-    """
-    Fondo desde Pollinations evitando texto/typography y procurando centro limpio.
-    """
-    base_prompt = (
-        "birthday greeting card background, cute, clean, vector, pastel, "
-        "seamless pattern, no text, no words, no typography, "
-        "empty clean center, focus on icons (gifts, balloons, confetti)"
-    )
-    full_prompt = f"{base_prompt}. {style_text or ''}".strip()
-    q = quote(full_prompt)
-    seed = random.randint(1, 10_000_000)
-    return (
-        f"https://image.pollinations.ai/prompt/{q}"
-        f"?width={w}&height={h}&nologo=true&seed={seed}"
-    )
 
-
-def _cloud_name_from_url(cloudinary_url: str) -> str:
+def _cloud_name_from_url(cld_url: str) -> str | None:
     # CLOUDINARY_URL=cloudinary://<key>:<secret>@<cloud_name>
     try:
-        return cloudinary_url.rsplit("@", 1)[-1]
+        return cld_url.rsplit("@", 1)[-1]
     except Exception:
-        return ""
+        return None
     
 def _cld_card_url(cloud_name: str, bg_url: str, title: str,
                   w: int = 1024, h: int = 1024) -> str:
-    """
-    Toma el fondo remoto con fetch, lo suaviza un poco y superpone texto legible.
-    - Suavizado: blur + algo de brillo para despegar el texto
-    - Texto: ancho limitado (auto wrap) + sombra
-    """
-    # No sobre-codificamos la URL remota
-    bg_enc = bg_url
+
+    # No sobre-encodear la URL del fondo; si hiciera falta, el caller reintenta.
     title_enc = quote(title.replace("\n", "%0A"))
 
     transforms = "/".join([
-        # lienzo final + suavizado del fondo
-        f"w_{w},h_{h},c_fill,q_auto,f_png,e_blur:60,e_brightness:15",
-        # texto: ancho máximo y ajuste, color blanco y sombra fuerte
-        f"l_text:Poppins_96_bold:{title_enc},w_900,c_fit,co_rgb:ffffff,e_shadow:90,g_center,y_-40",
+        f"w_{w},h_{h},c_fill,q_auto,f_png,e_blur:40,e_brightness:12",
+        # Texto centrado, ancho máx, con sombra. Ajusta tamaño/pos si quieres.
+        f"l_text:Poppins_96_bold:{title_enc},w_900,c_fit,co_rgb:ffffff,e_shadow:95,g_center,y_-40"
     ])
-
     return (
         f"https://res.cloudinary.com/{cloud_name}/image/fetch/"
-        f"{transforms}/{bg_enc}"
+        f"{transforms}/{bg_url}"
     )
 
 
 @login_required
 @require_POST
 def generar_card_hf(request):
-    HF_TOKEN = os.environ.get("HF_TOKEN")
-    HF_MODEL = os.environ.get("HF_MODEL", "stabilityai/stable-diffusion-xl-base-1.0")
-    if not HF_TOKEN:
-        return _bad({"error": "Falta HF_TOKEN en el entorno"})
-
     prompt = (request.POST.get("prompt") or "").strip()
-    style  = (request.POST.get("style") or "postal colorida con tipografía grande, fondo limpio y decoraciones de cumpleaños").strip()
+    style  = (request.POST.get("style")  or "postal minimalista con borde sutil").strip()
     if not prompt:
         return _bad({"error": "Falta 'prompt'"})
 
+    # Prompt unificado para estética de postal
     full_prompt = (
-        f"Postal cuadrada de felicitación: {prompt}. "
-        f"Estilo: {style}. En español, con ilustración coherente, tipografía legible, "
-        f"colores suaves, fondo limpio, composición centrada y estética moderna."
+        f"{prompt}. Estilo: {style}. composición centrada, formato cuadrado 1:1, fondo claro, "
+        "tipografía limpia, borde sutil y agradable, alta calidad."
     )
 
-    try:
-        # 1️⃣ Intento con Hugging Face
-        r = requests.post(
-            f"https://api-inference.huggingface.co/models/{HF_MODEL}",
-            headers={
-                "Authorization": f"Bearer {HF_TOKEN}",
-                "Accept": "image/png",
-            },
-            json={"inputs": full_prompt, "options": {"wait_for_model": True}},
-            timeout=120,
-        )
+    img_bytes = None
+    used_provider = None
+    tried = []
 
-        # 2️⃣ Si el modelo falla, probamos con otro más estable
-        if r.status_code == 404 or r.status_code >= 500:
-            fallback_model = "stabilityai/stable-diffusion-xl-base-1.0"
-            r_fb = requests.post(
-                f"https://api-inference.huggingface.co/models/{fallback_model}",
-                headers={
-                    "Authorization": f"Bearer {HF_TOKEN}",
-                    "Accept": "image/png",
-                },
-                json={"inputs": full_prompt, "options": {"wait_for_model": True}},
-                timeout=120,
-            )
-            if r_fb.status_code == 200:
-                r = r_fb
-            else:
-                # 3️⃣ Último recurso: Pollinations
-                bg_url = f"https://image.pollinations.ai/prompt/{quote(full_prompt)}"
-                r = requests.get(bg_url, timeout=60)
+    # 1) Intento Hugging Face si tienes token/modelo en .env
+    hf_token = os.environ.get("HF_TOKEN")
+    hf_model = (os.environ.get("HF_MODEL") or "stabilityai/sdxl-turbo").strip()
 
-        if r.status_code != 200:
-            return _bad({
-                "error": "No se pudo generar la imagen",
-                "status": r.status_code,
-                "body": r.text[:300],
-                "model": HF_MODEL
-            })
+    if hf_token:
+        try:
+            url_hf, r = _hf_generate(hf_token, hf_model, full_prompt)
+            tried.append({"provider": "huggingface", "url": url_hf, "status": r.status_code})
+            if r.status_code == 200 and r.content:
+                img_bytes = r.content
+                used_provider = "huggingface"
+        except Exception as e:
+            tried.append({"provider": "huggingface", "error": str(e)})
 
-        img_bytes = r.content
+    # 2) Fallback sin clave: Pollinations
+    if img_bytes is None:
+        try:
+            poll_url = _pollinations_url(full_prompt, 1024, 1024)
+            r2 = requests.get(poll_url, timeout=180)
+            tried.append({"provider": "pollinations", "url": poll_url, "status": r2.status_code})
+            if r2.status_code != 200:
+                return _bad({
+                    "error": "Proveedor de imagen no respondió con 200",
+                    "details": tried
+                })
+            img_bytes = r2.content
+            used_provider = "pollinations"
+        except Exception as e:
+            return _bad({"error": "Excepción obteniendo imagen (pollinations)", "details": str(e), "tried": tried})
 
-    except Exception as e:
-        return _bad({"error": "Error generando la postal", "details": str(e)})
-
+    # 3) Guardar en GeneratedCard y responder
     try:
         GeneratedCard = apps.get_model('core', 'GeneratedCard')
         card = GeneratedCard.objects.create(user=request.user, prompt=prompt)
@@ -3563,9 +3525,9 @@ def generar_card_hf(request):
         "id": card.id,
         "url": card.image.url,
         "share": request.build_absolute_uri(f"/cards/s/{card.share_token}/"),
-        "provider_used": HF_MODEL,
+        "provider_used": used_provider,
+        "tried": tried
     })
-
 
 
 
