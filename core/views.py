@@ -56,7 +56,7 @@ from core.models import Conversacion, Mensaje, ParticipanteConversacion
 from core.models import NotificationDevice, PreferenciasUsuario, Perfil
 from .serializers import ConversacionLiteSerializer, MensajeSerializer
 from .models import RecommendationFeedback, Producto
-#import pandas as pd
+import pandas as pd
 import random
 from core.services_social import amigos_qs, sugerencias_qs, obtener_o_crear_conv_directa
 from django.contrib.auth import get_user_model
@@ -3267,7 +3267,7 @@ def chat_unread_summary(request):
     total = sum(per_conv.values())
     return JsonResponse({"total": total, "per_conversation": per_conv})
 
-
+####################DESKTOP FUNCTIONS!!!
 @api_view(['GET']) # cite: Sex.txt
 @permission_classes([IsAdminUser]) # cite: Sex.txt
 def download_active_products_csv(request): # cite: Sex.txt
@@ -3337,7 +3337,51 @@ def download_active_products_pdf(request): # Nuevo nombre de función
         print(f"Error generando PDF de productos: {e}") # Mensaje específico
         return Response({"error": f"No se pudo generar el reporte PDF: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) # cite: Sex.txt
     
-    
+@api_view(['GET']) # cite: Sex.txt
+@permission_classes([IsAdminUser]) # cite: Sex.txt
+def download_active_products_excel(request): # Nuevo nombre específico
+    """
+    Genera y devuelve un archivo Excel (.xlsx) con todos los productos activos.
+    """
+    try:
+        # Obtener datos (igual que en las otras vistas)
+        productos = Producto.objects.filter(activo=True).select_related('id_categoria', 'id_marca').order_by('id_producto') # cite: Sex.txt
+        filename_base = f"productos_activos_{datetime.date.today()}" # cite: Sex.txt
+
+        # Preparar datos para Pandas (igual que antes)
+        data_list = []
+        for p in productos:
+            data_list.append({
+                'ID Producto': p.id_producto,
+                'Nombre': p.nombre_producto,
+                'Descripcion': p.descripcion,
+                'Precio': p.precio,
+                'Categoria ID': p.id_categoria_id,
+                'Categoria Nombre': p.id_categoria.nombre_categoria if p.id_categoria else '',
+                'Marca ID': p.id_marca_id,
+                'Marca Nombre': p.id_marca.nombre_marca if p.id_marca else '',
+                'URL Imagen': request.build_absolute_uri(p.imagen.url) if p.imagen else ''
+            })
+        df = pd.DataFrame(data_list) # Crear DataFrame
+
+        # Configurar respuesta para Excel
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', # cite: Sex.txt
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename_base}.xlsx"' # cite: Sex.txt
+
+        # Escribir DataFrame a Excel en la respuesta
+        df.to_excel(response, index=False, engine='openpyxl') # cite: Sex.txt
+        return response # cite: Sex.txt
+
+    except Exception as e:
+        print(f"Error generando Excel de productos: {e}") # Mensaje específico
+        return Response({"error": f"No se pudo generar el reporte Excel: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) # cite: Sex.txt
+
+
+
+
+##########FINN REPORTS FUNCTIONS    
 def producto_detalle(request, id_producto=None, pk=None):
     """
     Vista de detalle del producto.
@@ -3415,8 +3459,8 @@ def ver_card_publica(request, token):
 
     return render(request, "cards/ver_publica.html", {"card": card})
 
+HF_PRIMARY  = "stabilityai/stable-diffusion-xl-base-1.0"
 HF_FALLBACK = "stabilityai/sdxl-turbo"
-HF_PRIMARY  = "stabilityai/sdxl-turbo"
 
 def _hf_generate(hf_token: str, model: str, prompt: str, timeout: int = 120):
     url = f"https://api-inference.huggingface.co/models/{model}"
@@ -3428,92 +3472,70 @@ def _hf_generate(hf_token: str, model: str, prompt: str, timeout: int = 120):
     )
     return url, resp
 
-def _bad_request(payload: dict):
-
-    return HttpResponseBadRequest(json.dumps(payload), content_type="application/json")
-
 def _bad(payload: dict):
     return HttpResponseBadRequest(json.dumps(payload), content_type="application/json")
-
-def _pollinations_url(prompt: str, w: int = 1024, h: int = 1024):
-    # Endpoint público, sin API key ni seed aleatorio
-    q = urllib.parse.quote(prompt)
-    return f"https://image.pollinations.ai/prompt/{q}?width={w}&height={h}&nofeed=true"
-
-
-def _cloud_name_from_url(cld_url: str) -> str | None:
-    # CLOUDINARY_URL=cloudinary://<key>:<secret>@<cloud_name>
-    try:
-        return cld_url.rsplit("@", 1)[-1]
-    except Exception:
-        return None
-    
-def _cld_card_url(cloud_name: str, bg_url: str, title: str,
-                  w: int = 1024, h: int = 1024) -> str:
-
-    # No sobre-encodear la URL del fondo; si hiciera falta, el caller reintenta.
-    title_enc = quote(title.replace("\n", "%0A"))
-
-    transforms = "/".join([
-        f"w_{w},h_{h},c_fill,q_auto,f_png,e_blur:40,e_brightness:12",
-        # Texto centrado, ancho máx, con sombra. Ajusta tamaño/pos si quieres.
-        f"l_text:Poppins_96_bold:{title_enc},w_900,c_fit,co_rgb:ffffff,e_shadow:95,g_center,y_-40"
-    ])
-    return (
-        f"https://res.cloudinary.com/{cloud_name}/image/fetch/"
-        f"{transforms}/{bg_url}"
-    )
-
 
 @login_required
 @require_POST
 def generar_card_hf(request):
     prompt = (request.POST.get("prompt") or "").strip()
-    style  = (request.POST.get("style")  or "postal minimalista con borde sutil").strip()
+    style  = (request.POST.get("style")  or "postal colorida, fondo limpio, composición centrada").strip()
     if not prompt:
         return _bad({"error": "Falta 'prompt'"})
 
-    # Prompt unificado para estética de postal
+    hf_token = os.environ.get("HF_TOKEN")
+    if not hf_token:
+        return _bad({"error": "Falta HF_TOKEN en el entorno"})
+
+    hf_model = (os.environ.get("HF_MODEL") or HF_PRIMARY).strip()
+
     full_prompt = (
-        f"{prompt}. Estilo: {style}. composición centrada, formato cuadrado 1:1, fondo claro, "
-        "tipografía limpia, borde sutil y agradable, alta calidad."
+        f"Square greeting card. {style}. "
+        f"Spanish theme for: {prompt}. "
+        f"Coherent illustration, modern, soft colors, clean background, "
+        f"no random text, no gibberish letters, high quality."
     )
 
-    img_bytes = None
-    used_provider = None
     tried = []
+    img_bytes = None
 
-    # 1) Intento Hugging Face si tienes token/modelo en .env
-    hf_token = os.environ.get("HF_TOKEN")
-    hf_model = (os.environ.get("HF_MODEL") or "stabilityai/sdxl-turbo").strip()
+    # intento 1
+    url1, r1 = _hf_generate(hf_token, hf_model, full_prompt)
+    tried.append({"model": hf_model, "url": url1, "status": r1.status_code})
 
-    if hf_token:
-        try:
-            url_hf, r = _hf_generate(hf_token, hf_model, full_prompt)
-            tried.append({"provider": "huggingface", "url": url_hf, "status": r.status_code})
-            if r.status_code == 200 and r.content:
-                img_bytes = r.content
-                used_provider = "huggingface"
-        except Exception as e:
-            tried.append({"provider": "huggingface", "error": str(e)})
-
-    # 2) Fallback sin clave: Pollinations
-    if img_bytes is None:
-        try:
-            poll_url = _pollinations_url(full_prompt, 1024, 1024)
-            r2 = requests.get(poll_url, timeout=180)
-            tried.append({"provider": "pollinations", "url": poll_url, "status": r2.status_code})
-            if r2.status_code != 200:
-                return _bad({
-                    "error": "Proveedor de imagen no respondió con 200",
-                    "details": tried
-                })
+    if r1.status_code == 200 and r1.content:
+        img_bytes = r1.content
+    else:
+        # errores conocidos
+        if r1.status_code in (401, 403):
+            msg = "Token inválido o sin acceso al modelo (acepta los términos en Hugging Face)."
+            return _bad({
+                "error": msg,
+                "status": r1.status_code,
+                "model": hf_model,
+                "hint": "Revisa HF_TOKEN y acepta los términos del modelo en su página.",
+                "tried": tried
+            })
+        # intento 2 (fallback dentro de HF)
+        url2, r2 = _hf_generate(hf_token, HF_FALLBACK, full_prompt)
+        tried.append({"model": HF_FALLBACK, "url": url2, "status": r2.status_code})
+        if r2.status_code == 200 and r2.content:
             img_bytes = r2.content
-            used_provider = "pollinations"
-        except Exception as e:
-            return _bad({"error": "Excepción obteniendo imagen (pollinations)", "details": str(e), "tried": tried})
+        elif r2.status_code in (401, 403):
+            msg = "Token inválido o sin acceso al modelo (fallback) en HF."
+            return _bad({
+                "error": msg,
+                "status": r2.status_code,
+                "model": HF_FALLBACK,
+                "hint": "Revisa HF_TOKEN y acepta los términos del modelo en su página.",
+                "tried": tried
+            })
+        else:
+            return _bad({
+                "error": "Hugging Face no devolvió imagen",
+                "tried": tried
+            })
 
-    # 3) Guardar en GeneratedCard y responder
     try:
         GeneratedCard = apps.get_model('core', 'GeneratedCard')
         card = GeneratedCard.objects.create(user=request.user, prompt=prompt)
@@ -3525,9 +3547,10 @@ def generar_card_hf(request):
         "id": card.id,
         "url": card.image.url,
         "share": request.build_absolute_uri(f"/cards/s/{card.share_token}/"),
-        "provider_used": used_provider,
-        "tried": tried
+        "provider_used": hf_model,
+        "tried": tried[:3],
     })
+
 
 
 

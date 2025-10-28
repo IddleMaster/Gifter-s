@@ -336,41 +336,52 @@ class ApiClient:
         
     def download_product_report(self, report_format='csv'): # cite: Sex.txt
         """
-        Descarga el reporte CSV o PDF de productos activos desde la API,
+        Descarga el reporte CSV, Excel o PDF de productos activos desde la API,
         llamando a la URL específica para cada formato.
         """
         if not self.token: # cite: Sex.txt
             return None, "No autenticado." # cite: Sex.txt
-
+    
         # --- Elegir la URL correcta ---
         if report_format == 'pdf':
-            report_url = f"{self.base_url}/reports/products/download/pdf/" # URL para PDF
+            report_url = f"{self.base_url}/reports/products/download/pdf/" # URL PDF # cite: Sex.txt (modificado)
+        elif report_format == 'excel':
+             # NUEVA URL para Excel
+             report_url = f"{self.base_url}/reports/products/download/excel/"
         else: # Default a CSV
-            report_url = f"{self.base_url}/reports/products/download/" # URL para CSV (sin ?format=)
+            report_url = f"{self.base_url}/reports/products/download/" # URL CSV # cite: Sex.txt
         # -----------------------------
-
+    
         try:
             temp_headers = self.headers.copy() # cite: Sex.txt
             if 'Content-Type' in temp_headers: del temp_headers['Content-Type'] # cite: Sex.txt
             if 'Accept' in temp_headers: del temp_headers['Accept'] # cite: Sex.txt
-
+    
             response = requests.get(report_url, headers=temp_headers, stream=True) # cite: Sex.txt
             response.raise_for_status() # cite: Sex.txt
-
-            # Verificar Content-Type esperado (CSV o PDF)
+    
+            # Verificar Content-Type esperado (CSV, Excel o PDF)
             content_type = response.headers.get('content-type', '').lower() # cite: Sex.txt
-            expected_content_type = 'csv' if report_format == 'csv' else 'pdf' # cite: Sex.txt
-
+            if report_format == 'csv': # cite: Sex.txt
+                 expected_content_type = 'csv'
+            elif report_format == 'excel':
+                 expected_content_type = 'spreadsheetml' # Parte del content-type de Excel
+            elif report_format == 'pdf': # cite: Sex.txt
+                 expected_content_type = 'pdf'
+            else:
+                 expected_content_type = 'desconocido'
+    
             if expected_content_type not in content_type: # cite: Sex.txt
+                 # ... (manejo de error igual que antes) ...
                  try: # cite: Sex.txt
                      error_data = response.json() # cite: Sex.txt
                      error_detail = error_data.get("error", f"Respuesta inesperada (esperaba {report_format.upper()}).") # cite: Sex.txt
                  except json.JSONDecodeError: # cite: Sex.txt
                      error_detail = f"Respuesta inesperada del servidor (no es {expected_content_type})." # cite: Sex.txt
                  return None, error_detail # cite: Sex.txt
-
+    
             return response.content, None # cite: Sex.txt
-
+    
         # --- Manejo de errores (igual que antes) ---
         except requests.exceptions.HTTPError as http_err: # cite: Sex.txt
              # ... (código existente) ...
@@ -385,7 +396,7 @@ class ApiClient:
             return None, f"Error de conexión: {e}" # cite: Sex.txt
         except Exception as e: # cite: Sex.txt
              return None, f"Error inesperado: {str(e)}" # cite: Sex.txt
-         
+             
     def create_product(self, product_data):
         """
         Envía una petición POST para crear un nuevo producto.

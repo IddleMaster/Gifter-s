@@ -3529,6 +3529,313 @@
       // Cuando abras una conversación de grupo, si el usuario cambia a “Eventos”, ya existe currentConvId
     })();
   </script>
+<script>
+(() => {
+  const eventsEl = document.getElementById('eventsList');
+  if (!eventsEl) return;
+
+  // ------- Helpers generales -------
+  const getCSRF = () => (window.CSRF_TOKEN || (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '');
+  const fmtMoney = v => (v == null || v === '') ? '' : `$${Number(v).toLocaleString('es-CL')}`;
+  const nowISO = () => new Date().toISOString();
+
+  // Modal básico reutilizable (no toca tu HTML)
+  function ensureModal(id, title = '') {
+    let m = document.getElementById(id);
+    if (!m) {
+      m = document.createElement('div');
+      m.id = id;
+      m.className = 'modal';
+      m.tabIndex = -1;
+      m.innerHTML = `
+        <div class="modal-dialog modal-dialog-scrollable">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">${title || ''}</h5>
+              <button type="button" class="btn-close" data-close></button>
+            </div>
+            <div class="modal-body" id="${id}-body"></div>
+            <div class="modal-footer" id="${id}-footer">
+              <button class="btn btn-light" data-close>Cancelar</button>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(m);
+    } else {
+      m.querySelector('.modal-title').textContent = title || '';
+    }
+    return m;
+  }
+  function openModal(id) {
+    const m = document.getElementById(id);
+    if (!m) return;
+    m.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+  }
+  function closeModal(id) {
+    const m = document.getElementById(id);
+    if (!m) return;
+    m.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+  document.addEventListener('click', (e) => {
+    const m = e.target.closest('.modal');
+    if (!m) return;
+    if (e.target.matches('.btn-close,[data-close]') || e.target === m) {
+      m.style.display = 'none';
+      document.body.style.overflow = '';
+    }
+  });
+
+  // ------- Carga de eventos por conversación (grupo) -------
+  async function loadEvents() {
+    // Si no hay grupo abierto:
+    if (!window.currentConvId || !window.currentConvIsGroup) {
+      eventsEl.innerHTML = '<div class="p-3 text-muted">Abre un <strong>grupo</strong> para ver y crear eventos.</div>';
+      return;
+    }
+    eventsEl.innerHTML = '<div class="p-3 text-muted">Cargando eventos…</div>';
+
+    try {
+      const url = window.URLS.eventosListCreate.replace('/0/', `/${window.currentConvId}/`);
+      const r = await fetch(url, { credentials: 'same-origin' });
+      if (!r.ok) throw 0;
+      const j = await r.json();
+      const list = Array.isArray(j.results) ? j.results : (Array.isArray(j) ? j : []);
+
+      const header = `
+        <div class="d-flex justify-content-between align-items-center p-2">
+          <span class="fw-semibold">Eventos</span>
+          <button class="btn btn-sm btn-primary" id="btnNewEvent">Nuevo Amigo Secreto</button>
+        </div>`;
+
+      if (!list.length) {
+        eventsEl.innerHTML = `
+          ${header}
+          <div class="px-2 pb-3 text-muted">Aún no hay eventos en este grupo.</div>`;
+      } else {
+        eventsEl.innerHTML = `
+          ${header}
+          <div class="px-2">
+            ${list.map(e => `
+              <div class="chat-list-item d-flex align-items-center justify-content-between" data-event-id="${e.id}">
+                <div class="chat-names">
+                  <div class="line1">${e.titulo || 'Amigo Secreto'}</div>
+                  <div class="line2">
+                    ${e.estado || 'borrador'}${e.presupuesto ? ' • ' + fmtMoney(e.presupuesto) : ''}
+                  </div>
+                </div>
+                <div class="chat-time">${e.creado_en ? new Date(e.creado_en).toLocaleDateString('es-CL') : ''}</div>
+              </div>`).join('')}
+          </div>`;
+      }
+
+      eventsEl.querySelector('#btnNewEvent')?.addEventListener('click', openCreateEventModal);
+      eventsEl.querySelectorAll('[data-event-id]').forEach(row => {
+        row.addEventListener('click', () => openEventDetail(Number(row.dataset.eventId)));
+      });
+    } catch {
+      eventsEl.innerHTML = '<div class="p-3 text-danger">No se pudieron cargar los eventos.</div>';
+    }
+  }
+
+  // ------- Crear evento (modal con nombre, presupuesto y participantes) -------
+  async function openCreateEventModal() {
+    // Traer miembros del grupo para pre-seleccionar
+    let miembros = [];
+    try {
+      const url = window.URLS.grupoMiembros.replace('/0/', `/${window.currentConvId}/`);
+      const r = await fetch(url, { credentials: 'same-origin' });
+      if (r.ok) {
+        const j = await r.json();
+        miembros = (j.miembros || j.participantes || []).map(m => ({
+          id: Number(m.id),
+          nombre: (m.nombre_completo || [m.nombre, m.apellido].filter(Boolean).join(' ') || m.username || m.nombre_usuario || 'Miembro')
+        }));
+      }
+    } catch { /* noop */ }
+
+    const MODAL_ID = 'modalCreateEvent';
+    const m = ensureModal(MODAL_ID, 'Nuevo Amigo Secreto');
+    const body = m.querySelector(`#${MODAL_ID}-body`);
+    const footer = m.querySelector(`#${MODAL_ID}-footer`);
+
+    body.innerHTML = `
+      <div class="mb-2">
+        <label class="form-label">Nombre del evento</label>
+        <input id="evName" class="form-control" maxlength="80" value="Amigo Secreto">
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Presupuesto estimado (opcional)</label>
+        <input id="evBudget" class="form-control" type="number" min="0" step="1" placeholder="Ej: 15000">
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Participantes</label>
+        <div id="evParticipants" class="d-grid gap-2" style="max-height: 320px; overflow:auto;">
+          ${
+            miembros.length
+              ? miembros.map(m => `
+                  <label class="d-flex align-items-center gap-2">
+                    <input type="checkbox" value="${m.id}" checked>
+                    <span>${m.nombre}</span>
+                  </label>`).join('')
+              : '<div class="text-muted">No se pudieron cargar los miembros del grupo.</div>'
+          }
+        </div>
+        <small class="text-muted">Puedes desmarcar quienes no participen.</small>
+      </div>`;
+
+    footer.innerHTML = `
+      <button class="btn btn-light" data-close>Cancelar</button>
+      <button id="evCreate" class="btn btn-primary">Crear evento</button>`;
+
+    footer.querySelector('#evCreate').onclick = submitCreateEvent;
+    openModal(MODAL_ID);
+  }
+
+  async function submitCreateEvent() {
+    const MODAL_ID = 'modalCreateEvent';
+    const name = (document.getElementById('evName')?.value || '').trim();
+    const budgetRaw = document.getElementById('evBudget')?.value || '';
+    const ids = Array.from(document.querySelectorAll('#evParticipants input[type=checkbox]:checked'))
+                .map(i => Number(i.value));
+
+    if (!name) { document.getElementById('evName')?.focus(); return; }
+    if (!ids.length) { alert('Selecciona al menos un participante.'); return; }
+
+    const url = window.URLS.eventosListCreate.replace('/0/', `/${window.currentConvId}/`);
+    const payload = {
+      tipo: 'secret_santa',
+      titulo: name,
+      presupuesto: budgetRaw === '' ? null : Number(budgetRaw),
+      participantes: ids
+    };
+
+    try {
+      const r = await fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+        body: JSON.stringify(payload)
+      });
+      if (!r.ok) throw 0;
+      closeModal(MODAL_ID);
+      await loadEvents();
+    } catch {
+      alert('No se pudo crear el evento.');
+    }
+  }
+
+  // ------- Detalle del evento (sortear / cerrar / ver mi asignación) -------
+  async function openEventDetail(eventId) {
+    const MODAL_ID = 'modalEventDetail';
+    const m = ensureModal(MODAL_ID, 'Detalle del evento');
+    const body = m.querySelector(`#${MODAL_ID}-body`);
+    const footer = m.querySelector(`#${MODAL_ID}-footer`);
+
+    body.innerHTML = '<div class="text-muted">Cargando…</div>';
+    footer.innerHTML = `<button class="btn btn-light" data-close>Cerrar</button>`;
+
+    try {
+      const r = await fetch(window.URLS.eventoDetail.replace('/0/', `/${eventId}/`), { credentials: 'same-origin' });
+      if (!r.ok) throw 0;
+      const j = await r.json();
+
+      const soyAdmin = !!j.soy_admin;   // ← usamos el flag del backend si existe
+      const estado = j.estado || 'borrador';
+      const presupuesto = j.presupuesto ? fmtMoney(j.presupuesto) : null;
+
+      // Cuerpo
+      body.innerHTML = `
+        <div class="mb-2"><strong>${j.titulo || 'Amigo Secreto'}</strong></div>
+        <div class="mb-2 text-muted">Estado: ${estado}${presupuesto ? ' • Presupuesto: ' + presupuesto : ''}</div>
+        <div class="mb-3" id="mineBox"></div>
+        <div class="small text-muted">Creado: ${j.creado_en ? new Date(j.creado_en).toLocaleString('es-CL') : ''}</div>
+      `;
+
+      // Footer (acciones)
+      const btns = [];
+      if (soyAdmin && (estado === 'borrador' || estado === 'sorteado')) {
+        btns.push(`<button id="btnDraw" class="btn btn-primary">Sortear</button>`);
+      }
+      if (soyAdmin && estado === 'sorteado') {
+        btns.push(`<button id="btnLock" class="btn btn-outline-secondary">Cerrar</button>`);
+      }
+      btns.push(`<button id="btnMine" class="btn btn-success">Ver mi asignación</button>`);
+      btns.push(`<button class="btn btn-light" data-close>Cerrar</button>`);
+      footer.innerHTML = btns.join(' ');
+
+      // Listeners
+      footer.querySelector('#btnDraw')?.addEventListener('click', async () => {
+        if (!confirm('¿Confirmas realizar el sorteo?')) return;
+        try {
+          const r = await fetch(window.URLS.eventoDraw.replace('/0/', `/${eventId}/`), {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'X-CSRFToken': getCSRF() }
+          });
+          if (!r.ok) throw 0;
+          await openEventDetail(eventId); // recarga detalle
+          // opcional: refrescar listado
+          loadEvents();
+        } catch { alert('No se pudo realizar el sorteo.'); }
+      });
+
+      footer.querySelector('#btnLock')?.addEventListener('click', async () => {
+        if (!confirm('Al cerrar el evento se congela la asignación. ¿Continuar?')) return;
+        try {
+          const r = await fetch(window.URLS.eventoLock.replace('/0/', `/${eventId}/`), {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'X-CSRFToken': getCSRF() }
+          });
+          if (!r.ok) throw 0;
+          await openEventDetail(eventId);
+          loadEvents();
+        } catch { alert('No se pudo cerrar el evento.'); }
+      });
+
+      footer.querySelector('#btnMine')?.addEventListener('click', () => showMyAssignment(eventId));
+
+      // Mostrar mi asignación si ya está sorteado/cerrado
+      if (estado === 'sorteado' || estado === 'cerrado') showMyAssignment(eventId);
+
+      openModal(MODAL_ID);
+    } catch {
+      body.innerHTML = '<div class="text-danger">No se pudo cargar el evento.</div>';
+      openModal(MODAL_ID);
+    }
+  }
+
+  async function showMyAssignment(eventId) {
+    const box = document.getElementById('mineBox');
+    if (!box) return;
+    box.innerHTML = '<div class="text-muted">Buscando tu asignación…</div>';
+    try {
+      const r = await fetch(window.URLS.eventoMine.replace('/0/', `/${eventId}/`), { credentials: 'same-origin' });
+      if (!r.ok) throw 0;
+      const j = await r.json();
+      const a = j.asignacion || j.assignment || null;
+      if (!a) {
+        box.innerHTML = '<div class="text-muted">Aún no tienes una asignación.</div>';
+        return;
+      }
+      const nombre = a.nombre_completo || [a.nombre, a.apellido].filter(Boolean).join(' ') || a.username || a.nombre_usuario || 'Tu persona';
+      box.innerHTML = `
+        <div class="alert alert-success">
+          <div class="fw-semibold">¡Tu “amigo secreto” es:</div>
+          <div>${nombre}</div>
+        </div>`;
+    } catch {
+      box.innerHTML = '<div class="text-danger">No se pudo consultar tu asignación.</div>';
+    }
+  }
+
+  // Exponer el loader para que tu tab “eventos” lo llame
+  window.loadEvents = loadEvents;
+
+  // Si ya tienes manejador de tabs, basta con que, al entrar a "eventos",
+  // llames: loadEvents() y muestres #eventsList (como ya haces).
+})();
+</script>
 
 </body>
 

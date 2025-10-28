@@ -102,6 +102,7 @@ urlpatterns = [
     # --- Rutas API para Reportes ---
     path('api/reports/products/download/', views.download_active_products_csv, name='api_report_products_csv_download'),
     path('api/reports/products/download/pdf/', views.download_active_products_pdf, name='api_report_products_pdf_download'),
+    path('api/reports/products/download/excel/', views.download_active_products_excel, name='api_report_products_excel_download'), # <-- NUEVA RUTA EXCEL
     path('reports/products/download/', views.download_active_products_csv, name='download_product_report'),
     
     # --- Rutas API para Usuarios (Admin) --- # <-- NUEVA SECCIÓN

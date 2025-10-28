@@ -226,7 +226,7 @@ class MainWindow(QMainWindow):
         return sidebar_widget
 
     def create_reportes_page(self):
-        """Crea la página de Reportes con selector de formato (CSV/PDF)."""
+        """Crea la página de Reportes con selector de formato (CSV/PDF/exceln)."""
         page = QWidget() # cite: Sex.txt
         layout = QVBoxLayout(page) # cite: Sex.txt
         layout.setContentsMargins(20, 20, 20, 20) # cite: Sex.txt
@@ -239,7 +239,7 @@ class MainWindow(QMainWindow):
         format_layout = QHBoxLayout()
         format_label = QLabel("Selecciona el formato del reporte:")
         self.combo_report_format = QComboBox() # cite: Sex.txt
-        self.combo_report_format.addItems(["CSV", "PDF"]) # <-- CSV y PDF # cite: Sex.txt
+        self.combo_report_format.addItems(["CSV", "Excel (.xlsx)", "PDF"]) # <-- CSV y PDF # cite: Sex.txt
         format_layout.addWidget(format_label)
         format_layout.addWidget(self.combo_report_format) # Añadir ComboBox
         format_layout.addStretch()
@@ -556,26 +556,31 @@ class MainWindow(QMainWindow):
 
     def handle_download_report(self):
         """
-        Descarga el reporte en el formato seleccionado (CSV o PDF).
+        Descarga el reporte en el formato seleccionado (CSV, Excel o PDF).
         """
+        # Asegúrate de tener estas importaciones al principio de main.py
         import datetime # cite: Sex.txt
         import os # cite: Sex.txt
         from PyQt6.QtWidgets import QApplication, QMessageBox, QFileDialog # cite: Sex.txt
     
         # --- Determinar el formato ---
-        selected_text = self.combo_report_format.currentText() # Lee el selector # cite: Sex.txt
+        selected_text = self.combo_report_format.currentText() # cite: Sex.txt
         report_format = 'csv' # Default # cite: Sex.txt
         file_extension = '.csv' # cite: Sex.txt
         file_filter = "CSV Files (*.csv)" # cite: Sex.txt
     
-        if "PDF" in selected_text: # Si selecciona PDF # cite: Sex.txt
+        if "Excel" in selected_text: # <-- AÑADIDO ESTE IF
+            report_format = 'excel'
+            file_extension = '.xlsx'
+            file_filter = "Excel Files (*.xlsx)"
+        elif "PDF" in selected_text: # <-- CAMBIADO A ELIF # cite: Sex.txt
             report_format = 'pdf' # cite: Sex.txt
             file_extension = '.pdf' # cite: Sex.txt
             file_filter = "PDF Files (*.pdf)" # cite: Sex.txt
     
         # --- Llamada a la API ---
         self.statusBar.showMessage(f"Generando reporte de productos ({report_format.upper()})...") # cite: Sex.txt
-        QApplication.processEvents() # cite: Sex.txt
+        QApplication.processEvents() # Actualiza la interfaz gráfica # cite: Sex.txt
     
         content_bytes, error = self.api_client.download_product_report(report_format) # Pasa el formato # cite: Sex.txt
     
@@ -595,7 +600,7 @@ class MainWindow(QMainWindow):
             self,
             f"Guardar Reporte {report_format.upper()}", # cite: Sex.txt
             os.path.join(os.path.expanduser("~"), default_filename), # cite: Sex.txt
-            file_filter # Usa el filtro correcto # cite: Sex.txt
+            file_filter # Usa el filtro correcto (CSV, Excel o PDF) # cite: Sex.txt
         )
     
         # --- Guardar el Archivo (igual que antes) ---
@@ -612,7 +617,7 @@ class MainWindow(QMainWindow):
                 self.statusBar.showMessage("Error al guardar el archivo.", 5000) # cite: Sex.txt
         else:
             self.statusBar.showMessage("Descarga cancelada.", 3000) # cite: Sex.txt
-
+    
     def handle_user_change(self, item):
         """
         Se llama cuando el contenido de una celda en la tabla de usuarios cambia.
