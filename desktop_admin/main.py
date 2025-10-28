@@ -226,30 +226,36 @@ class MainWindow(QMainWindow):
         return sidebar_widget
 
     def create_reportes_page(self):
-        """Crea la página de Reportes (Versión solo CSV)."""
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(20, 20, 20, 20)
+        """Crea la página de Reportes con selector de formato (CSV/PDF)."""
+        page = QWidget() # cite: Sex.txt
+        layout = QVBoxLayout(page) # cite: Sex.txt
+        layout.setContentsMargins(20, 20, 20, 20) # cite: Sex.txt
 
-        title = QLabel("Reportes")
-        title.setFont(QFont("Arial", 24, QFont.Weight.Bold))
-        layout.addWidget(title)
+        title = QLabel("Reportes") # cite: Sex.txt
+        title.setFont(QFont("Arial", 24, QFont.Weight.Bold)) # cite: Sex.txt
+        layout.addWidget(title) # cite: Sex.txt
 
-        # Puedes dejar el botón de categoría como placeholder o quitarlo
-        layout.addWidget(QPushButton("Categoría (Aún no implementado)"))
+        # --- Selector de Formato ---
+        format_layout = QHBoxLayout()
+        format_label = QLabel("Selecciona el formato del reporte:")
+        self.combo_report_format = QComboBox() # cite: Sex.txt
+        self.combo_report_format.addItems(["CSV", "PDF"]) # <-- CSV y PDF # cite: Sex.txt
+        format_layout.addWidget(format_label)
+        format_layout.addWidget(self.combo_report_format) # Añadir ComboBox
+        format_layout.addStretch()
+        layout.addLayout(format_layout) # Añadir layout H
+        # ------------------------------------
 
-        layout.addStretch() # Empuja el botón de descarga al fondo
+        layout.addStretch() # Empuja botón al fondo # cite: Sex.txt
 
-        # Botón Descargar (conectado a handle_download_report)
-        self.combo_report_format = QComboBox()
-        self.combo_report_format.addItems(["CSV", "PDF"]) 
-        self.btn_download_report = QPushButton("Descargar Reporte CSV de Productos Activos") # Texto ajustado
-        self.btn_download_report.setStyleSheet("background-color: #28a745; color: white; padding: 10px; font-size: 14px;")
-        self.btn_download_report.clicked.connect(self.handle_download_report)
-        layout.addWidget(self.btn_download_report)
+        # Botón Descargar (sin cambios en conexión o estilo)
+        self.btn_download_report = QPushButton("Descargar Reporte de Productos Activos") # cite: Sex.txt
+        self.btn_download_report.setStyleSheet("background-color: #28a745; color: white; padding: 10px; font-size: 14px;") # cite: Sex.txt
+        self.btn_download_report.clicked.connect(self.handle_download_report) # cite: Sex.txt
+        layout.addWidget(self.btn_download_report) # cite: Sex.txt
 
-        return page
-
+        return page # cite: Sex.txt
+    
     def create_admin_page(self):
         """Crea la página de Administración (Mockup 3)."""
         page = QWidget()
@@ -283,48 +289,50 @@ class MainWindow(QMainWindow):
 
     def create_catalogo_page(self):
         """Crea la página de Catálogo (Mockup 4)."""
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(20, 20, 20, 20)
-        
-        title = QLabel("Catálogo de Productos")
-        title.setFont(QFont("Arial", 24, QFont.Weight.Bold))
-        layout.addWidget(title)
-        
-        # Tabla para mostrar productos
-        self.table_products = QTableWidget()
-        self.table_products.setColumnCount(4) # Ejemplo: ID, Nombre, Precio, Categoría
-        self.table_products.setHorizontalHeaderLabels(["ID", "Nombre", "Precio", "Categoría"])
-        self.table_products.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        # Permitir edición al hacer doble clic
-        self.table_products.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked)
-        # Deshabilitar ordenación por clic en cabecera por ahora
-        self.table_products.setSortingEnabled(False)
-        # Conectar la señal 'itemChanged' a una función (que crearemos luego)
-        self.table_products.itemChanged.connect(self.handle_product_change)
-        # --------------------    
-        layout.addWidget(self.table_products)
-        
-        button_row_layout = QHBoxLayout() # Layout horizontal para botones
+        page = QWidget() # cite: Sex.txt
+        layout = QVBoxLayout(page) # cite: Sex.txt
+        layout.setContentsMargins(20, 20, 20, 20) # cite: Sex.txt
 
-    # Botón Crear
-        self.btn_create_product = QPushButton("Crear Nuevo Producto")
-        self.btn_create_product.setStyleSheet("background-color: #007bff; color: white; padding: 10px; font-size: 14px;") # Estilo azul
-        self.btn_create_product.clicked.connect(self.handle_create_product) # Conectar
-        button_row_layout.addWidget(self.btn_create_product)
-        button_row_layout.addStretch() # Espacio entre botones
-        
-        # --- BOTÓN BORRAR ---
-        self.btn_delete_product = QPushButton("Borrar Producto Seleccionado")
-        self.btn_delete_product.setStyleSheet("background-color: #dc3545; color: white; padding: 10px; font-size: 14px;") # Estilo rojo
-        self.btn_delete_product.clicked.connect(self.handle_delete_product) # Conectar a nueva función
-        layout.addWidget(self.btn_delete_product)
-        # ---------------------
+        title = QLabel("Catálogo de Productos") # cite: Sex.txt
+        title.setFont(QFont("Arial", 24, QFont.Weight.Bold)) # cite: Sex.txt
+        layout.addWidget(title) # cite: Sex.txt
 
-        # TODO: Llamar a la función para cargar datos de la API
-        # self.load_products()
-        
-        return page
+        # Tabla (sin cambios)
+        self.table_products = QTableWidget() # cite: Sex.txt
+        # ... (configuración de columnas, cabeceras, edición, señales, etc. como estaba)
+        self.table_products.setColumnCount(5) # Ajustado a 5 por código anterior
+        self.table_products.setHorizontalHeaderLabels(["ID", "Nombre", "Precio", "Categoría", "Marca"]) # Ajustado
+        self.table_products.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch) # cite: Sex.txt
+        self.table_products.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked) # cite: Sex.txt
+        self.table_products.setSortingEnabled(False) # cite: Sex.txt
+        self.table_products.itemChanged.connect(self.handle_product_change) # cite: Sex.txt
+        self.table_products.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows) # Agregado antes
+        self.table_products.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection) # Agregado antes
+
+        layout.addWidget(self.table_products) # cite: Sex.txt
+
+        # --- Layout para Botones (CORREGIDO) ---
+        button_row_layout = QHBoxLayout() # cite: Sex.txt
+
+        # Botón Crear
+        self.btn_create_product = QPushButton("Crear Nuevo Producto") # cite: Sex.txt
+        self.btn_create_product.setStyleSheet("background-color: #007bff; color: white; padding: 10px; font-size: 14px;") # cite: Sex.txt
+        self.btn_create_product.clicked.connect(self.handle_create_product) # cite: Sex.txt
+        button_row_layout.addWidget(self.btn_create_product) # Añadir a layout H # cite: Sex.txt
+
+        button_row_layout.addStretch() # Espacio entre botones # cite: Sex.txt
+
+        # Botón Borrar
+        self.btn_delete_product = QPushButton("Borrar Producto Seleccionado") # cite: Sex.txt
+        self.btn_delete_product.setStyleSheet("background-color: #dc3545; color: white; padding: 10px; font-size: 14px;") # cite: Sex.txt
+        self.btn_delete_product.clicked.connect(self.handle_delete_product) # cite: Sex.txt
+        button_row_layout.addWidget(self.btn_delete_product) # Añadir a layout H (CORREGIDO)
+
+        # Añadir layout de botones al layout principal de la página
+        layout.addLayout(button_row_layout) # <-- AÑADIR ESTA LÍNEA
+        # ------------------------------------
+
+        return page # cite: Sex.txt
 
 
     def load_products(self):
@@ -550,62 +558,61 @@ class MainWindow(QMainWindow):
         """
         Descarga el reporte en el formato seleccionado (CSV o PDF).
         """
-        # Asegúrate de tener estas importaciones al principio de main.py
-        import datetime    
-        import os    
-        from PyQt6.QtWidgets import QApplication, QMessageBox, QFileDialog    
-
+        import datetime # cite: Sex.txt
+        import os # cite: Sex.txt
+        from PyQt6.QtWidgets import QApplication, QMessageBox, QFileDialog # cite: Sex.txt
+    
         # --- Determinar el formato ---
-        selected_text = self.combo_report_format.currentText()    
-        report_format = 'csv' # Default    
-        file_extension = '.csv'    
-        file_filter = "CSV Files (*.csv)"    
-
-        if "PDF" in selected_text:    
-            report_format = 'pdf'    
-            file_extension = '.pdf'    
-            file_filter = "PDF Files (*.pdf)"    
-
+        selected_text = self.combo_report_format.currentText() # Lee el selector # cite: Sex.txt
+        report_format = 'csv' # Default # cite: Sex.txt
+        file_extension = '.csv' # cite: Sex.txt
+        file_filter = "CSV Files (*.csv)" # cite: Sex.txt
+    
+        if "PDF" in selected_text: # Si selecciona PDF # cite: Sex.txt
+            report_format = 'pdf' # cite: Sex.txt
+            file_extension = '.pdf' # cite: Sex.txt
+            file_filter = "PDF Files (*.pdf)" # cite: Sex.txt
+    
         # --- Llamada a la API ---
-        self.statusBar.showMessage(f"Generando reporte de productos ({report_format.upper()})...")    
-        QApplication.processEvents() # Actualiza la interfaz gráfica    
-
-        content_bytes, error = self.api_client.download_product_report(report_format)    
-
-        # --- Manejar Errores de la API ---
-        if error:    
-            QMessageBox.critical(self, "Error al Descargar Reporte", error)    
-            self.statusBar.showMessage("Error al descargar reporte.", 5000)    
-            return    
-
-        if not content_bytes:    
-            QMessageBox.warning(self, "Descargar Reporte", "No se recibió contenido para el reporte.")    
-            self.statusBar.showMessage("No se recibió contenido del reporte.", 3000)    
-            return    
-
+        self.statusBar.showMessage(f"Generando reporte de productos ({report_format.upper()})...") # cite: Sex.txt
+        QApplication.processEvents() # cite: Sex.txt
+    
+        content_bytes, error = self.api_client.download_product_report(report_format) # Pasa el formato # cite: Sex.txt
+    
+        # --- Manejar Errores de la API (igual que antes) ---
+        if error: # cite: Sex.txt
+            QMessageBox.critical(self, "Error al Descargar Reporte", error) # cite: Sex.txt
+            self.statusBar.showMessage("Error al descargar reporte.", 5000) # cite: Sex.txt
+            return # cite: Sex.txt
+        if not content_bytes: # cite: Sex.txt
+            QMessageBox.warning(self, "Descargar Reporte", "No se recibió contenido para el reporte.") # cite: Sex.txt
+            self.statusBar.showMessage("No se recibió contenido del reporte.", 3000) # cite: Sex.txt
+            return # cite: Sex.txt
+    
         # --- Diálogo para Guardar Archivo ---
-        default_filename = f"productos_activos_{datetime.date.today()}{file_extension}"    
-        save_path, _ = QFileDialog.getSaveFileName(    
+        default_filename = f"productos_activos_{datetime.date.today()}{file_extension}" # cite: Sex.txt
+        save_path, _ = QFileDialog.getSaveFileName( # cite: Sex.txt
             self,
-            f"Guardar Reporte {report_format.upper()}",    
-            os.path.join(os.path.expanduser("~"), default_filename),    
-            file_filter    
+            f"Guardar Reporte {report_format.upper()}", # cite: Sex.txt
+            os.path.join(os.path.expanduser("~"), default_filename), # cite: Sex.txt
+            file_filter # Usa el filtro correcto # cite: Sex.txt
         )
-
-        # --- Guardar el Archivo ---
-        if save_path:    
-            if not save_path.lower().endswith(file_extension):    
-                 save_path += file_extension    
+    
+        # --- Guardar el Archivo (igual que antes) ---
+        if save_path: # cite: Sex.txt
+            if not save_path.lower().endswith(file_extension): # cite: Sex.txt
+                 save_path += file_extension # cite: Sex.txt
             try:
-                with open(save_path, 'wb') as f:    
-                    f.write(content_bytes)    
-                self.statusBar.showMessage(f"Reporte {report_format.upper()} guardado en {save_path}", 5000)    
-                QMessageBox.information(self, "Reporte Guardado", f"El reporte ({report_format.upper()}) se guardó en:\n{save_path}")    
-            except Exception as e:    
-                QMessageBox.critical(self, "Error al Guardar Archivo", f"No se pudo guardar el archivo:\n{e}")    
-                self.statusBar.showMessage("Error al guardar el archivo.", 5000)    
+                with open(save_path, 'wb') as f: # cite: Sex.txt
+                    f.write(content_bytes) # cite: Sex.txt
+                self.statusBar.showMessage(f"Reporte {report_format.upper()} guardado en {save_path}", 5000) # cite: Sex.txt
+                QMessageBox.information(self, "Reporte Guardado", f"El reporte ({report_format.upper()}) se guardó en:\n{save_path}") # cite: Sex.txt
+            except Exception as e: # cite: Sex.txt
+                QMessageBox.critical(self, "Error al Guardar Archivo", f"No se pudo guardar el archivo:\n{e}") # cite: Sex.txt
+                self.statusBar.showMessage("Error al guardar el archivo.", 5000) # cite: Sex.txt
         else:
-            self.statusBar.showMessage("Descarga cancelada.", 3000)    
+            self.statusBar.showMessage("Descarga cancelada.", 3000) # cite: Sex.txt
+
     def handle_user_change(self, item):
         """
         Se llama cuando el contenido de una celda en la tabla de usuarios cambia.
@@ -649,23 +656,23 @@ class MainWindow(QMainWindow):
     def handle_create_product(self):
         """Abre el diálogo para crear un producto y envía los datos a la API."""
         dialog = CreateProductDialog(self)
-    
+
         # Si el usuario hace clic en "Guardar Producto" (dialog.accept() es llamado)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             product_data = dialog.get_data()
-    
+
             # Validación simple (nombre no vacío)
             if not product_data['nombre_producto']:
                 QMessageBox.warning(self, "Datos Incompletos", "El nombre del producto es obligatorio.")
                 return # Podrías reabrir el diálogo o simplemente no hacer nada
-    
+
             self.statusBar.showMessage("Creando nuevo producto...")
             QApplication.processEvents()
-    
+
             # --- Llamar a la API ---
             new_product, message = self.api_client.create_product(product_data)
             # ---------------------
-    
+
             if new_product:
                 self.statusBar.showMessage(f"Producto '{new_product.get('nombre_producto')}' creado (ID: {new_product.get('id_producto')}).", 5000)
                 QMessageBox.information(self, "Producto Creado", message)

@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin, User
 from django.core.validators import MinLengthValidator, MaxValueValidator, MinValueValidator, MinValueValidator
 import uuid
@@ -6,6 +6,10 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.conf import settings
 from datetime import timedelta, date
+from django.utils.crypto import get_random_string
+
+
+
 
 
 
@@ -108,9 +112,24 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
-    is_verified = models.BooleanField(default=False)  # <-- NUEVO
+    is_verified = models.BooleanField(default=False)
 
     is_private = models.BooleanField(default=False, verbose_name="Perfil Privado")
+
+    # --- 👇 CAMPOS NUEVOS PARA INTERESES 👇 ---
+    intereses_categorias = models.ManyToManyField(
+        'Categoria', 
+        blank=True, 
+        related_name="usuarios_interesados",
+        verbose_name="Categorías de Interés"
+    )
+    intereses_marcas = models.ManyToManyField(
+        'Marca',
+        blank=True,
+        related_name="usuarios_interesados",
+        verbose_name="Marcas de Interés"
+    )
+    # -----------------------------------------
 
     verification_token = models.UUIDField(default=uuid.uuid4, editable=False, null=True, blank=True)
     token_created_at = models.DateTimeField(default=timezone.now)
@@ -1891,3 +1910,90 @@ class EntregaMensaje(models.Model):
 
     def __str__(self):
         return f"Entrega msg {self.mensaje_id} → user {self.usuario_id} [{self.estado}]"
+
+
+def card_upload_to(instance, filename):
+    return f"cards/{instance.user_id}/{instance.id}_{filename}"
+
+class GeneratedCard(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    prompt = models.TextField()
+    image = models.ImageField(upload_to=card_upload_to, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    share_token = models.CharField(max_length=32, unique=True, db_index=True, editable=False)
+
+    def save(self, *args, **kwargs):
+        if not self.share_token:
+            self.share_token = get_random_string(24)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Card #{self.pk} de {self.user_id}"
+    
+class ConversationEvent(models.Model):
+    TIPO_CHOICES = (
+        ('secret_santa', 'Amigo Secreto'),
+    )
+    conversacion = models.ForeignKey('Conversacion', on_delete=models.CASCADE, related_name='eventos')
+    tipo = models.CharField(max_length=40, choices=TIPO_CHOICES)
+    creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='eventos_creados')
+    titulo = models.CharField(max_length=120, blank=True, default='')
+    presupuesto_fijo = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    estado = models.CharField(max_length=20, default='borrador')  # borrador | sorteado | cerrado
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+    ejecutado_en = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-creado_en']
+
+class SecretSantaAssignment(models.Model):
+    evento = models.ForeignKey(ConversationEvent, on_delete=models.CASCADE, related_name='asignaciones')
+    da = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='ss_giver')
+    recibe = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='ss_receiver')
+
+    class Meta:
+        unique_together = (('evento', 'da'), ('evento', 'recibe'))
+
+
+# ⬇ NUEVO: participantes explícitos del evento standalone
+class EventParticipant(models.Model):
+    evento = models.ForeignKey(ConversationEvent, on_delete=models.CASCADE, related_name='participantes')
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    estado = models.CharField(max_length=16, default='inscrito')  # inscrito|retirado
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = (('evento', 'usuario'),)
+
+class RecommendationFeedback(models.Model):
+    """
+    Registra el feedback negativo (dislike) de un usuario
+    sobre una recomendación de producto.
+    """
+    id = models.AutoField(primary_key=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='recommendation_feedback'
+    )
+    product = models.ForeignKey(
+        'Producto',
+        on_delete=models.CASCADE,
+        related_name='recommendation_feedback'
+    )
+    # Guardamos solo los 'dislikes' por ahora
+    feedback_type = models.CharField(max_length=10, default='dislike')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'recommendation_feedback'
+        verbose_name = 'Feedback de Recomendación'
+        verbose_name_plural = 'Feedbacks de Recomendaciones'
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'product'], name='unique_user_product_feedback')
+        ]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.nombre_usuario} no le gusta {self.product.nombre_producto}"        

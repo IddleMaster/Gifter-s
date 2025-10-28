@@ -20,6 +20,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env()
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+for key, value in env.ENVIRON.items():
+    os.environ[key] = value
+
 # ===== Meilisearch  =====
 USE_MEILI = os.getenv("USE_MEILI", "false").lower() == "true"
 MEILI_URL = os.getenv("MEILI_URL", "http://meilisearch:7700")
@@ -109,6 +112,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 "django.template.context_processors.request",
+                'core.context.navbar_notifications',
                 
             ],
         },
@@ -249,7 +253,7 @@ ACCOUNT_PRESERVE_USERNAME_CASING = False
 
 # Allauth sin username
 ACCOUNT_USERNAME_REQUIRED = False
-ACCOUNT_USER_MODEL_USERNAME_FIELD = None   # <- clave para que no busque 'username'
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None   
 ACCOUNT_AUTHENTICATION_METHOD = "email"
 ACCOUNT_USER_MODEL_EMAIL_FIELD = "correo"
 ACCOUNT_EMAIL_REQUIRED = True
@@ -283,3 +287,4 @@ GIFTER_AI_MODEL = "gpt-4o-mini"
 
 # Tiempo de caché para sugerencias IA (30 minutos)
 GIFTER_AI_CACHE_TTL = 60 * 30
+

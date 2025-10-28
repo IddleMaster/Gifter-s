@@ -151,7 +151,7 @@ class ProductoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Producto
         fields = (
-            
+            'id_producto',
             'nombre_producto', 
             'descripcion', 
             'precio', 
@@ -162,7 +162,7 @@ class ProductoSerializer(serializers.ModelSerializer):
             'imagen', # URL de la imagen si la tienes configurada
             'activo' 
         )
-        read_only_fields = ('categoria_nombre', 'marca_nombre') 
+        read_only_fields = ('categoria_nombre', 'marca_nombre','id_producto') 
         
 # ---- Usuarios (Admin) ----
 class AdminUserSerializer(serializers.ModelSerializer):

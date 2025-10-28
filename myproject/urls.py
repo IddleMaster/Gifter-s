@@ -20,8 +20,12 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 
-
-
+from core.api_views import (
+    NotificacionListCreateView,
+    NotificacionDetailView,
+    MarkAllReadView,
+    SummaryView,
+)
 
 
 
@@ -96,7 +100,9 @@ urlpatterns = [
     path('api/productos/', views.ProductoListAPIView.as_view(), name='api_producto_list'), 
     path('api/productos/<int:pk>/', views.ProductoDetailAPIView.as_view(), name='api_producto_detail'),
     # --- Rutas API para Reportes ---
-    path('api/reports/products/download/', views.download_active_products_csv, name='api_report_products_download'), 
+    path('api/reports/products/download/', views.download_active_products_csv, name='api_report_products_csv_download'),
+    path('api/reports/products/download/pdf/', views.download_active_products_pdf, name='api_report_products_pdf_download'),
+    path('reports/products/download/', views.download_active_products_csv, name='download_product_report'),
     
     # --- Rutas API para Usuarios (Admin) --- # <-- NUEVA SECCIÓN
     path('api/users/', views.UserListAPIView.as_view(), name='api_user_list'),
@@ -155,14 +161,34 @@ urlpatterns = [
     path('chat/unread-summary/', views.chat_unread_summary, name='chat_unread_summary'),
     path("chat/unread-summary/", views.chat_unread_summary, name="chat_unread_summary"),
     path("chat/<int:conv_id>/mark-read/", views.conversacion_mark_read, name="conversacion_mark_read"),
+
+   # Eventos standalone (no dependen de un grupo existente)
+    path('chat/events/', views.events_my_list_create, name='events_my_list_create'),
+    
  
-   
+    path("cards/s/<str:token>/", ver_card_publica, name="cards_publica"),
     
     ##para resena jiji
     path("resena/", views.resena_sitio_crear, name="resena_sitio_crear"),
     path("resena/editar/", views.resena_sitio_editar, name="resena_sitio_editar"),
     path("resena/eliminar/", views.resena_sitio_eliminar, name="resena_sitio_eliminar"),
+    
 
+    ## Para notificaciones navBar
+    path("notificaciones/mark-all-read/", views.notificaciones_mark_all_read, name="notificaciones_mark_all_read"),
+
+
+
+
+    path('recommendation-feedback/', recommendation_feedback, name='recommendation_feedback'),
+
+
+
+
+
+
+    path("api/cards/generar/", views.generar_card_hf, name="cards_generar"),
+    path("cards/crear/<str:username>/", views.cards_crear, name="cards_crear"),
 
 
 
@@ -193,6 +219,12 @@ urlpatterns = [
          name='password_reset_complete'),
     # --- Fin URLs para Restablecimiento ---
 
+###apartadiño de evento (amigo secret)
+    path('chat/<int:conversacion_id>/events/', views.events_list_create, name='events_list_create'),           # GET lista, POST crear
+    path('chat/events/<int:evento_id>/', views.event_detail, name='event_detail'),                             # GET detalle (admin)
+    path('chat/events/<int:evento_id>/draw/', views.event_draw, name='event_draw'),                            # POST sortear
+    path('chat/events/<int:evento_id>/lock/', views.event_lock, name='event_lock'),                            # POST cerrar (opcional)
+    path('chat/events/<int:evento_id>/mine/', views.event_my_assignment, name='event_my_assignment'),          # GET mi asignación
     
 
 ]

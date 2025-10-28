@@ -6,6 +6,134 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/perfil.css' %}">
+<style>
+  /* --- Botones de perfil público --- */
+  .btn-edit {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 30px;
+    font-weight: 600;
+    padding: 8px 18px;
+    transition: all .25s ease;
+    text-decoration: none;
+    border: none;
+  }
+
+  /* Botón "Chatear" */
+  .btn-edit.btn-chat {
+    background: #fff;
+    color: #1970ea;
+    border: 2px solid #1970ea;
+  }
+  .btn-edit.btn-chat:hover {
+    background: #1970ea;
+    color: #fff;
+  }
+
+  /* Botón "Enviar postal" */
+  .btn-edit.btn-postal {
+    background: #1970ea;
+    color: #fff;
+    border: 2px solid #fff;
+  }
+  .btn-edit.btn-postal:hover {
+    background: #fff;
+    color: #1970ea;
+  }
+  /* --- Botones de perfil público --- */
+.acciones-amigo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end; /* o center si quieres centrarlos */
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.btn-edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 30px;
+  font-weight: 600;
+  padding: 8px 20px;
+  transition: all .25s ease;
+  text-decoration: none;
+  border: none;
+}
+
+/* Botón "Chatear" */
+.btn-edit.btn-chat {
+  background: #fff;
+  color: #1970ea;
+  border: 2px solid #1970ea;
+}
+.btn-edit.btn-chat:hover {
+  background: #1970ea;
+  color: #fff;
+}
+
+/* Botón "Enviar postal" */
+.btn-edit.btn-postal {
+  background: #1970ea;
+  color: #fff;
+  border: 2px solid #fff;
+}
+.btn-edit.btn-postal:hover {
+  background: #fff;
+  color: #1970ea;
+}
+/* --- Contenedor botones --- */
+.acciones-amigo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end; /* o center si prefieres centrados */
+  gap: 10px;
+  margin-top: 8px;
+}
+
+/* --- Estilos base --- */
+.btn-edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 30px;
+  font-weight: 600;
+  padding: 10px 20px;
+  width: 180px;             /* <<< asegura mismo ancho */
+  text-align: center;
+  transition: all .25s ease;
+  text-decoration: none;
+  border: none;
+  box-sizing: border-box;
+}
+
+/* Botón "Chatear" */
+.btn-edit.btn-chat {
+  background: #fff;
+  color: #1970ea;
+  border: 2px solid #1970ea;
+}
+.btn-edit.btn-chat:hover {
+  background: #1970ea;
+  color: #fff;
+}
+
+/* Botón "Enviar postal" */
+.btn-edit.btn-postal {
+  background: #1970ea;
+  color: #fff;
+  border: 2px solid #fff;
+}
+.btn-edit.btn-postal:hover {
+  background: #fff;
+  color: #1970ea;
+}
+
+</style>
+
 {% endblock %}
 
 {% block content %}
@@ -26,10 +154,19 @@
     <div class="edit-profile">
       {# --- Acciones de relación / chat --- #}
       {% if request.user.is_authenticated %}
-      {% if es_amigo %}
-      <a href="#" id="btnChatPerfilPublico" class="btn-edit" data-username="{{ usuario_publico.nombre_usuario }}">
-        <i class="bi bi-chat-dots"></i> Chatear
-      </a>
+{% if es_amigo %}
+  <div class="acciones-amigo">
+    <a href="#" id="btnChatPerfilPublico" class="btn-edit btn-chat" data-username="{{ usuario_publico.nombre_usuario }}">
+      <i class="bi bi-chat-dots"></i> Chatear
+    </a>
+
+    <a href="{% url 'cards_crear' usuario_publico.nombre_usuario %}" class="btn-edit btn-postal mt-2">
+      <i class="bi bi-envelope-paper-heart"></i> Enviar postal
+    </a>
+  </div>
+
+
+
       {% elif pendiente_enviada %}
       <form method="post" action="{% url 'amistad_cancelar' usuario_publico.nombre_usuario %}"
         class="js-amistad-cancelar">
@@ -77,7 +214,7 @@
 
   <section id="actividad" class="tab-content">
     <h3>Actividad de “{{ usuario_publico.nombre_usuario }}”</h3>
-     <hr class="my-3">
+    <hr class="my-3">
     {% if not es_amigo %}
     <p class="text-muted">Solo los amigos pueden ver la actividad.</p>
     {% else %}
@@ -116,9 +253,9 @@
   <section id="eventos" class="tab-content">
     <div class="events-header">
       <h3>Eventos importantes de “{{ usuario_publico.nombre_usuario }}”</h3>
-       
+
     </div>
-     <hr class="my-3">
+    <hr class="my-3">
     {% if not es_amigo %}
     <p class="text-muted">Solo los amigos pueden ver los eventos.</p>
     {% else %}
@@ -149,67 +286,90 @@
     {% endif %}
   </section>
 
-<section id="wishlist" class="tab-content active">
-  <h3>Wishlist de “{{ usuario_publico.nombre_usuario }}”</h3>
-   <hr class="my-3">
+  <div class="user-interests mt-3">
+    {% if usuario_publico.intereses_categorias.all %}
+    <h6 class="small text-uppercase text-muted">Categorías de interés</h6>
+    <div class="interest-pills-container">
+      {% for categoria in usuario_publico.intereses_categorias.all %}
+      <span class="badge rounded-pill bg-primary">{{ categoria.nombre_categoria }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
 
-  {# --- NUEVA LÓGICA DE PRIVACIDAD --- #}
-  {% if usuario_publico.is_private and not es_amigo %}
+    {% if usuario_publico.intereses_marcas.all %}
+    <h6 class="small text-uppercase text-muted mt-3">Marcas de interés</h6>
+    <div class="interest-pills-container">
+      {% for marca in usuario_publico.intereses_marcas.all %}
+      <span class="badge rounded-pill bg-secondary">{{ marca.nombre_marca }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <section id="wishlist" class="tab-content active">
+    <h3>Wishlist de “{{ usuario_publico.nombre_usuario }}”</h3>
+    <hr class="my-3">
+
+
+    {# --- NUEVA LÓGICA DE PRIVACIDAD --- #}
+    {% if usuario_publico.is_private and not es_amigo %}
     <p class="text-muted">🔒 Este perfil es privado. Solo los amigos pueden ver la wishlist.</p>
-  {% else %}
-
+    {% else %}
+    
     {# --- Wishlist: SIEMPRE lo no comprado --- #}
     {% if wishlist_items_publicos and wishlist_items_publicos|length > 0 %}
-      <div class="gift-grid">
-        {% for it in wishlist_items_publicos %}
-          {% with p=it.id_producto %}
-            <div class="gift-card">
-              <img src="{% if p.imagen and p.imagen.url %}{{ p.imagen.url }}{% else %}{% static 'img/Gifters/favicongift.png' %}{% endif %}"
-                   alt="{{ p.nombre_producto }}">
-              <div class="gift-info">
-                <h4>{{ p.nombre_producto }}</h4>
-                <p>{{ p.id_marca.nombre_marca|default:'' }}</p>
-              </div>
-              <div class="gift-actions">
-                <a class="btn btn-sm btn-outline-primary" href="{% url 'producto_detalle' p.id_producto %}">Ver</a>
-                {% with url_tienda=p.url_tienda_principal|default:p.urls_tienda.first %}
-                  {% if url_tienda %}
-                    <a class="btn btn-sm btn-outline-secondary" href="{{ url_tienda.url }}" target="_blank" rel="noopener">Tienda</a>
-                  {% endif %}
-                {% endwith %}
-              </div>
-            </div>
+    <div class="gift-grid">
+      {% for it in wishlist_items_publicos %}
+      {% with p=it.id_producto %}
+      <div class="gift-card">
+        <img
+          src="{% if p.imagen and p.imagen.url %}{{ p.imagen.url }}{% else %}{% static 'img/Gifters/favicongift.png' %}{% endif %}"
+          alt="{{ p.nombre_producto }}">
+        <div class="gift-info">
+          <h4>{{ p.nombre_producto }}</h4>
+          <p>{{ p.id_marca.nombre_marca|default:'' }}</p>
+        </div>
+        <div class="gift-actions">
+          <a class="btn btn-sm btn-outline-primary" href="{% url 'producto_detalle' p.id_producto %}">Ver</a>
+          {% with url_tienda=p.url_tienda_principal|default:p.urls_tienda.first %}
+          {% if url_tienda %}
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_tienda.url }}" target="_blank"
+            rel="noopener">Tienda</a>
+          {% endif %}
           {% endwith %}
-        {% endfor %}
+        </div>
       </div>
+      {% endwith %}
+      {% endfor %}
+    </div>
     {% else %}
-      <p class="text-muted mt-3">No tiene productos visibles en su wishlist.</p>
+    <p class="text-muted mt-3">No tiene productos visibles en su wishlist.</p>
     {% endif %}
 
     {# --- IA 100% (texto): ideas debajo de la wishlist --- #}
     {% if sugerencias_ia and sugerencias_ia|length > 0 %}
-      <div class="card mt-4">
-        <div class="card-header fw-bold">💡 Ideas de regalo</div>
-        <div class="card-body">
-          <ul class="mb-0 ps-3">
-            {% for sug in sugerencias_ia %}
-              <li class="mb-1">
-                <strong>{{ sug.idea }}</strong>{% if sug.explicacion %}: {{ sug.explicacion }}{% endif %}
-              </li>
-            {% endfor %}
-          </ul>
-        </div>
+    <div class="card mt-4">
+      <div class="card-header fw-bold">💡 Ideas de regalo</div>
+      <div class="card-body">
+        <ul class="mb-0 ps-3">
+          {% for sug in sugerencias_ia %}
+          <li class="mb-1">
+            <strong>{{ sug.idea }}</strong>{% if sug.explicacion %}: {{ sug.explicacion }}{% endif %}
+          </li>
+          {% endfor %}
+        </ul>
       </div>
+    </div>
     {% endif %}
 
-  {% endif %}
-</section>
+    {% endif %}
+  </section>
 
 
 
   <section id="recibidos" class="tab-content">
     <h3>Regalos recibidos por “{{ usuario_publico.nombre_usuario }}”</h3>
-     <hr class="my-3">
+    <hr class="my-3">
 
     {% if not recibidos_publicos %}
     <p class="text-muted">Aún no registra regalos recibidos.</p>

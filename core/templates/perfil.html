@@ -290,8 +290,10 @@
       <h2>{{ request.user.nombre }} {{ request.user.apellido }}</h2>
       <p class="text-muted">@{{ request.user.nombre_usuario }}</p>
       <p class="description">{{ request.user.perfil.bio|default:"Sin biografía aún." }}</p>
+      
     </div>
 
+    
     <div class="edit-profile">
 
       <a href="{% url 'perfil_editar' %}" class="btn-edit">Editar perfil ✎</a>
@@ -319,8 +321,29 @@
   </nav>
 </div>
 
-<div class="profile-content">
+<br>
 
+<div class="profile-content">
+  <div class="user-interests mt-3">
+    {% if user.intereses_categorias.all %}
+        <h6 class="small text-uppercase text-muted">Categorías de interés</h6>
+        <div class="interest-pills-container">
+            {% for categoria in user.intereses_categorias.all %}
+                <span class="badge rounded-pill bg-primary">{{ categoria.nombre_categoria }}</span>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    
+</div>
+{% if user.intereses_marcas.all %}
+        <h6 class="small text-uppercase text-muted mt-3">Marcas de interés</h6>
+        <div class="interest-pills-container">
+            {% for marca in user.intereses_marcas.all %}
+                <span class="badge rounded-pill bg-secondary">{{ marca.nombre_marca }}</span>
+            {% endfor %}
+        </div>
+    {% endif %}
   <!-- Wishlist -->
   <section id="wishlist" class="tab-content active">
     <h3>Tu WishList</h3>
@@ -370,6 +393,13 @@
       {% endfor %}
       {% endif %}
     </div>
+  </section>
+  <!-- Wishlist -->
+  <section id="Intereses" class="tab-content active">
+    <h3>Tus intereses</h3>
+    <hr class="my-3">
+
+    
   </section>
 
 
@@ -748,6 +778,51 @@
       transform: scale(.96);
     }
   }
+  /* Estilos para los contenedores de píldoras en perfil */
+.user-interests-scroll-container {
+    display: flex; /* Para que las píldoras se alineen horizontalmente */
+    flex-wrap: nowrap; /* Evita que las píldoras salten a la siguiente línea */
+    overflow-x: auto; /* Habilita el scroll horizontal si las píldoras exceden el ancho */
+    -webkit-overflow-scrolling: touch; /* Mejorar el scroll en iOS */
+    padding-bottom: 5px; /* Pequeño padding para evitar que la barra de scroll se pegue */
+    gap: 8px; /* Espacio entre las píldoras */
+    scrollbar-width: thin; /* Estilo de la barra de scroll en Firefox */
+    scrollbar-color: #0d6efd #f1f1f1; /* Color de la barra de scroll en Firefox */
+}
+
+/* Estilo de la barra de scroll para Webkit (Chrome, Safari) */
+.user-interests-scroll-container::-webkit-scrollbar {
+    height: 8px;
+}
+.user-interests-scroll-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+.user-interests-scroll-container::-webkit-scrollbar-thumb {
+    background: #0d6efd;
+    border-radius: 10px;
+}
+.user-interests-scroll-container::-webkit-scrollbar-thumb:hover {
+    background: #0a58ca;
+}
+
+/* Estilo para las píldoras de interés */
+.interest-pill-display {
+    flex-shrink: 0; /* Evita que las píldoras se achiquen */
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border-radius: 999px;
+    white-space: nowrap; /* Asegura que el texto no se rompa */
+}
+.interest-pill-display.bg-primary { /* Para categorías */
+    background-color: #0d6efd !important; /* Asegura que se aplique el color de Bootstrap */
+    color: #fff;
+}
+.interest-pill-display.bg-secondary { /* Para marcas */
+    background-color: #6c757d !important; /* Asegura que se aplique el color de Bootstrap */
+    color: #fff;
+}
 </style>
 
 
@@ -1369,7 +1444,18 @@
     }
   });
 </script>
-
+<style>
+  .interest-pills-container {
+    display: flex;       /* Alinea las píldoras horizontalmente */
+    flex-wrap: wrap;     /* Permite que salten a la siguiente línea si no caben */
+    gap: 8px;            /* Espacio entre las píldoras */
+  }
+  .user-interests .badge {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+  }
+</style>
 
 
 {% endblock %}

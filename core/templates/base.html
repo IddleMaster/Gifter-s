@@ -31,7 +31,6 @@
 
 
   <style>
-    
     body,
     h1,
     h2,
@@ -236,7 +235,7 @@
       color: #9ca3af;
     }
 
-    
+
     .msg {
       display: flex;
       gap: 8px;
@@ -309,7 +308,7 @@
       font-weight: 700;
     }
 
-    
+
     .phone-bottom-nav {
       display: none;
       border-top: 1px solid #eef1f5;
@@ -1007,6 +1006,9 @@
         <i class="bi bi-collection"></i> Grupos
         <span class="dot hidden" id="tabDotGrupos"></span>
       </button>
+      <button class="tab-btn" data-tab="eventos">
+        <i class="bi bi-calendar-event"></i> Eventos
+      </button>
     </div>
 
     <div class="chat-head" hidden></div>
@@ -1027,6 +1029,8 @@
           style="display:none; position:absolute; inset:0; overflow:auto; background:#fff;"></div>
       </div>
 
+      <div id="eventsList" class="chat-list"
+        style="display:none; position:absolute; inset:0; overflow:auto; background:#fff;"></div>
 
       <!-- Columna derecha (mensajes) -->
       <div class="chat-pane" style="flex:1; display:flex; flex-direction:column;">
@@ -1065,6 +1069,11 @@
       grupoQuitarMiembro: "{% url 'grupos_remove_member' 0 %}",
       grupoEliminar: "{% url 'grupos_delete' 0 %}",
       grupoSalir: "{% url 'grupos_leave' 0 %}",
+      eventosListCreate: "{% url 'events_list_create' 0 %}",     // .replace('/0/', `/${convId}/`)
+      eventoDetail: "{% url 'event_detail' 0 %}",
+      eventoDraw: "{% url 'event_draw' 0 %}",
+      eventoLock: "{% url 'event_lock' 0 %}",
+      eventoMine: "{% url 'event_my_assignment' 0 %}",
 
     };
   </script>
@@ -1091,20 +1100,39 @@
         username: ("{{ user.nombre_usuario|default:''|escapejs }}").trim()
       };
       // Cache liviana del preview por conversación
-      const previewCache = new Map(); // convId -> {text, time}
-      function setPreview(convId, text, timeISO) {
+      const previewCache = new Map();
+
+      function setPreview(convId, text, timeISO, lastId = null, opts = {}) {
+        const { noReorderOnSeed = false } = opts;
+
         const key = String(convId);
-        const next = { text: text || '', time: timeISO || null };
+        const next = { text: text || '', time: timeISO || null, id: lastId ?? null };
         const prev = previewCache.get(key);
 
-        const changed =
-          !prev ||
-          prev.text !== next.text ||
-          String(prev.time || '') !== String(next.time || '');
+        // ⚠️ Semilla inicial (no había cache)
+        if (!prev) {
+          previewCache.set(key, next);
+          // Si venimos de un click (seed), NO reordenar
+          if (noReorderOnSeed) return;
+          // Comportamiento anterior: en otros casos sí puede reordenar
+          patchAnyRow(convId);
+          return;
+        }
+
+        // --- Tu misma lógica de cambio (prioriza id) ---
+        let changed;
+        if ((prev && prev.id != null) || (next.id != null)) {
+          changed = String(prev?.id ?? '') !== String(next.id ?? '');
+        } else {
+          changed = (
+            prev.text !== next.text ||
+            String(prev.time || '') !== String(next.time || '')
+          );
+        }
 
         previewCache.set(key, next);
 
-        // 👇 Sólo reordenamos/parchamos si cambió el contenido mostrado
+        // Solo reordenar si cambió
         if (changed) patchAnyRow(convId);
       }
       function getPreview(convId) {
@@ -1159,7 +1187,7 @@
         const m = arr[0];
         const isImg = (m.tipo === 'imagen') || !!m.archivo_url || !!(m.metadatos && m.metadatos.archivo_url);
         const prevText = isImg ? '📷 Imagen' : slicePreview(m.contenido);
-        setPreview(convId, prevText, m.creado_en);
+        setPreview(convId, prevText, m.creado_en, m.id || m.pk || null);
         patchAnyRow(convId);
       }
 
@@ -1275,7 +1303,7 @@
           (data || []).forEach(c => {
             const last = c.ultimo_mensaje || {};
             const prevText = (last.tipo === 'imagen') ? '📷 Imagen' : slicePreview(last.contenido);
-            setPreview(c.conversacion_id, prevText, last.creado_en);
+            setPreview(c.conversacion_id, prevText, last.creado_en, last.id || last.pk || null);
           });
 
           renderConversationList(data, typingMap);  // ← pasamos typingMap al renderer
@@ -1364,7 +1392,7 @@
           // ✅ Detecta imagen y guarda en cache el texto correcto
           const isImg = (last.tipo === 'imagen') || !!last.archivo_url || !!(last.metadatos && last.metadatos.archivo_url);
           const prevText = isImg ? '📷 Imagen' : slicePreview(last.contenido);
-          setPreview(conv.conversacion_id, prevText, last.creado_en);
+          setPreview(conv.conversacion_id, prevText, last.creado_en, last.id || last.pk || null);
 
           const row = document.createElement('div');
           row.className = 'chat-list-item' + (conv.conversacion_id === window.currentConvId ? ' active' : '');
@@ -1458,7 +1486,7 @@
             const isImg = (last.tipo === 'imagen') || !!last.archivo_url || !!(last.metadatos && last.metadatos.archivo_url);
             const prevText = isImg ? '📷 Imagen' : slicePreview(last.contenido);
             // 👉 esto actualiza cache + texto/tiempo y mueve la fila al tope en #groupsList si ya existe
-            setPreview(c.conversacion_id, prevText, last.creado_en);
+            setPreview(c.conversacion_id, prevText, last.creado_en, last.id || last.pk || null);
           });
         } catch { /* noop */ }
       }
@@ -1507,7 +1535,13 @@
           // Actualiza preview/horario en ambas listas (chats y grupos)
           if (newest) {
             const prevText = (newest.tipo === 'imagen') ? '📷 Imagen' : slicePreview(newest.contenido);
-            setPreview(window.currentConvId, prevText, newest.creado_en); // ya hace el patch internally
+            setPreview(
+              window.currentConvId,
+              prevText,
+              newest.creado_en,
+              newest.id || newest.pk || null,
+              { noReorderOnSeed: true }   // 👈 evita subir solo por click
+            );
           }
 
           // Auto-scroll si hay mensajes nuevos o ya estabas abajo
@@ -3313,7 +3347,7 @@
           headers: { "X-CSRFToken": (window.CSRF_TOKEN || "") },
           credentials: "same-origin"
         });
-        if (!r.ok) { console.warn("mark-read failed", r.status); return; } 
+        if (!r.ok) { console.warn("mark-read failed", r.status); return; }
         window.Chat.clearUnreadDot(convId);
         refreshGlobalUnreadDot();
       } catch (e) { console.error("mark-read failed", e); }
@@ -3322,7 +3356,179 @@
 
     // Estado inicial
     document.addEventListener("DOMContentLoaded", refreshGlobalUnreadDot);
-  </script>  
+  </script>
+  <script>
+    (function () {
+      const eventsEl = document.getElementById('eventsList');
+      let eventsLoaded = false;
+
+      async function loadEvents() {
+        if (!window.currentConvId) {
+          eventsEl.innerHTML = '<div class="p-3 text-muted">Abre un grupo para ver sus eventos.</div>';
+          return;
+        }
+        eventsEl.innerHTML = '<div class="p-3 text-muted">Cargando eventos…</div>';
+        try {
+          const url = window.URLS.eventosListCreate.replace('/0/', `/${window.currentConvId}/`);
+          const r = await fetch(url, { credentials: 'same-origin' });
+          if (!r.ok) throw 0;
+          const j = await r.json();
+          const list = Array.isArray(j.results) ? j.results : [];
+          if (!list.length) {
+            eventsEl.innerHTML = `
+          <div class="p-3">
+            <div class="mb-2 text-muted">Aún no hay eventos.</div>
+            ${window.currentConvIsGroup ? '<button class="btn btn-sm btn-primary" id="btnNewEvent">Nuevo Amigo Secreto</button>' : ''}
+          </div>`;
+          } else {
+            eventsEl.innerHTML = `
+          <div class="d-flex justify-content-between align-items-center p-2">
+            <span class="fw-semibold">Eventos</span>
+            ${window.currentConvIsGroup ? '<button class="btn btn-sm btn-primary" id="btnNewEvent">Nuevo</button>' : ''}
+          </div>
+          <div class="px-2">
+            ${list.map(e => `
+              <div class="chat-list-item" data-event-id="${e.id}">
+                <div class="chat-names">
+                  <div class="line1">${e.titulo || 'Amigo Secreto'}</div>
+                  <div class="line2">${e.estado}${e.presupuesto ? ' • $' + e.presupuesto : ''}</div>
+                </div>
+                <div class="chat-time">${new Date(e.creado_en).toLocaleDateString()}</div>
+              </div>`).join('')}
+          </div>`;
+          }
+
+          eventsEl.querySelector('#btnNewEvent')?.addEventListener('click', openCreateEvent);
+          eventsEl.querySelectorAll('.chat-list-item[data-event-id]')?.forEach(row => {
+            row.addEventListener('click', () => openEventDetail(Number(row.dataset.eventId)));
+          });
+
+        } catch (e) {
+          eventsEl.innerHTML = '<div class="p-3 text-danger">No se pudieron cargar eventos.</div>';
+        }
+      }
+
+      async function openCreateEvent() {
+        // Minimal: crea evento con defaults
+        const url = window.URLS.eventosListCreate.replace('/0/', `/${window.currentConvId}/`);
+        try {
+          const r = await fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': (window.CSRF_TOKEN || '') },
+            body: JSON.stringify({ tipo: 'secret_santa', titulo: 'Amigo Secreto', presupuesto: null })
+          });
+          if (!r.ok) throw 0;
+          await loadEvents();
+        } catch { alert('No se pudo crear el evento.'); }
+      }
+
+      async function openEventDetail(eventId) {
+        try {
+          const r = await fetch(window.URLS.eventoDetail.replace('/0/', `/${eventId}/`), { credentials: 'same-origin' });
+          if (!r.ok) throw 0;
+          const j = await r.json();
+          // Admin: permitir sortear; todos: ver mi asignación (si ya sorteado/cerrado)
+          const isAdmin = !!document.getElementById('groupKebab')?.style?.display && document.getElementById('groupKebab').style.display !== 'none';
+
+          let actions = '';
+          if (isAdmin && (j.estado === 'borrador' or j.estado === 'sorteado')) {
+            actions += `<button class="btn btn-sm btn-primary" id="btnDraw">Sortear</button>`;
+            if (j.estado === 'sorteado') actions += ` <button class="btn btn-sm btn-outline-secondary" id="btnLock">Cerrar</button>`;
+          }
+          const body = document.createElement('div');
+          body.className = 'p-3';
+          body.innerHTML = `
+        <div class="mb-2"><strong>${j.titulo || 'Amigo Secreto'}</strong></div>
+        <div class="mb-3 text-muted">Estado: ${j.estado}${j.presupuesto ? ' • Presupuesto: $' + j.presupuesto : ''}</div>
+        <div class="mb-3" id="mineBox"></div>
+        <div>${actions}</div>
+      `;
+
+          // Modal básico reutilizando tus helpers
+          const MODAL_ID = 'modalEventDetail';
+          let modal = document.getElementById(MODAL_ID);
+          if (!modal) {
+            modal = document.createElement('div');
+            modal.id = MODAL_ID;
+            modal.className = 'modal';
+            modal.tabIndex = -1;
+            modal.innerHTML = `
+          <div class="modal-dialog"><div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Evento</h5>
+              <button type="button" class="btn-close" data-close></button>
+            </div>
+            <div class="modal-body" id="${MODAL_ID}-body"></div>
+            <div class="modal-footer"><button class="btn btn-light" data-close>Cerrar</button></div>
+          </div></div>`;
+            document.body.appendChild(modal);
+          }
+          document.getElementById(`${MODAL_ID}-body`).innerHTML = '';
+          document.getElementById(`${MODAL_ID}-body`).appendChild(body);
+          openBasicModal(MODAL_ID);
+
+          // “Mi asignación”
+          if (j.estado !== 'borrador') {
+            try {
+              const r2 = await fetch(window.URLS.eventoMine.replace('/0/', `/${eventId}/`), { credentials: 'same-origin' });
+              const m = await r2.json();
+              const mineBox = body.querySelector('#mineBox');
+              if (m.has) {
+                const n = [m.usuario.nombre, m.usuario.apellido].filter(Boolean).join(' ') || ('@' + (m.usuario.username || ''));
+                mineBox.innerHTML = `<div class="alert alert-info">Te tocó: <strong>${n}</strong></div>`;
+              } else {
+                mineBox.innerHTML = `<div class="text-muted">Aún no tienes asignación visible.</div>`;
+              }
+            } catch { }
+          }
+
+          // Acciones admin
+          body.querySelector('#btnDraw')?.addEventListener('click', async () => {
+            if (!confirm('¿Realizar sorteo ahora?')) return;
+            try {
+              const rr = await fetch(window.URLS.eventoDraw.replace('/0/', `/${eventId}/`), {
+                method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': (window.CSRF_TOKEN || '') }
+              });
+              if (!rr.ok) throw 0;
+              await openEventDetail(eventId);
+            } catch { alert('No se pudo sortear.'); }
+          });
+          body.querySelector('#btnLock')?.addEventListener('click', async () => {
+            try {
+              const rr = await fetch(window.URLS.eventoLock.replace('/0/', `/${eventId}/`), {
+                method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': (window.CSRF_TOKEN || '') }
+              });
+              if (!rr.ok) throw 0;
+              await openEventDetail(eventId);
+            } catch { alert('No se pudo cerrar.'); }
+          });
+
+        } catch { alert('No se pudo abrir el evento.'); }
+      }
+
+      // Hook del tab
+      (function hookTabs() {
+        const drawer = document.getElementById('chatDrawer');
+        if (!drawer) return;
+        drawer.addEventListener('click', (e) => {
+          const btn = e.target.closest('.tab-btn[data-tab]');
+          if (!btn) return;
+          const tab = btn.dataset.tab;
+          if (tab !== 'eventos') return;
+
+          // Mostrar panel eventos, ocultar otros en columna izquierda
+          document.getElementById('friendsList')?.style && (document.getElementById('friendsList').style.display = 'none');
+          document.getElementById('groupsList')?.style && (document.getElementById('groupsList').style.display = 'none');
+          document.getElementById('chatList')?.style && (document.getElementById('chatList').style.visibility = 'hidden');
+          eventsEl.style.display = 'block';
+          loadEvents();
+        });
+      })();
+
+      // Cuando abras una conversación de grupo, si el usuario cambia a “Eventos”, ya existe currentConvId
+    })();
+  </script>
 
 </body>
 

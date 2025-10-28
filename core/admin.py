@@ -133,3 +133,9 @@ class ProductoAdmin(admin.ModelAdmin):
 #     list_display = ('id_usuario', 'calificacion', 'fecha_resena')
 #     list_filter = ('calificacion', 'fecha_resena')
 #     search_fields = ('id_usuario__username', 'comentario')
+
+@admin.register(GeneratedCard)
+class GeneratedCardAdmin(admin.ModelAdmin):
+    list_display = ("id", "user", "created_at")
+    search_fields = ("prompt", "share_token")
+    list_filter = ("created_at",)

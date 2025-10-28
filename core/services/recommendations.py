@@ -1,8 +1,9 @@
 # core/services/recommendations.py
-from typing import List, Tuple
+# core/services/recommendations.py
+from typing import List, Tuple, Optional
 from django.core.cache import cache
 from django.db.models import Q, Case, When, Value, IntegerField, F, ExpressionWrapper, Max
-from core.models import Producto, Wishlist, ItemEnWishlist, User
+from core.models import Producto, Wishlist, ItemEnWishlist, User, RecommendationFeedback
 
 CACHE_TTL = 60 * 5  # 5 minutos
 
@@ -79,13 +80,15 @@ def invalidate_user_reco_cache(usuario: User):
     cache.delete(f"ai:reco:v2:{usuario.id}:*")  # si tu backend soporta wildcard, OK
     # si NO soporta wildcard, no pasa nada; el fingerprint ya forzará recálculo.
 
-def recommend_products_for_user(usuario: User, limit: int = 6) -> List[Producto]:
+# --- 👇 AQUÍ ESTÁ LA FUNCIÓN CORREGIDA 👇 ---
+def recommend_products_for_user(usuario: User, limit: int = 6, exclude_ids: Optional[List[int]] = None) -> List[Producto]:
     """
     Recomendador con caché inteligente:
-    - Excluye vistos (recibidos/wishlist)
-    - Prioriza match por marca (peso 2) y categoría (peso 1)
-    - Cachea con fingerprint (se invalida solo cuando cambian señales o items)
-    - Fallback estable por usuario si no hay señales
+    - Acepta una lista externa de IDs a excluir (`exclude_ids`).
+    - Excluye vistos (recibidos/wishlist) y productos con 'dislike'.
+    - Prioriza match por marca (peso 2) y categoría (peso 1).
+    - Cachea con fingerprint (se invalida solo cuando cambian señales o items).
+    - Fallback estable por usuario si no hay señales.
     """
     fp = _fingerprint_usuario(usuario)
     cache_key = f"ai:reco:v2:{usuario.id}:{fp}:{limit}"
@@ -94,8 +97,15 @@ def recommend_products_for_user(usuario: User, limit: int = 6) -> List[Producto]
         return cached
 
     marcas_pref, cats_pref = _user_preference_vectors(usuario)
-    exclude_ids = _already_seen_product_ids(usuario)
-    base = Producto.objects.filter(activo=True).exclude(pk__in=exclude_ids)
+    
+    # --- CAMBIO 1: COMBINAMOS LA LISTA DE EXCLUSIÓN ---
+    # Unimos los IDs de la vista (wishlist + dislikes) con los que calcula esta función internamente.
+    final_exclude_ids = set(_already_seen_product_ids(usuario))
+    if exclude_ids:
+        final_exclude_ids.update(exclude_ids)
+    
+    # --- CAMBIO 2: USAMOS LA LISTA FINAL EN LA CONSULTA ---
+    base = Producto.objects.filter(activo=True).exclude(pk__in=final_exclude_ids)
 
     if marcas_pref or cats_pref:
         candidatos = (base.annotate(
@@ -116,7 +126,15 @@ def recommend_products_for_user(usuario: User, limit: int = 6) -> List[Producto]
         ).order_by("-score", "-pk")
          .select_related("id_marca", "id_categoria")
          .prefetch_related("urls_tienda")[:limit])
+        
         result = list(candidatos)
+        
+        # Si después de filtrar no hay suficientes, rellenamos con el fallback
+        if len(result) < limit:
+            fallback_qs = base.exclude(pk__in=[p.pk for p in result]).order_by("-pk")
+            relleno = list(_stable_offset_queryset(fallback_qs, usuario, limit - len(result)))
+            result.extend(relleno)
+            
         cache.set(cache_key, result, CACHE_TTL)
         return result
 

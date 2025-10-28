@@ -26,8 +26,8 @@ django-environ
 djangorestframework-simplejwt
 openai>=1.46.0
 pyinstaller
-pandas
-openpyxl
+#pandas
+#openpyxl
 xhtml2pdf
 pycairo
 

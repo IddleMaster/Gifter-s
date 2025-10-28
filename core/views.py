@@ -8,7 +8,10 @@ from core.services.gifter_ai import generar_sugerencias_regalo
 from core.services.recommendations import recommend_when_wishlist_empty
 from .forms import PostForm, RegisterForm, PerfilForm, PreferenciasUsuarioForm, EventoForm
 from .models import *
-
+from django.apps import apps
+from django.core.files.base import ContentFile
+from urllib.parse import quote
+from .services.recommendations import invalidate_user_reco_cache
 # views.py
 from core.services.recommendations import recommend_products_for_user as ai_recommend_products
 from core.services.social import amigos_qs, sugerencias_qs
@@ -24,8 +27,9 @@ from django.db import IntegrityError, transaction
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 import uuid
+import requests
 from django.shortcuts import get_object_or_404
-from .models import User, Post, Like  # ajusta si necesitas más
+from .models import User, Post, Like 
 from core.forms import ProfileEditForm
 from .utils import get_default_wishlist, _push_inbox
 from django.db.models import Q, Avg, Case, When
@@ -38,12 +42,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from core.models import User, SolicitudAmistad, Seguidor, Evento
 from .serializers import SolicitudAmistadSerializer, UsuarioLiteSerializer
-from .models import *
 from .serializers import *
 from core.models import Producto, Categoria, Marca
 from core.search import meili
 from django.contrib.auth import get_user_model
-from django.shortcuts import get_object_or_404, redirect, render  # ajusta imports según tu app
+from django.shortcuts import get_object_or_404, redirect, render  
 from core.models import Evento, Post, Seguidor, SolicitudAmistad
 from rest_framework.pagination import PageNumberPagination
 from channels.layers import get_channel_layer
@@ -52,14 +55,16 @@ from core.models import Wishlist, ItemEnWishlist, ResenaSitio
 from core.models import Conversacion, Mensaje, ParticipanteConversacion
 from core.models import NotificationDevice, PreferenciasUsuario, Perfil
 from .serializers import ConversacionLiteSerializer, MensajeSerializer
-###nuevo hoy 1 del 10 (abajo)
+from .models import RecommendationFeedback, Producto
+#import pandas as pd
+import random
 from core.services_social import amigos_qs, sugerencias_qs, obtener_o_crear_conv_directa
 from django.contrib.auth import get_user_model
 from core.models import Post, Comentario
 from django.utils.html import escape
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
-from django.urls import reverse  # puedes dejarlo, pero ya no dependemos de reverse en el fallback
+from django.urls import reverse  
 from django.views.decorators.http import require_GET
 from django.core.cache import cache
 # Para Reseña
@@ -97,7 +102,7 @@ import csv
 
 # Decoradores/permissions DRF
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAdminUser,IsAuthenticated
+from rest_framework.permissions import IsAdminUser,IsAuthenticated, AllowAny
 
 # Utilidades Django
 from django.core.management import call_command
@@ -124,7 +129,13 @@ from django.db import connection
 log = logging.getLogger("gifters.health")  # salus de los gifters
 ##########
 
+#### notificaioens
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+##
 
+from .models import Conversacion, ConversationEvent, SecretSantaAssignment
 
 
 if hasattr(settings, 'OPENAI_API_KEY') and settings.OPENAI_API_KEY:
@@ -391,9 +402,34 @@ def home(request):
         except Exception:
             favoritos_ids = set()
 
+        # --- 👇 PASO 1: OBTENER PRODUCTOS MARCADOS CON "NO ME GUSTA" 👇 ---
+        try:
+            disliked_product_ids = set(
+                RecommendationFeedback.objects.filter(
+                    user=request.user,
+                    feedback_type='dislike'
+                ).values_list('product_id', flat=True)
+            )
+        except Exception:
+            disliked_product_ids = set()
+        
+        # --- PASO 2: CREAR UNA LISTA COMPLETA DE PRODUCTOS A EXCLUIR ---
+        exclude_ids = favoritos_ids.union(disliked_product_ids)
+        # -----------------------------------------------------------------
+
+        # --- 👇 LÍNEA DE DEPURACIÓN CLAVE 👇 ---
+        print(f"--- DEBUG HOME VIEW ---")
+        print(f"Usuario: {request.user.nombre_usuario}")
+        print(f"IDs en Wishlist (Favoritos): {favoritos_ids}")
+        print(f"IDs con Dislike: {disliked_product_ids}")
+        print(f"Lista final de IDs a EXCLUIR: {exclude_ids}")
+        print(f"----------------------")
+        # -----------------------------------------------
         # ===================== RECO (IA SOBRE CATÁLOGO) =====================
         try:
-            ai_reco = ai_recommend_products(request.user, limit=6)
+            # --- PASO 3: PASAR LA LISTA DE EXCLUSIÓN AL ALGORITMO ---
+            # (Asegúrate de que tu función `ai_recommend_products` acepte el parámetro `exclude_ids`)
+            ai_reco = ai_recommend_products(request.user, limit=6, exclude_ids=list(exclude_ids))
         except Exception:
             ai_reco = []
 
@@ -415,9 +451,10 @@ def home(request):
                 qs = Producto.objects.filter(activo=True)
                 if marcas_ids:
                     qs = qs.filter(id_marca_id__in=marcas_ids)
-                # excluir ya vistos
+                
+                # --- PASO 4: APLICAR EXCLUSIÓN EN EL FALLBACK 1 ---
                 ai_reco = list(
-                    qs.exclude(pk__in=favoritos_ids)
+                    qs.exclude(pk__in=exclude_ids) # <-- Usamos la lista completa de exclusión
                       .order_by('-pk')[:6]
                 )
             except Exception:
@@ -426,16 +463,17 @@ def home(request):
         # Fallback 2: últimos del catálogo, excluyendo vistos
         if not ai_reco:
             try:
+                # --- PASO 5: APLICAR EXCLUSIÓN EN EL FALLBACK 2 ---
                 ai_reco = list(
                     Producto.objects
                     .filter(activo=True)
-                    .exclude(pk__in=favoritos_ids)
+                    .exclude(pk__in=exclude_ids) # <-- Usamos la lista completa de exclusión
                     .order_by('-pk')[:6]
                 )
             except Exception:
                 ai_reco = []
     else:
-        ai_reco = []  # no logueados no ven “para ti”
+        ai_reco = []
 
     # ===================== RESEÑAS DEL SITIO =====================
     try:
@@ -1649,7 +1687,6 @@ def profile_view(request):
 
 @login_required
 def profile_edit(request):
-
     user = request.user
     perfil, _ = Perfil.objects.get_or_create(user=user)
     prefs, _  = PreferenciasUsuario.objects.get_or_create(user=user)
@@ -1664,26 +1701,49 @@ def profile_edit(request):
             p_form.save()
             pref_form.save()
 
-            # Lee el estado del interruptor 'is_private' del formulario.
+            # Guardamos la configuración de privacidad
             user.is_private = 'is_private' in request.POST
             user.save(update_fields=['is_private'])
-            # ------------------------------------
+            
+            # --- 👇 NUEVA LÓGICA PARA GUARDAR INTERESES 👇 ---
+            # Obtenemos las listas de IDs de los checkboxes marcados
+            selected_category_ids = request.POST.getlist('intereses_categorias')
+            selected_brand_ids = request.POST.getlist('intereses_marcas')
+
+            # El método .set() es perfecto: limpia los intereses antiguos y añade los nuevos.
+            user.intereses_categorias.set(selected_category_ids)
+            user.intereses_marcas.set(selected_brand_ids)
+            # ------------------------------------------------
 
             messages.success(request, 'Perfil actualizado correctamente.')
             return redirect('perfil')
         else:
             messages.error(request, 'Revisa los campos marcados.')
     else:
+        # Si la petición es GET, preparamos los formularios como siempre
         u_form    = ProfileEditForm(instance=user)
         p_form    = PerfilForm(instance=perfil)
         pref_form = PreferenciasUsuarioForm(instance=prefs)
 
+    # --- 👇 NUEVO CONTEXTO PARA MOSTRAR LAS OPCIONES 👇 ---
+    # Obtenemos todas las categorías y marcas disponibles
+    all_categories = Categoria.objects.all().order_by('nombre_categoria')
+    all_brands = Marca.objects.all().order_by('nombre_marca')
 
+    # Obtenemos los IDs de los intereses que el usuario ya tiene para marcar los checkboxes
+    user_category_ids = set(user.intereses_categorias.values_list('id_categoria', flat=True))
+    user_brand_ids = set(user.intereses_marcas.values_list('id_marca', flat=True))
+    # ----------------------------------------------------
 
     return render(request, 'perfil_editar.html', {
         'u_form': u_form,
         'p_form': p_form,
         'pref_form': pref_form,
+        # --- 👇 AÑADIMOS LAS NUEVAS VARIABLES AL CONTEXTO 👇 ---
+        'all_categories': all_categories,
+        'all_brands': all_brands,
+        'user_category_ids': user_category_ids,
+        'user_brand_ids': user_brand_ids,
     })
 
 
@@ -2534,10 +2594,6 @@ class TypingSummaryView(APIView):
         return Response({"typing": result})        
 
 
-#####################################################################
-#####################################################################
-#####################################################################
-
 @login_required
 @require_POST
 def resena_sitio_crear(request):
@@ -2593,9 +2649,6 @@ def resena_sitio_eliminar(request):
     return redirect(f"{reverse('home')}#testimonials")
 
 
-#####################################################################
-#####################################################################
-#####################################################################
 
 
 ### CHAT GRUPALLLL
@@ -2812,7 +2865,6 @@ class ProductoListAPIView(generics.ListCreateAPIView): # <-- CAMBIO AQUÍ
     #     # Aquí podrías añadir lógica extra si fuera necesario antes de guardar
     #     # por ejemplo, validar IDs de categoría/marca, pero el serializer ya lo hace.
     #     serializer.save()
-    
 class ProductoDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     """
     Vista de API para ver, actualizar (parcial o total) o eliminar un producto específico.
@@ -3216,65 +3268,75 @@ def chat_unread_summary(request):
     return JsonResponse({"total": total, "per_conversation": per_conv})
 
 
-def download_active_products_csv(request): # Puedes renombrar la función si quieres # cite: Sex.txt
+@api_view(['GET']) # cite: Sex.txt
+@permission_classes([IsAdminUser]) # cite: Sex.txt
+def download_active_products_csv(request): # cite: Sex.txt
     """
-    Genera y devuelve un archivo CSV o PDF con productos activos.
-    Acepta ?format=csv (default) o ?format=pdf
+    Genera y devuelve un archivo CSV con todos los productos activos.
     """
-    requested_format = request.GET.get('format', 'csv').lower() # cite: Sex.txt
-
     try:
         productos = Producto.objects.filter(activo=True).select_related('id_categoria', 'id_marca').order_by('id_producto') # cite: Sex.txt
-
         filename_base = f"productos_activos_{datetime.date.today()}" # cite: Sex.txt
 
-        # --- Generación de PDF ---
-        if requested_format == 'pdf': # cite: Sex.txt
-            template = get_template('reports/product_report_pdf.html') # cite: Sex.txt
-            context = { # cite: Sex.txt
-                'productos': productos, # cite: Sex.txt
-                'generation_date': timezone.now() # cite: Sex.txt
-            }
-            html = template.render(context) # cite: Sex.txt
-            result = BytesIO() # cite: Sex.txt
-            pdf = pisa.pisaDocument(BytesIO(html.encode("UTF-8")), result) # cite: Sex.txt
+        response = HttpResponse( # cite: Sex.txt
+            content_type='text/csv',
+            headers={'Content-Disposition': f'attachment; filename="{filename_base}.csv"'},
+        )
+        response.write('\ufeff'.encode('utf8')) # BOM # cite: Sex.txt
+        writer = csv.writer(response, delimiter=';') # cite: Sex.txt
 
-            if not pdf.err: # cite: Sex.txt
-                response = HttpResponse(result.getvalue(), content_type='application/pdf') # cite: Sex.txt
-                response['Content-Disposition'] = f'attachment; filename="{filename_base}.pdf"' # cite: Sex.txt
-                return response # cite: Sex.txt
-            else: # Error al generar PDF
-                print(f"Error generando PDF: {pdf.err}") # cite: Sex.txt
-                return Response({"error": "No se pudo generar el reporte PDF."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) # cite: Sex.txt
-
-        # --- Generación de CSV (Default) ---
-        else: # Default a CSV # cite: Sex.txt
-            response = HttpResponse( # cite: Sex.txt
-                content_type='text/csv',
-                headers={'Content-Disposition': f'attachment; filename="{filename_base}.csv"'},
-            )
-            response.write('\ufeff'.encode('utf8')) # BOM para Excel Windows # cite: Sex.txt
-            writer = csv.writer(response, delimiter=';') # cite: Sex.txt
-
-            # Encabezado CSV
+        # Encabezado
+        writer.writerow([ # cite: Sex.txt
+            'ID Producto', 'Nombre', 'Descripcion', 'Precio',
+            'Categoria ID', 'Categoria Nombre', 'Marca ID', 'Marca Nombre', 'URL Imagen'
+        ])
+        # Filas
+        for producto in productos: # cite: Sex.txt
             writer.writerow([ # cite: Sex.txt
-                'ID Producto', 'Nombre', 'Descripcion', 'Precio',
-                'Categoria ID', 'Categoria Nombre', 'Marca ID', 'Marca Nombre', 'URL Imagen'
+                producto.id_producto, producto.nombre_producto, producto.descripcion, producto.precio,
+                producto.id_categoria_id, producto.id_categoria.nombre_categoria if producto.id_categoria else '',
+                producto.id_marca_id, producto.id_marca.nombre_marca if producto.id_marca else '',
+                request.build_absolute_uri(producto.imagen.url) if producto.imagen else ''
             ])
-
-            # Filas CSV
-            for producto in productos: # cite: Sex.txt
-                writer.writerow([ # cite: Sex.txt
-                    producto.id_producto, producto.nombre_producto, producto.descripcion, producto.precio,
-                    producto.id_categoria_id, producto.id_categoria.nombre_categoria if producto.id_categoria else '',
-                    producto.id_marca_id, producto.id_marca.nombre_marca if producto.id_marca else '',
-                    request.build_absolute_uri(producto.imagen.url) if producto.imagen else ''
-                ])
-            return response # cite: Sex.txt
+        return response # cite: Sex.txt
 
     except Exception as e:
-        print(f"Error generando reporte ({requested_format}): {e}") # cite: Sex.txt
-        return Response({"error": f"No se pudo generar el reporte {requested_format.upper()}: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) # cite: Sex.txt
+        print(f"Error generando CSV de productos: {e}") # cite: Sex.txt
+        return Response({"error": f"No se pudo generar el reporte CSV: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) # cite: Sex.txt
+    
+    
+@api_view(['GET']) # cite: Sex.txt
+@permission_classes([IsAdminUser]) # cite: Sex.txt
+def download_active_products_pdf(request): # Nuevo nombre de función
+    """
+    Genera y devuelve un archivo PDF con todos los productos activos.
+    """
+    try:
+        productos = Producto.objects.filter(activo=True).select_related('id_categoria', 'id_marca').order_by('id_producto') # cite: Sex.txt
+        filename_base = f"productos_activos_{datetime.date.today()}" # cite: Sex.txt
+
+        # Lógica de generación de PDF (la misma que tenías antes)
+        template = get_template('reports/product_report_pdf.html') # cite: Sex.txt
+        context = { # cite: Sex.txt
+            'productos': productos, # cite: Sex.txt
+            'generation_date': timezone.now() # cite: Sex.txt
+        }
+        html = template.render(context) # cite: Sex.txt
+        result = BytesIO() # cite: Sex.txt
+        pdf = pisa.pisaDocument(BytesIO(html.encode("UTF-8")), result) # cite: Sex.txt
+
+        if not pdf.err: # cite: Sex.txt
+            response = HttpResponse(result.getvalue(), content_type='application/pdf') # cite: Sex.txt
+            response['Content-Disposition'] = f'attachment; filename="{filename_base}.pdf"' # cite: Sex.txt
+            return response # cite: Sex.txt
+        else:
+            print(f"Error generando PDF: {pdf.err}") # cite: Sex.txt
+            return Response({"error": "No se pudo generar el reporte PDF."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) # cite: Sex.txt
+
+    except Exception as e:
+        print(f"Error generando PDF de productos: {e}") # Mensaje específico
+        return Response({"error": f"No se pudo generar el reporte PDF: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) # cite: Sex.txt
+    
     
 def producto_detalle(request, id_producto=None, pk=None):
     """
@@ -3338,3 +3400,522 @@ def producto_detalle(request, id_producto=None, pk=None):
         "similares": similares,
     }
     return render(request, "producto_detalle.html", context)
+
+def ver_card_publica(request, token):
+
+    card = None
+    try:
+        # Carga diferida del modelo para no fallar si aún no está migrado
+        from django.apps import apps
+        GeneratedCard = apps.get_model('core', 'GeneratedCard')  # core.models.GeneratedCard
+        if GeneratedCard:
+            card = GeneratedCard.objects.filter(share_token=token).first()
+    except Exception:
+        card = None
+
+    return render(request, "cards/ver_publica.html", {"card": card})
+
+HF_FALLBACK = "stabilityai/sdxl-turbo"
+HF_PRIMARY  = "stabilityai/sdxl-turbo"
+
+def _hf_generate(hf_token: str, model: str, prompt: str, timeout: int = 120):
+    url = f"https://api-inference.huggingface.co/models/{model}"
+    resp = requests.post(
+        url,
+        headers={"Authorization": f"Bearer {hf_token}", "Accept": "image/png"},
+        json={"inputs": prompt, "options": {"wait_for_model": True}},
+        timeout=timeout,
+    )
+    return url, resp
+
+def _bad_request(payload: dict):
+
+    return HttpResponseBadRequest(json.dumps(payload), content_type="application/json")
+
+def _bad(payload: dict):
+    return HttpResponseBadRequest(json.dumps(payload), content_type="application/json")
+
+def _pollinations_url(prompt: str, w: int = 1024, h: int = 1024):
+    # Endpoint público, sin API key. No usamos 'seed' para no depender de 'random'.
+    q = urllib.parse.quote(prompt)
+    return f"https://image.pollinations.ai/prompt/{q}?width={w}&height={h}&nofeed=true"
+
+def _pollinations_bg_url(style_text: str, w: int = 1024, h: int = 1024) -> str:
+    """
+    Fondo desde Pollinations evitando texto/typography y procurando centro limpio.
+    """
+    base_prompt = (
+        "birthday greeting card background, cute, clean, vector, pastel, "
+        "seamless pattern, no text, no words, no typography, "
+        "empty clean center, focus on icons (gifts, balloons, confetti)"
+    )
+    full_prompt = f"{base_prompt}. {style_text or ''}".strip()
+    q = quote(full_prompt)
+    seed = random.randint(1, 10_000_000)
+    return (
+        f"https://image.pollinations.ai/prompt/{q}"
+        f"?width={w}&height={h}&nologo=true&seed={seed}"
+    )
+
+
+def _cloud_name_from_url(cloudinary_url: str) -> str:
+    # CLOUDINARY_URL=cloudinary://<key>:<secret>@<cloud_name>
+    try:
+        return cloudinary_url.rsplit("@", 1)[-1]
+    except Exception:
+        return ""
+    
+def _cld_card_url(cloud_name: str, bg_url: str, title: str,
+                  w: int = 1024, h: int = 1024) -> str:
+    """
+    Toma el fondo remoto con fetch, lo suaviza un poco y superpone texto legible.
+    - Suavizado: blur + algo de brillo para despegar el texto
+    - Texto: ancho limitado (auto wrap) + sombra
+    """
+    # No sobre-codificamos la URL remota
+    bg_enc = bg_url
+    title_enc = quote(title.replace("\n", "%0A"))
+
+    transforms = "/".join([
+        # lienzo final + suavizado del fondo
+        f"w_{w},h_{h},c_fill,q_auto,f_png,e_blur:60,e_brightness:15",
+        # texto: ancho máximo y ajuste, color blanco y sombra fuerte
+        f"l_text:Poppins_96_bold:{title_enc},w_900,c_fit,co_rgb:ffffff,e_shadow:90,g_center,y_-40",
+    ])
+
+    return (
+        f"https://res.cloudinary.com/{cloud_name}/image/fetch/"
+        f"{transforms}/{bg_enc}"
+    )
+
+
+@login_required
+@require_POST
+def generar_card_hf(request):
+    HF_TOKEN = os.environ.get("HF_TOKEN")
+    HF_MODEL = os.environ.get("HF_MODEL", "stabilityai/stable-diffusion-xl-base-1.0")
+    if not HF_TOKEN:
+        return _bad({"error": "Falta HF_TOKEN en el entorno"})
+
+    prompt = (request.POST.get("prompt") or "").strip()
+    style  = (request.POST.get("style") or "postal colorida con tipografía grande, fondo limpio y decoraciones de cumpleaños").strip()
+    if not prompt:
+        return _bad({"error": "Falta 'prompt'"})
+
+    full_prompt = (
+        f"Postal cuadrada de felicitación: {prompt}. "
+        f"Estilo: {style}. En español, con ilustración coherente, tipografía legible, "
+        f"colores suaves, fondo limpio, composición centrada y estética moderna."
+    )
+
+    try:
+        # 1️⃣ Intento con Hugging Face
+        r = requests.post(
+            f"https://api-inference.huggingface.co/models/{HF_MODEL}",
+            headers={
+                "Authorization": f"Bearer {HF_TOKEN}",
+                "Accept": "image/png",
+            },
+            json={"inputs": full_prompt, "options": {"wait_for_model": True}},
+            timeout=120,
+        )
+
+        # 2️⃣ Si el modelo falla, probamos con otro más estable
+        if r.status_code == 404 or r.status_code >= 500:
+            fallback_model = "stabilityai/stable-diffusion-xl-base-1.0"
+            r_fb = requests.post(
+                f"https://api-inference.huggingface.co/models/{fallback_model}",
+                headers={
+                    "Authorization": f"Bearer {HF_TOKEN}",
+                    "Accept": "image/png",
+                },
+                json={"inputs": full_prompt, "options": {"wait_for_model": True}},
+                timeout=120,
+            )
+            if r_fb.status_code == 200:
+                r = r_fb
+            else:
+                # 3️⃣ Último recurso: Pollinations
+                bg_url = f"https://image.pollinations.ai/prompt/{quote(full_prompt)}"
+                r = requests.get(bg_url, timeout=60)
+
+        if r.status_code != 200:
+            return _bad({
+                "error": "No se pudo generar la imagen",
+                "status": r.status_code,
+                "body": r.text[:300],
+                "model": HF_MODEL
+            })
+
+        img_bytes = r.content
+
+    except Exception as e:
+        return _bad({"error": "Error generando la postal", "details": str(e)})
+
+    try:
+        GeneratedCard = apps.get_model('core', 'GeneratedCard')
+        card = GeneratedCard.objects.create(user=request.user, prompt=prompt)
+        card.image.save(f"card_{card.id}.png", ContentFile(img_bytes), save=True)
+    except Exception as e:
+        return _bad({"error": "No se pudo guardar la imagen", "details": str(e)})
+
+    return JsonResponse({
+        "id": card.id,
+        "url": card.image.url,
+        "share": request.build_absolute_uri(f"/cards/s/{card.share_token}/"),
+        "provider_used": HF_MODEL,
+    })
+
+
+
+
+ ### apartadiño evento amigo secret
+def _is_group(conv: Conversacion) -> bool:
+    return bool(getattr(conv, 'is_group', False) or str(getattr(conv, 'tipo', '')).lower() == 'grupo')
+
+def _is_member(conv: Conversacion, user) -> bool:
+    # Ajusta a tu relación real de participantes
+    return any(int(getattr(p, 'id', 0)) == int(user.id) for p in (conv.participantes.all() if hasattr(conv, 'participantes') else []))
+
+def _is_author(conv: Conversacion, user) -> bool:
+    # Ajusta al campo real del creador/autor del grupo
+    return int(getattr(getattr(conv, 'autor', None), 'id', 0)) == int(user.id)
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def events_list_create(request, conversacion_id):
+    try:
+        conv = Conversacion.objects.get(pk=conversacion_id)
+    except Conversacion.DoesNotExist:
+        return HttpResponseBadRequest("Conversación no existe")
+
+    if not _is_group(conv) or not _is_member(conv, request.user):
+        return HttpResponseForbidden("No permitido")
+
+    if request.method == "GET":
+        qs = conv.eventos.all().order_by('-creado_en')
+        data = [{
+            "id": e.id, "tipo": e.tipo, "titulo": e.titulo, "presupuesto": str(e.presupuesto_fijo) if e.presupuesto_fijo is not None else None,
+            "estado": e.estado, "creado_en": e.creado_en.isoformat()
+        } for e in qs]
+        return JsonResponse({"results": data})
+
+    # POST crear (solo autor/administrador del grupo)
+    if not _is_author(conv, request.user):
+        return HttpResponseForbidden("Solo el autor del grupo puede crear eventos")
+
+    import json
+    try:
+        payload = json.loads(request.body or "{}")
+    except Exception:
+        payload = {}
+
+    tipo = (payload.get('tipo') or 'secret_santa').strip()
+    if tipo != 'secret_santa':
+        return HttpResponseBadRequest("Tipo no soportado")
+
+    titulo = (payload.get('titulo') or 'Amigo Secreto').strip()
+    presupuesto = payload.get('presupuesto')
+    try:
+        from decimal import Decimal
+        presupuesto = Decimal(str(presupuesto)) if presupuesto not in (None, '') else None
+    except Exception:
+        presupuesto = None
+
+    ev = ConversationEvent.objects.create(
+        conversacion=conv,
+        tipo='secret_santa',
+        creado_por=request.user,
+        titulo=titulo,
+        presupuesto_fijo=presupuesto,
+        estado='borrador'
+    )
+    return JsonResponse({"ok": True, "id": ev.id})
+
+@login_required
+@require_http_methods(["GET"])
+def event_detail(request, evento_id):
+    try:
+        ev = ConversationEvent.objects.select_related('conversacion').get(pk=evento_id)
+    except ConversationEvent.DoesNotExist:
+        return HttpResponseBadRequest("Evento no existe")
+
+    conv = ev.conversacion
+    if not _is_group(conv) or not _is_member(conv, request.user):
+        return HttpResponseForbidden("No permitido")
+
+    # Admin ve todas las asignaciones; miembros ven meta
+    payload = {
+        "id": ev.id, "tipo": ev.tipo, "titulo": ev.titulo, "presupuesto": str(ev.presupuesto_fijo) if ev.presupuesto_fijo is not None else None,
+        "estado": ev.estado, "creado_en": ev.creado_en.isoformat(),
+    }
+    if _is_author(conv, request.user):
+        payload["asignaciones"] = [
+            {"da": a.da_id, "recibe": a.recibe_id}
+            for a in ev.asignaciones.select_related('da', 'recibe').all()
+        ]
+    return JsonResponse(payload)
+
+@login_required
+@require_http_methods(["POST"])
+def event_draw(request, evento_id):
+    try:
+        ev = ConversationEvent.objects.select_related('conversacion').get(pk=evento_id)
+    except ConversationEvent.DoesNotExist:
+        return HttpResponseBadRequest("Evento no existe")
+
+    conv = ev.conversacion
+    if not _is_group(conv) or not _is_author(conv, request.user):
+        return HttpResponseForbidden("Solo autor del grupo")
+
+    # Participantes = todos los miembros del grupo (ajusta si tienes una relación distinta)
+    participantes = list(conv.participantes.all())
+    if len(participantes) < 2:
+        return HttpResponseBadRequest("Se requieren al menos 2 participantes")
+
+    import random
+    # Sorteo simple: permutación sin puntos fijos (reintenta si hay self-assignment)
+    ids = [p.id for p in participantes]
+    for _ in range(30):
+        perm = ids[:]  # copia
+        random.shuffle(perm)
+        if all(g != r for g, r in zip(ids, perm)):
+            break
+    else:
+        return HttpResponseBadRequest("No se pudo generar una asignación válida, intenta de nuevo")
+
+    with transaction.atomic():
+        ev.asignaciones.all().delete()
+        for giver_id, receiver_id in zip(ids, perm):
+            SecretSantaAssignment.objects.create(evento=ev, da_id=giver_id, recibe_id=receiver_id)
+        ev.estado = 'sorteado'
+        ev.ejecutado_en = timezone.now()
+        ev.save(update_fields=['estado', 'ejecutado_en'])
+    parts_qs = ev.participantes.select_related('usuario').all()
+    if parts_qs.exists():
+        participantes = [ep.usuario for ep in parts_qs]   # standalone
+    else:
+        participantes = list(conv.participantes.all())    # grupo (tu flujo anterior)    
+
+    return JsonResponse({"ok": True})
+
+@login_required
+@require_http_methods(["POST"])
+def event_lock(request, evento_id):
+    try:
+        ev = ConversationEvent.objects.select_related('conversacion').get(pk=evento_id)
+    except ConversationEvent.DoesNotExist:
+        return HttpResponseBadRequest("Evento no existe")
+
+    conv = ev.conversacion
+    if not _is_group(conv) or not _is_author(conv, request.user):
+        return HttpResponseForbidden("Solo autor del grupo")
+
+    ev.estado = 'cerrado'
+    ev.save(update_fields=['estado'])
+    return JsonResponse({"ok": True})
+
+@login_required
+@require_http_methods(["GET"])
+def event_my_assignment(request, evento_id):
+    try:
+        ev = ConversationEvent.objects.select_related('conversacion').get(pk=evento_id)
+    except ConversationEvent.DoesNotExist:
+        return HttpResponseBadRequest("Evento no existe")
+
+    conv = ev.conversacion
+    if not _is_group(conv) or not _is_member(conv, request.user):
+        return HttpResponseForbidden("No permitido")
+
+    a = ev.asignaciones.filter(da=request.user).select_related('recibe').first()
+    if not a:
+        return JsonResponse({"has": False})
+
+    # Devuelve INFO mínima del destinatario
+    rec = a.recibe
+    return JsonResponse({
+        "has": True,
+        "usuario": {
+            "id": rec.id,
+            "nombre": getattr(rec, 'nombre', '') or getattr(rec, 'first_name', '') or '',
+            "apellido": getattr(rec, 'apellido', '') or getattr(rec, 'last_name', '') or '',
+            "username": getattr(rec, 'nombre_usuario', '') or getattr(rec, 'username', ''),
+            "avatar_url": getattr(getattr(rec, 'perfil', None), 'profile_picture_url', None) or getattr(rec, 'avatar_url', None)
+        }
+    })   
+
+@login_required
+def cards_crear(request, username):
+    """
+    Pantalla para crear/enviar una postal dirigida a `username`.
+    Solo renderiza el formulario; la generación real la hace /api/cards/generar/.
+    """
+    User = settings.AUTH_USER_MODEL
+    # Si tu User tiene campo `nombre_usuario`, úsalo para buscar:
+    from django.apps import apps
+    UserModel = apps.get_model(*User.split('.'))
+    destinatario = get_object_or_404(UserModel, nombre_usuario=username)
+
+    return render(request, "cards/crear.html", {
+        "destinatario": destinatario,
+        "username_dest": username,
+    })
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def events_my_list_create(request):
+    """
+    GET: lista de eventos donde soy creador o participante (standalone)
+    POST: crea un Amigo Secreto standalone (sin grupo) con la lista de amigos elegida
+    """
+    if request.method == "GET":
+        qs = ConversationEvent.objects.filter(
+            models.Q(creado_por=request.user) |
+            models.Q(participantes__usuario=request.user)
+        ).distinct().order_by('-creado_en')
+        return JsonResponse({"results": [
+            {
+                "id": e.id,
+                "tipo": e.tipo,
+                "titulo": e.titulo,
+                "presupuesto_fijo": str(e.presupuesto_fijo) if e.presupuesto_fijo is not None else None,
+                "presupuesto_min": str(e.presupuesto_min) if e.presupuesto_min is not None else None,
+                "presupuesto_max": str(e.presupuesto_max) if e.presupuesto_max is not None else None,
+                "estado": e.estado,
+                "creado_en": e.creado_en.isoformat(),
+            } for e in qs
+        ]})
+
+    # POST crear
+    import json, random
+    try:
+        p = json.loads(request.body or "{}")
+    except Exception:
+        p = {}
+
+    titulo = (p.get('titulo') or 'Amigo Secreto').strip()
+    miembros = p.get('miembros') or []  # IDs de usuarios (amigos seleccionados)
+    pres_fijo = p.get('presupuesto_fijo', None)
+    pmin = p.get('presupuesto_min', None)
+    pmax = p.get('presupuesto_max', None)
+
+    try:
+        miembros = [int(x) for x in miembros if int(x) > 0]
+    except Exception:
+        miembros = []
+
+    # Incluimos al creador
+    ids = sorted(set(miembros + [int(request.user.id)]))
+    if len(ids) < 2:
+        return HttpResponseBadRequest("Se requieren al menos 2 participantes")
+
+    with transaction.atomic():
+        ev = ConversationEvent.objects.create(
+            conversacion=None,                     # ⬅️ standalone
+            tipo='secret_santa',
+            creado_por=request.user,
+            titulo=titulo,
+            presupuesto_fijo=(Decimal(str(pres_fijo)) if pres_fijo not in (None, '') else None),
+            presupuesto_min=(Decimal(str(pmin)) if pmin not in (None, '') else None),
+            presupuesto_max=(Decimal(str(pmax)) if pmax not in (None, '') else None),
+            estado='borrador'
+        )
+
+        # Participantes explícitos
+        users = User.objects.filter(id__in=ids).order_by('id')
+        id_list = [u.id for u in users]
+        EventParticipant.objects.bulk_create([
+            EventParticipant(evento=ev, usuario=u) for u in users
+        ])
+
+        # Sorteo (derangement simple)
+        def derangement(a, max_tries=500):
+            arr = a[:]
+            for _ in range(max_tries):
+                random.shuffle(arr)
+                if all(x != y for x, y in zip(a, arr)):
+                    return arr
+            return a[1:] + a[:1]
+        asignados = derangement(id_list)
+
+        # Persistir asignaciones
+        SecretSantaAssignment.objects.bulk_create([
+            SecretSantaAssignment(evento=ev, da_id=g, recibe_id=r)
+            for g, r in zip(id_list, asignados)
+        ])
+        ev.estado = 'sorteado'
+        ev.save(update_fields=['estado'])
+
+    return JsonResponse({"ok": True, "evento_id": ev.id})    
+
+@login_required
+@require_POST
+def record_recommendation_feedback(request):
+    """
+    Registra el feedback 'dislike' de un usuario para un producto recomendado.
+    """
+    try:
+        product_id = request.POST.get('product_id')
+        if not product_id:
+            return HttpResponseBadRequest('Falta el parámetro product_id.')
+
+        product = get_object_or_404(Producto, pk=product_id)
+        
+        RecommendationFeedback.objects.update_or_create(
+            user=request.user,
+            product=product,
+            defaults={'feedback_type': 'dislike'}
+        )
+        
+        # --- 👇 2. LLAMA A LA FUNCIÓN PARA ROMPER LA CACHÉ 👇 ---
+        # Justo después de guardar el feedback, invalidamos la caché de recomendaciones.
+        invalidate_user_reco_cache(request.user)
+        # --------------------------------------------------------
+        
+        return JsonResponse({'status': 'ok', 'message': 'Feedback registrado.'})
+
+    except Producto.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Producto no encontrado.'}, status=404)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+    
+@login_required
+@require_POST
+def recommendation_feedback(request):
+    """
+    Vista para manejar feedback de recomendaciones (me gusta/no me gusta)
+    """
+    try:
+        product_id = request.POST.get('product_id')
+        feedback_type = request.POST.get('feedback_type', 'dislike')  # 'like' o 'dislike'
+        
+        if not product_id:
+            return JsonResponse({'status': 'error', 'message': 'Falta product_id'}, status=400)
+            
+        product = get_object_or_404(Producto, pk=product_id)
+        
+        # Registrar o actualizar el feedback
+        RecommendationFeedback.objects.update_or_create(
+            user=request.user,
+            product=product,
+            defaults={'feedback_type': feedback_type}
+        )
+        
+        return JsonResponse({'status': 'ok', 'message': f'Feedback {feedback_type} registrado'})
+        
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+
+
+
+@require_POST
+@login_required
+def notificaciones_mark_all_read(request):
+    Notificacion.objects.filter(usuario=request.user, leida=False).update(leida=True, leida_en=None)
+    return JsonResponse({"ok": True})
+
+
+

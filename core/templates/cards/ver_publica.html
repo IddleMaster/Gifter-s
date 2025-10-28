@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Tu postal | Gifter’s{% endblock %}
+
+{% block extra_css %}
+  <!-- Metadatos OG (para vista previa en WhatsApp/Telegram) -->
+  {% if card and card.image %}
+    <meta name="description" content="Una postal hecha para ti">
+    <meta property="og:title" content="Te llegó una postal">
+    <meta property="og:description" content="Ábrela y descárgala">
+    <meta property="og:type" content="article">
+    <meta property="og:image" content="{{ request.build_absolute_uri(card.image.url) }}">
+    <meta property="og:url" content="{{ request.build_absolute_uri }}">
+  {% endif %}
+
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+  <style>
+    .card-view {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+    .card-view__img {
+      width: 100%;
+      height: auto;
+      border-radius: 1rem;
+      box-shadow: 0 10px 24px rgba(0,0,0,.12);
+    }
+    .card-view__actions .btn { min-width: 180px; }
+  </style>
+{% endblock %}
+
+{% block content %}
+<section class="section">
+  <div class="container">
+    <div class="text-center mb-4">
+      <h1 class="h3 mb-1">Tu postal <i class="bi bi-envelope-heart"></i></h1>
+      <p class="text-muted mb-0">Alguien te envió algo especial desde Gifter’s</p>
+    </div>
+
+    <div class="card-view">
+      {% if card and card.image %}
+        <img src="{{ card.image.url }}" alt="Postal generada" class="card-view__img">
+      {% else %}
+        <div class="alert alert-warning">No encontramos esta postal.</div>
+      {% endif %}
+
+      <div class="card-view__actions d-flex flex-wrap gap-2 justify-content-center mt-3">
+        {% if card and card.image %}
+          <a class="btn btn-primary" href="{{ card.image.url }}" download>
+            <i class="bi bi-download"></i> Descargar
+          </a>
+
+          <button class="btn btn-outline-secondary" id="btn-copy">
+            <i class="bi bi-link-45deg"></i> Copiar enlace
+          </button>
+
+          <a class="btn btn-success"
+             href="https://wa.me/?text={{ ('Te hice esta postal ' ~ request.build_absolute_uri)|urlencode }}"
+             target="_blank" rel="noopener">
+            <i class="bi bi-whatsapp"></i> WhatsApp
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  (function(){
+    const btn = document.getElementById('btn-copy');
+    if(!btn) return;
+    btn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(location.href);
+        btn.innerHTML = '<i class="bi bi-check2-circle"></i> Enlace copiado';
+        setTimeout(() => {
+          btn.innerHTML = '<i class="bi bi-link-45deg"></i> Copiar enlace';
+        }, 1500);
+      } catch(e) {
+        alert('No se pudo copiar el enlace');
+      }
+    });
+  })();
+</script>
+{% endblock %}
