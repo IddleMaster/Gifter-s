@@ -36,10 +36,17 @@ AUTH_USER_MODEL = "core.User"
 SECRET_KEY = '+)9=)%0hw!lc0!_cc4o(43bb-t4$vr==(@0anb-h!9#kb4!3tg'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',')
 
+RAILWAY_DOMAIN = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
+if RAILWAY_DOMAIN and RAILWAY_DOMAIN not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(RAILWAY_DOMAIN)
+    
+CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',')
+if RAILWAY_DOMAIN and f"https://{RAILWAY_DOMAIN}" not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append(f"https://{RAILWAY_DOMAIN}")
 # --- Firebase (FCM) ---
 
 
@@ -129,8 +136,9 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            # Host/puerto del servicio 'redis' en docker-compose
-            "hosts": [("redis", 6379)],
+            # Lee la URL de Redis desde la variable de entorno que dará Railway
+            # Si no existe, usa la local de Docker
+            "hosts": [os.environ.get('REDIS_URL', 'redis://redis:6379')],
         },
     },
 }
