@@ -100,3 +100,7 @@ PAGINAS...
 http://localhost:8000/feed/
                                 /id/
 http://localhost:8000/chat/room/1/
+
+
+Para actualizar el descargable despues de cambiar el escritorio: 
+ pyinstaller --onefile --windowed desktop_admin/main.py

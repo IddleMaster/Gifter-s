@@ -652,6 +652,49 @@
     <p class="text-muted">Aún no tienes amigos agregados. ¡Empieza enviando solicitudes!</p>
     {% endif %}
   </section>
+  <div class="modal fade" id="thankYouModal" tabindex="-1" aria-labelledby="thankYouModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="thankYouModalLabel">Agradecer por tu Regalo</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        
+        <div id="thankYouStep1">
+            <p>¡Felicidades por tu nuevo regalo! ¿Quieres agradecer a la persona que te lo dio?</p>
+            <div class="d-grid gap-2">
+                <button class="btn btn-primary" id="btnThankPublicly">📢 Agradecer en una publicación</button>
+                <button class="btn btn-info text-white" id="btnThankPrivately">✉️ Enviar un mensaje privado</button>
+                <button class="btn btn-secondary" data-bs-dismiss="modal">No, gracias</button>
+            </div>
+        </div>
+
+        <div id="thankYouStep2" style="display: none;">
+            <div class="mb-3">
+                <label for="userSearchInput" class="form-label">¿Quién te hizo el regalo?</label>
+                <input type="text" class="form-control" id="userSearchInput" placeholder="Busca a un amigo...">
+                <div id="userSearchResults" class="list-group mt-1"></div>
+                <input type="hidden" id="thankedUserId">
+            </div>
+            
+            <div id="selectedUserDisplay" class="alert alert-light" style="display:none;"></div>
+            
+            <div class="mb-3" id="privateMessageContainer" style="display:none;">
+                <label for="privateMessageText" class="form-label">Mensaje de agradecimiento (opcional)</label>
+                <textarea class="form-control" id="privateMessageText" rows="3" placeholder="Ej: ¡Muchas gracias por el regalo, me encantó!"></textarea>
+            </div>
+            
+            <div class="d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-secondary" id="btnBackToStep1">Volver</button>
+                <button type="button" class="btn btn-success" id="btnSendThankYou">Enviar Agradecimiento</button>
+            </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>  
 
 
 

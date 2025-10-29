@@ -9,7 +9,8 @@ from core.views import *
 from core import views
 from django.contrib.auth import views as auth_views
 from django.views.decorators.cache import never_cache
-
+from core.api_views import AmigosRecomendadosView
+from core.views_populares import populares_ai
 
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_GET
@@ -27,6 +28,7 @@ from core.api_views import (
     SummaryView,
 )
 
+from core import views as core_views
 
 
 
@@ -100,10 +102,20 @@ urlpatterns = [
     path('api/productos/', views.ProductoListAPIView.as_view(), name='api_producto_list'), 
     path('api/productos/<int:pk>/', views.ProductoDetailAPIView.as_view(), name='api_producto_detail'),
     # --- Rutas API para Reportes ---
-    path('api/reports/products/download/', views.download_active_products_csv, name='api_report_products_csv_download'),
-    path('api/reports/products/download/pdf/', views.download_active_products_pdf, name='api_report_products_pdf_download'),
-    path('api/reports/products/download/excel/', views.download_active_products_excel, name='api_report_products_excel_download'), # <-- NUEVA RUTA EXCEL
+    path('api/reports/products/download/', views.download_active_products_csv, name='api_report_products_csv_download'),#CSV EL PRIMERO!!!  
+    path('api/reports/products/download/pdf/', views.download_active_products_pdf, name='api_report_products_pdf_download'),#PDF
+    path('api/reports/products/download/excel/', views.download_active_products_excel, name='api_report_products_excel_download'), # Excel
     path('reports/products/download/', views.download_active_products_csv, name='download_product_report'),
+    
+    
+    # --- (NUEVO) APIs de Reportes de Actividad ---
+    path('api/reports/moderation/', views.ModerationReportAPIView.as_view(), name='api_report_moderation'),
+    path('api/reports/popular-searches/', views.PopularSearchReportAPIView.as_view(), name='api_report_popular_searches'),
+    path('api/reports/site-reviews/', views.SiteReviewsReportAPIView.as_view(), name='api_report_site_reviews'),
+    path('api/reports/top-active-users/', views.TopActiveUsersReportAPIView.as_view(), name='api_report_top_active_users'),
+    
+    # Esta ruta es para ver el detalle de un usuario (para el reporte de "a quién bloqueó")
+    path('api/reports/user-activity/<int:pk>/', views.UserActivityDetailAPIView.as_view(), name='api_report_user_activity_detail'),
     
     # --- Rutas API para Usuarios (Admin) --- # <-- NUEVA SECCIÓN
     path('api/users/', views.UserListAPIView.as_view(), name='api_user_list'),
@@ -135,6 +147,9 @@ urlpatterns = [
     path('favoritos/toggle/<int:product_id>/', views.toggle_favorito, name='favoritos_toggle'),
     # Wishlist (acciones)
     path('wishlist/item/<int:item_id>/recibir/', views.wishlist_marcar_recibido, name='wishlist_marcar_recibido'),
+    path('api/search_friends/', views.search_friends_for_thanks, name='search_friends_for_thanks'),
+    path('api/thank_you/post/', views.create_thank_you_post, name='create_thank_you_post'),
+    path('api/thank_you/notification/', views.send_thank_you_notification, name='send_thank_you_notification'),
 
     path('wishlist/item/<int:item_id>/desmarcar/',views.wishlist_desmarcar_recibido,name='wishlist_desmarcar_recibido'),
     path('amistad/amigos/', views.amistad_amigos_view, name='amistad_amigos'),
@@ -166,8 +181,15 @@ urlpatterns = [
    # Eventos standalone (no dependen de un grupo existente)
     path('chat/events/', views.events_my_list_create, name='events_my_list_create'),
     
+     # Crear evento con chat (elige amigos) -> devuelve {evento_id, conversacion_id}
+    path('api/events/create_with_chat/', views.event_create_with_chat, name='event_create_with_chat'),
+
+    # Sortear amigo secreto para un evento existente
+    path('api/events/<int:evento_id>/draw', views.event_draw, name='event_draw'),
+     
  
-    path("cards/s/<str:token>/", ver_card_publica, name="cards_publica"),
+    
+    path("cards/s/<slug:slug>/", views.ver_card_publica, name="ver_card_publica"),
     
     ##para resena jiji
     path("resena/", views.resena_sitio_crear, name="resena_sitio_crear"),
@@ -176,17 +198,18 @@ urlpatterns = [
     
 
     ## Para notificaciones navBar
-    path("notificaciones/mark-all-read/", views.notificaciones_mark_all_read, name="notificaciones_mark_all_read"),
-
-
+    path("notificaciones/mark-all/", views.notificaciones_mark_all, name="notificaciones_mark_all"),
+    path("notificaciones/click/<uuid:notificacion_id>/", views.notificacion_click, name="notificacion_click"),
+    path("notificaciones/mark-one/<uuid:notificacion_id>/", views.notificacion_mark_one, name="notificacion_mark_one"),
 
 
     path('recommendation-feedback/', recommendation_feedback, name='recommendation_feedback'),
 
 
+    path("api/recs/amigos/", AmigosRecomendadosView.as_view(), name="api_amigos_recomendados"),
 
 
-
+     path("api/populares-ai/", populares_ai, name="populares_ai"),
 
     path("api/cards/generar/", views.generar_card_hf, name="cards_generar"),
     path("cards/crear/<str:username>/", views.cards_crear, name="cards_crear"),

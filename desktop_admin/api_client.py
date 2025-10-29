@@ -442,4 +442,94 @@ class ApiClient:
     
         except requests.exceptions.RequestException as e:
             return None, f"Error de conexión al crear producto: {e}"
-    # Puedes añadir más métodos según las necesidades de tu aplicación
+    ########################
+    #REPORTES DE ACTIVIDAD#
+    # ########################
+    def get_moderation_report(self):
+        """Obtiene el reporte de moderación (top reporters / most reported)."""
+        if not self.token:
+            return None, "No autenticado."
+        report_url = f"{self.base_url}/reports/moderation/"
+        
+        try:
+            response = requests.get(report_url, headers=self.headers)
+            response.raise_for_status() # Lanza error en 4xx/5xx
+            return response.json(), None
+        except requests.exceptions.HTTPError as http_err:
+            error_detail = http_err.response.text
+            try:
+                error_data = http_err.response.json()
+                error_detail = error_data.get("error", error_data.get("detail", error_detail))
+            except json.JSONDecodeError:
+                pass
+            return None, f"Error del servidor ({http_err.response.status_code}): {error_detail}"
+        except requests.exceptions.RequestException as e:
+            return None, f"Error de conexión: {e}"
+
+    def get_popular_search_report(self):
+        """Obtiene el reporte de búsquedas populares."""
+        if not self.token:
+            return None, "No autenticado."
+        report_url = f"{self.base_url}/reports/popular-searches/"
+        try:
+            response = requests.get(report_url, headers=self.headers)
+            response.raise_for_status() 
+            return response.json(), None
+        except requests.exceptions.HTTPError as http_err:
+            error_detail = http_err.response.text
+            try: error_detail = http_err.response.json().get("detail", error_detail)
+            except json.JSONDecodeError: pass
+            return None, f"Error del servidor ({http_err.response.status_code}): {error_detail}"
+        except requests.exceptions.RequestException as e:
+            return None, f"Error de conexión: {e}"
+
+    def get_site_reviews_report(self):
+        """Obtiene el reporte de reseñas del sitio."""
+        if not self.token:
+            return None, "No autenticado."
+        report_url = f"{self.base_url}/reports/site-reviews/"
+        try:
+            response = requests.get(report_url, headers=self.headers)
+            response.raise_for_status() 
+            return response.json(), None
+        except requests.exceptions.HTTPError as http_err:
+            error_detail = http_err.response.text
+            try: error_detail = http_err.response.json().get("detail", error_detail)
+            except json.JSONDecodeError: pass
+            return None, f"Error del servidor ({http_err.response.status_code}): {error_detail}"
+        except requests.exceptions.RequestException as e:
+            return None, f"Error de conexión: {e}"
+
+    def get_top_active_users_report(self):
+        """Obtiene el reporte de top 10 usuarios activos."""
+        if not self.token:
+            return None, "No autenticado."
+        report_url = f"{self.base_url}/reports/top-active-users/"
+        try:
+            response = requests.get(report_url, headers=self.headers)
+            response.raise_for_status() 
+            return response.json(), None
+        except requests.exceptions.HTTPError as http_err:
+            error_detail = http_err.response.text
+            try: error_detail = http_err.response.json().get("detail", error_detail)
+            except json.JSONDecodeError: pass
+            return None, f"Error del servidor ({http_err.response.status_code}): {error_detail}"
+        except requests.exceptions.RequestException as e:
+            return None, f"Error de conexión: {e}"
+
+    def get_user_activity_detail(self, user_id):
+        """Obtiene el reporte de actividad detallado para un usuario."""
+        if not self.token:
+            return None, "No autenticado."
+        report_url = f"{self.base_url}/reports/user-activity/{user_id}/"
+        try:
+            response = requests.get(report_url, headers=self.headers)
+            response.raise_for_status() 
+            return response.json(), None
+        except requests.exceptions.HTTPError as http_err:
+            error_detail = http_err.response.text
+            try: error_detail = http_err.response.json().get("detail", error_detail)
+            except json.JSONDecodeError: pass
+            return None, f"Error del servidor ({http_err.response.status_code}): {error_detail}"
+        except requests.exceptions.RequestException as e:
+            return None, f"Error de conexión: {e}"

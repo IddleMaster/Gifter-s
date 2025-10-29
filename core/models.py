@@ -10,9 +10,6 @@ from django.utils.crypto import get_random_string
 
 
 
-
-
-
 class NotificationDevice(models.Model):
     PLATFORM_CHOICES = (
         ("web", "Web"),

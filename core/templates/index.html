@@ -93,7 +93,7 @@
 
   </div>
   {% endif %}
-  <p><span>&nbsp;</span> <span class="description-title">¡</span><span class="brand">Comienza a buscar
+  <p><span>&nbsp;</span> <span class="description-title"></span><span class="brand">Comienza a buscar
       regalos</span><span class="description-title">!</span></p>
 </div>
 
@@ -185,57 +185,65 @@
     {% if ai_reco and ai_reco|length > 0 %}
     <div class="row gy-4" data-aos="fade-up" data-aos-delay="100">
       {% for producto in ai_reco %}
-      
+
       <div class="col-lg-4 col-md-6" id="reco-card-{{ producto.id_producto }}">
         <div class="portfolio-item">
           <div class="product-image-container" style="height: 250px; overflow: hidden; border-radius: 8px;">
-            <a href="#" class="wishlist-badge wishlist-btn {% if producto.id_producto in favoritos_ids %}is-fav{% endif %}"
-               data-product-id="{{ producto.id_producto }}"
-               title="{% if producto.id_producto in favoritos_ids %}Quitar de wishlist{% else %}Agregar a wishlist{% endif %}"
-               aria-pressed="{% if producto.id_producto in favoritos_ids %}true{% else %}false{% endif %}">
+            <a href="#"
+              class="wishlist-badge wishlist-btn {% if producto.id_producto in favoritos_ids %}is-fav{% endif %}"
+              data-product-id="{{ producto.id_producto }}"
+              title="{% if producto.id_producto in favoritos_ids %}Quitar de wishlist{% else %}Agregar a wishlist{% endif %}"
+              aria-pressed="{% if producto.id_producto in favoritos_ids %}true{% else %}false{% endif %}">
+              
               {% if producto.id_producto in favoritos_ids %}
-                <i class="bi bi-heart-fill text-danger"></i>
+              <i class="bi bi-heart-fill text-danger"></i>
               {% else %}
-                <i class="bi bi-heart"></i>
+              <i class="bi bi-heart"></i>
               {% endif %}
             </a>
 
             {% if producto.imagen and producto.imagen.url %}
-              <img src="{{ producto.imagen.url }}" class="img-fluid" alt="{{ producto.nombre_producto }}" style="width: 100%; height: 100%; object-fit: cover;">
+            <img src="{{ producto.imagen.url }}" class="img-fluid" alt="{{ producto.nombre_producto }}"
+              style="width: 100%; height: 100%; object-fit: cover;">
             {% else %}
-              <img src="{% static 'img/Gifters/favicongift.png' %}" class="img-fluid" alt="{{ producto.nombre_producto }}" style="width: 100%; height: 100%; object-fit: cover;">
+            <img src="{% static 'img/Gifters/favicongift.png' %}" class="img-fluid" alt="{{ producto.nombre_producto }}"
+              style="width: 100%; height: 100%; object-fit: cover;">
             {% endif %}
           </div>
 
           <div class="portfolio-info">
             <h4>{{ producto.nombre_producto }}</h4>
             {% if producto.id_marca %}
-              <p class="text-primary">{{ producto.id_marca.nombre_marca }}</p>
+            <p class="text-primary">{{ producto.id_marca.nombre_marca }}</p>
             {% endif %}
-            
+
             <div class="product-actions">
               {% if producto.imagen and producto.imagen.url %}
-                <a href="{{ producto.imagen.url }}" class="glightbox preview-link" data-gallery="gal-reco-{{ producto.id_producto }}">
-                  <i class="bi bi-zoom-in"></i>
-                </a>
+              <a href="{{ producto.imagen.url }}" class="glightbox preview-link"
+                data-gallery="gal-reco-{{ producto.id_producto }}">
+                <i class="bi bi-zoom-in"></i>
+              </a>
+              
               {% else %}
-                <a href="{% static 'img/Gifters/favicongift.png' %}" class="glightbox preview-link" data-gallery="gal-reco-{{ producto.id_producto }}">
-                  <i class="bi bi-zoom-in"></i>
-                </a>
+              <a href="{% static 'img/Gifters/favicongift.png' %}" class="glightbox preview-link"
+                data-gallery="gal-reco-{{ producto.id_producto }}">
+                <i class="bi bi-zoom-in"></i>
+              </a>
               {% endif %}
 
-              <a href="#" class="btn btn-sm reco-dislike-btn" data-product-id="{{ producto.id_producto }}" title="No me interesa">
+              <a href="#" class="btn btn-sm reco-dislike-btn" data-product-id="{{ producto.id_producto }}"
+                title="No me interesa">
                 <i class="bi bi-hand-thumbs-down"></i>
               </a>
               <a href="{% url 'producto_detalle' producto.id_producto %}" class="details-link">
                 <i class="bi bi-eye"></i>
               </a>
               {% with producto.urls_tienda_activas.first as url_tienda %}
-                {% if url_tienda %}
-                  <a href="{{ url_tienda.url }}" target="_blank" rel="noopener" class="details-link">
-                    <i class="bi bi-link-45deg"></i>
-                  </a>
-                {% endif %}
+              {% if url_tienda %}
+              <a href="{{ url_tienda.url }}" target="_blank" rel="noopener" class="details-link">
+                <i class="bi bi-link-45deg"></i>
+              </a>
+              {% endif %}
               {% endwith %}
             </div>
           </div>
@@ -256,152 +264,429 @@
 {% endif %}
 
 <section id="portfolio" class="portfolio section">
-  <div class="container section-title" data-aos="fade-up">
-    <h2>Tendencias</h2>
-    <p><span>&nbsp;</span> <span class="description-title">Productos más populares</span></p>
+  <div class="container text-center" data-aos="fade-up">
+  <span id="pop-pill" class="badge rounded-pill px-4 py-2 mb-2 bg-primary">TENDENCIAS</span>
+  <h2 id="pop-title" class="fw-bold">Productos más populares</h2>
+  <p id="pop-rationale" class="text-muted mt-1" style="max-width:720px;margin:0 auto;"></p>
   </div>
 
+
   <div class="container">
-    <div class="isotope-layout" data-default-filter="*" data-layout="masonry" data-sort="original-order">
-      <div class="row gy-4 isotope-container" data-aos="fade-up" data-aos-delay="200">
-        {% for producto in productos_destacados %}
-        <div class="col-lg-4 col-md-6 portfolio-item isotope-item filter-app">
-
-          <!-- Imagen del producto -->
-          <div class="product-image-container" style="height: 250px; overflow: hidden; border-radius: 8px;">
-            <!-- Corazón flotante -->
-            <a href="#"
-              class="wishlist-badge wishlist-btn {% if producto.id_producto in favoritos_ids %}is-fav{% endif %}"
-              data-product-id="{{ producto.id_producto }}"
-              title="{% if producto.id_producto in favoritos_ids %}Quitar de wishlist{% else %}Agregar a wishlist{% endif %}"
-              aria-pressed="{% if producto.id_producto in favoritos_ids %}true{% else %}false{% endif %}">
-              {% if producto.id_producto in favoritos_ids %}
-              <i class="bi bi-heart-fill text-danger"></i>
-              {% else %}
-              <i class="bi bi-heart"></i>
-              {% endif %}
-            </a>
-
-            {% if producto.imagen and producto.imagen.url %}
-            <img src="{{ producto.imagen.url }}" class="img-fluid" alt="{{ producto.nombre_producto }}"
-              style="width: 100%; height: 100%; object-fit: cover;">
-            {% else %}
-            <img src="{% static 'img/Gifters/favicongift.png' %}" class="img-fluid" alt="{{ producto.nombre_producto }}"
-              style="width: 100%; height: 100%; object-fit: cover;">
-            {% endif %}
-          </div>
-
-
-          <div class="portfolio-info">
-            <h4>{{ producto.nombre_producto }}</h4>
-            <p class="text-primary">{{ producto.id_marca.nombre_marca }}</p>
-
-            {% if producto.precio %}
-
-            {% endif %}
-
-            <!-- Botones -->
-            <div class="product-actions">
-              {# quita todo el <a> del corazón aquí #}
-                {% if producto.imagen and producto.imagen.url %}
-                <a href="{{ producto.imagen.url }}" class="glightbox preview-link"
-                  data-gallery="gal-producto-{{ producto.id_producto }}">
-                  <i class="bi bi-zoom-in"></i>
-                </a>
-                {% else %}
-                <a href="{% static 'img/Gifters/favicongift.png' %}" class="glightbox preview-link"
-                  data-gallery="gal-producto-{{ producto.id_producto }}">
-                  <i class="bi bi-zoom-in"></i>
-                </a>
-                {% endif %}
-
-                {% with producto.urls_tienda_activas.first as url_tienda %}
-                <a href="{% url 'producto_detalle' producto.id_producto %}" class="details-link">
-                  <i class="bi bi-eye"></i>
-                </a>
-                {% if url_tienda %}
-                <a href="{{ url_tienda.url }}" target="_blank" rel="noopener" class="details-link">
-                  <i class="bi bi-link-45deg"></i>
-                </a>
-                {% endif %}
-                {% endwith %}
-
-            </div>
-
-          </div>
-
-        </div>
-        {% empty %}
-        <div class="col-12 text-center">
-          <div class="alert alert-info">
-            <h4>📦 No hay productos destacados</h4>
-            <p>Pronto agregaremos nuevos productos interesantes.</p>
-            <a href="{% url 'productos_list' %}" class="btn btn-primary mt-2">Explorar todos los productos</a>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
+    <div class="row gy-4" id="pop-grid" data-aos="fade-up" data-aos-delay="120">
+      <!-- Las tarjetas se inyectan por JS -->
+      <div class="col-12 text-center text-muted" id="pop-skel">Cargando tendencias…</div>
     </div>
 
-
-
-    <!-- Botón para ver más productos -->
-    {% if productos_destacados %}
-    <div class="text-center mt-4">
+    <div class="text-center mt-4" id="pop-vermas" style="display:none;">
       <a href="{% url 'productos_list' %}" class="btn btn-primary">Ver todos los productos</a>
     </div>
-    {% endif %}
   </div>
 </section>
 
+<!-- 1) Estado inicial de favoritos para Tendencias -->
+<script>
+  // ids ya marcados como favoritos (del context Django)
+  const FAV_IDS = new Set([
+    {% for id in favoritos_ids %}{{ id }}{% if not forloop.last %},{% endif %}{% endfor %}
+  ]);
+</script>
+
+<!-- 2) Carga de Tendencias (populares_ai) -->
+<script>
+(async () => {
+  const grid  = document.getElementById('pop-grid');
+  const pill  = document.getElementById('pop-pill');
+  const title = document.getElementById('pop-title');
+  const ratel = document.getElementById('pop-rationale');
+  const btnMore = document.getElementById('pop-vermas');
+
+  try {
+    const res = await fetch("{% url 'populares_ai' %}?k=6");
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+
+    pill.textContent  = data.pill   || 'TENDENCIAS';
+    title.textContent = data.title  || 'Productos más populares';
+
+    const rationale = (data.rationale || '').trim();
+    if (rationale) ratel.textContent = rationale; else ratel.style.display = 'none';
+
+    grid.innerHTML = '';
+
+    // Mapa de badges por product_id
+    const badgeMap = {};
+    (data.badges || []).forEach(b => { badgeMap[b.product_id] = b.badge; });
+
+    const items = Array.isArray(data.items) ? data.items : [];
+    if (!items.length) {
+      grid.innerHTML = `<div class="col-12 text-center text-muted">No hay tendencias por ahora.</div>`;
+      return;
+    }
+
+    items.forEach(p => {
+      const col = document.createElement('div');
+      col.className = 'col-lg-4 col-md-6';
+
+      const img = p.img || "{% static 'img/Gifters/favicongift.png' %}";
+      const marca = p.marca ? `<p class="text-primary">${p.marca}</p>` : '';
+      const productoUrl = "{% url 'producto_detalle' 0 %}".replace('/0/', `/${p.id}/`);
+      const tiendaUrl = p.url ? `<a href="${p.url}" target="_blank" rel="noopener" class="details-link"><i class="bi bi-link-45deg"></i></a>` : '';
+
+      const badgeTxt = (badgeMap[p.id] || '').trim();
+      const badgeHtml = badgeTxt ? `<span class="badge-ribbon">${badgeTxt}</span>` : '';
+
+      // === Estado inicial del corazón (igual que en tus otras secciones) ===
+      const fav = FAV_IDS.has(Number(p.id));
+      const heartClass = fav ? 'wishlist-badge wishlist-btn is-fav' : 'wishlist-badge wishlist-btn';
+      const heartTitle = fav ? 'Quitar de wishlist' : 'Agregar a wishlist';
+      const heartIcon  = fav ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
+      const heartAria  = fav ? 'true' : 'false';
+
+      col.innerHTML = `
+        <div class="portfolio-item">
+          <div class="product-image-container" style="height: 250px; overflow: hidden; border-radius: 8px; position:relative;">
+            ${badgeHtml}
+            <a href="#" class="${heartClass}" data-product-id="${p.id}" aria-pressed="${heartAria}" title="${heartTitle}">
+              <i class="${heartIcon}"></i>
+            </a>
+            <img src="${img}" class="img-fluid" alt="${p.nombre}" style="width:100%; height:100%; object-fit:cover;">
+          </div>
+
+          <div class="portfolio-info">
+            <h4>${p.nombre}</h4>
+            ${marca}
+            <div class="product-actions">
+              <a href="${img}" class="glightbox preview-link" data-gallery="gal-tendencias-${p.id}">
+                <i class="bi bi-zoom-in"></i>
+              </a>
+              <a href="${productoUrl}" class="details-link">
+                <i class="bi bi-eye"></i>
+              </a>
+              ${tiendaUrl}
+            </div>
+          </div>
+        </div>
+      `;
+      grid.appendChild(col);
+    });
+
+    btnMore.style.display = 'block';
+  } catch (e) {
+    console.error(e);
+    grid.innerHTML = `<div class="col-12 text-center text-danger">No pudimos cargar las tendencias.</div>`;
+  }
+})();
+</script>
 
 
-<section id="services" class="services section">
+
+
+
+<section id="services" class="services section" style="background-color: #f5f8ff;">
   <div class="container section-title" data-aos="fade-up">
     <h2>Conecta en Gifter’s</h2>
-
     <p><span>Personas que quizás conozcas</span> <span class="description-title"></span></p>
   </div>
 
-  <div class="container">
-    {% if request.user.is_authenticated %}
+  {% if request.user.is_authenticated %}
+  <div class="container position-relative" id="amigos-recomendados-container">
+    <!-- Flechas -->
+    <button id="recs-prev" class="recs-nav recs-prev" aria-label="Anterior">
+      <i class="bi bi-chevron-left"></i>
+    </button>
+    <button id="recs-next" class="recs-nav recs-next" aria-label="Siguiente">
+      <i class="bi bi-chevron-right"></i>
+    </button>
 
-    {% if sugerencias %}
-    <div class="row gy-4">
-      {% for u in sugerencias %}
-      <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="{{ forloop.counter0|add:1 }}00">
-        <div class="service-item position-relative">
-          <div>
-            {% if u.perfil and u.perfil.profile_picture %}
-            <img src="{{ u.perfil.profile_picture.url }}" alt="{{ u.nombre }} {{ u.apellido }}" height="100" width="100"
-              style="object-fit:cover;border-radius:50%;">
-            {% else %}
-            <img src="{% static 'img/Gifters/favicongift.png' %}" alt="{{ u.nombre }} {{ u.apellido }}" height="100"
-              width="100" style="object-fit:cover;border-radius:50%;">
-            {% endif %}
-          </div>
+    <!-- Carril -->
+    <div id="recs-track" class="recs-track">
+      <!-- skeletons suaves -->
+      <div class="recs-card skeleton"></div>
+      <div class="recs-card skeleton d-none d-md-block"></div>
+      <div class="recs-card skeleton d-none d-lg-block"></div>
+    </div>
 
-          <a href="{% url 'perfil_detalle' u.nombre_usuario %}" class="stretched-link">
-            <h3>{{ u.nombre }} {{ u.apellido }}</h3>
-          </a>
-          <p class="text-muted">@{{ u.nombre_usuario }}</p>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    <div class="text-center py-3">
-      <p class="text-muted">No hay sugerencias por ahora. Explora más perfiles para obtener mejores recomendaciones.</p>
-    </div>
-    {% endif %}
-
-    {% else %}
-    <div class="text-center py-3">
-      <p class="text-muted">Inicia sesión para ver a tus amigos y sugerencias de personas que podrías conocer.</p>
-    </div>
-    {% endif %}
+    <!-- estados -->
+    <div id="recs-empty" class="text-muted text-center py-3 d-none">Por ahora no hay sugerencias.</div>
+    <div id="recs-error" class="text-danger text-center py-3 d-none">No se pudieron cargar sugerencias.</div>
   </div>
+
+  <style>
+    #amigos-recomendados-container {
+      background: linear-gradient(180deg, #fff, #fbfcff 50%, #fff);
+      border-radius: 20px;
+      padding: 6px 8px 10px;
+    }
+
+    /* ——— Pildita superior ——— */
+    .pill-badge {
+      display: inline-block;
+      padding: .45rem .9rem;
+      border-radius: 9999px;
+      background: #0d6efd;
+      color: #fff;
+      font-weight: 600;
+      letter-spacing: .3px;
+      box-shadow: 0 6px 18px rgba(13, 110, 253, .18);
+    }
+
+    /* ——— Contenedor scroll ——— */
+    .recs-track {
+      display: flex;
+      gap: 18px;
+      overflow: hidden;
+      padding: 8px 8px 12px;
+      scroll-behavior: smooth;
+    }
+
+    /* ——— Tarjeta ——— */
+    .recs-card {
+      min-width: 260px;
+      max-width: 260px;
+      flex: 0 0 auto;
+      border-radius: 18px;
+      background: #fff;
+      border: 1px solid #eef0f4;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .06);
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    }
+
+    .recs-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 34px rgba(0, 0, 0, .10);
+      border-color: #e4e7ee;
+    }
+
+    .recs-body {
+      display: flex;
+      gap: 12px;
+      padding: 14px 14px 10px;
+    }
+
+    .recs-avatar {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex: 0 0 60px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, .12);
+    }
+
+    .recs-name {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1f2937;
+    }
+
+    .recs-username {
+      margin-top: 2px;
+      font-size: .875rem;
+      color: #6b7280;
+    }
+
+    .recs-reason {
+      margin-top: 6px;
+      font-size: .85rem;
+      color: #365cf5;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .recs-footer {
+      padding: 0 14px 14px;
+    }
+
+    .recs-btn {
+      display: block;
+      width: 100%;
+      text-align: center;
+      font-weight: 600;
+      font-size: .9rem;
+      padding: .52rem .8rem;
+      border-radius: 12px;
+      border: 1px solid #dbe2ff;
+      background: linear-gradient(180deg, #fff, #f8fbff);
+      color: #2b50f5;
+      text-decoration: none;
+      transition: transform .14s ease, box-shadow .14s ease, background .14s ease;
+    }
+
+    .recs-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 20px rgba(43, 80, 245, .15);
+      background: #fff;
+    }
+
+    /* ——— Skeleton ——— */
+    .skeleton {
+      position: relative;
+      height: 112px;
+    }
+
+    .skeleton::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 18px;
+      background:
+        linear-gradient(90deg, #f3f4f6 25%, #eceff3 37%, #f3f4f6 63%);
+      background-size: 400% 100%;
+      animation: shimmer 1.1s infinite;
+      border: 1px solid #eef0f4;
+    }
+
+    @keyframes shimmer {
+      0% {
+        background-position: 200% 0;
+      }
+
+      100% {
+        background-position: -200% 0;
+      }
+    }
+
+    /* ——— Flechas ——— */
+    .recs-nav {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 42px;
+      height: 42px;
+      border-radius: 9999px;
+      border: 1px solid #e8ecf3;
+      background: #fff;
+      display: grid;
+      place-items: center;
+      z-index: 5;
+      cursor: pointer;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, .08);
+      transition: transform .12s ease, box-shadow .12s ease, opacity .12s ease;
+    }
+
+    .recs-nav:hover {
+      transform: translateY(-50%) scale(1.03);
+      box-shadow: 0 14px 32px rgba(0, 0, 0, .12);
+    }
+
+    .recs-prev {
+      left: -8px;
+    }
+
+    .recs-next {
+      right: -8px;
+    }
+
+    .recs-nav i {
+      font-size: 1.1rem;
+      color: #111827;
+    }
+
+    @media (max-width: 576px) {
+      .recs-prev {
+        left: 4px;
+      }
+
+      .recs-next {
+        right: 4px;
+      }
+
+      .recs-card {
+        min-width: 85vw;
+        max-width: 85vw;
+      }
+    }
+  </style>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", async () => {
+      const track = document.getElementById("recs-track");
+      const prevBtn = document.getElementById("recs-prev");
+      const nextBtn = document.getElementById("recs-next");
+      const emptyMsg = document.getElementById("recs-empty");
+      const errMsg = document.getElementById("recs-error");
+
+      const hideArrowsIfNoOverflow = () => {
+        const canScroll = track.scrollWidth > track.clientWidth + 4;
+        prevBtn.style.display = canScroll ? "" : "none";
+        nextBtn.style.display = canScroll ? "" : "none";
+      };
+      const syncArrows = () => {
+        const max = track.scrollWidth - track.clientWidth - 2;
+        prevBtn.style.opacity = track.scrollLeft <= 2 ? .35 : 1;
+        nextBtn.style.opacity = track.scrollLeft >= max ? .35 : 1;
+      };
+
+      try {
+        const res = await fetch("{% url 'api_amigos_recomendados' %}", { credentials: "same-origin" });
+        if (!res.ok) throw new Error("network");
+        const data = await res.json();
+        const list = Array.isArray(data.results) ? data.results : [];
+
+        // limpio skeletons
+        track.innerHTML = "";
+
+        if (!list.length) {
+          emptyMsg.classList.remove("d-none");
+          hideArrowsIfNoOverflow();
+          return;
+        }
+
+        // render
+        list.forEach(p => {
+          const card = document.createElement("article");
+          card.className = "recs-card";
+
+          const avatar = p.avatar || "{% static 'img/Gifters/favicongift.png' %}";
+          const full = (p.full_name || "").trim() || `@${p.username}`;
+          const userUrl = "{% url 'perfil_detalle' 'USERNAME_PLACEHOLDER' %}".replace("USERNAME_PLACEHOLDER", p.username);
+
+          card.innerHTML = `
+          <div class="recs-body">
+            <img class="recs-avatar" src="${avatar}" alt="${full}">
+            <div class="w-100">
+              <h3 class="recs-name">${full}</h3>
+              <div class="recs-username">@${p.username}</div>
+              <div class="recs-reason"><i class="bi bi-people"></i> ${p.reason || 'Sugerencia'}</div>
+            </div>
+          </div>
+          <div class="recs-footer">
+            <a class="recs-btn" href="${userUrl}">Ver perfil</a>
+          </div>
+        `;
+          track.appendChild(card);
+        });
+
+        hideArrowsIfNoOverflow();
+        syncArrows();
+      } catch (e) {
+        console.error("Recs error:", e);
+        track.innerHTML = "";
+        errMsg.classList.remove("d-none");
+        prevBtn.style.display = "none";
+        nextBtn.style.display = "none";
+      }
+
+      // navegación
+      const step = 280; // ~ ancho de card + gap
+      prevBtn.addEventListener("click", () => { track.scrollBy({ left: -step, behavior: "smooth" }); setTimeout(syncArrows, 240); });
+      nextBtn.addEventListener("click", () => { track.scrollBy({ left: step, behavior: "smooth" }); setTimeout(syncArrows, 240); });
+      track.addEventListener("scroll", syncArrows);
+      window.addEventListener("resize", () => { hideArrowsIfNoOverflow(); syncArrows(); });
+    });
+  </script>
+
+  {% else %}
+  <div class="text-center py-3">
+    <p class="text-muted">Inicia sesión para ver a tus amigos y sugerencias personalizadas.</p>
+  </div>
+  {% endif %}
 </section>
+
+
+
+
 
 <!-- Tendencias - AHORA CON PRODUCTOS DESTACADOS -->
 
@@ -773,74 +1058,88 @@
 </script>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+  document.addEventListener('DOMContentLoaded', function () {
     // Asumimos que tienes una función getCookie para el CSRF token
     function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i].trim();
+          if (cookie.substring(0, name.length + 1) === (name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+          }
         }
-        return cookieValue;
+      }
+      return cookieValue;
     }
     const csrftoken = getCookie('csrftoken');
 
-    document.body.addEventListener('click', async function(event) {
-        const dislikeButton = event.target.closest('.reco-dislike-btn');
-        if (!dislikeButton) return;
+    document.body.addEventListener('click', async function (event) {
+      const dislikeButton = event.target.closest('.reco-dislike-btn');
+      if (!dislikeButton) return;
 
-        event.preventDefault();
+      event.preventDefault();
 
-        const productId = dislikeButton.dataset.productId;
-        const card = document.getElementById(`reco-card-${productId}`);
-        if (!productId || !card) return;
+      const productId = dislikeButton.dataset.productId;
+      const card = document.getElementById(`reco-card-${productId}`);
+      if (!productId || !card) return;
 
-        const formData = new FormData();
-        formData.append('product_id', productId);
+      const formData = new FormData();
+      formData.append('product_id', productId);
 
-        try {
-            const response = await fetch("{% url 'recommendation_feedback' %}", {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': csrftoken,
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: formData
+      try {
+        const response = await fetch("{% url 'recommendation_feedback' %}", {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': csrftoken,
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: formData
+        });
+
+        if (!response.ok) throw new Error('Error del servidor');
+        const data = await response.json();
+
+        if (data.status === 'ok') {
+          // Animar y eliminar la tarjeta del producto
+          card.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+          card.style.opacity = '0';
+          card.style.transform = 'scale(0.9)';
+          setTimeout(() => card.remove(), 400);
+
+          if (typeof Toast !== 'undefined') {
+            Toast.fire({
+              icon: 'info',
+              title: 'Entendido. ¡Afinando tus gustos!'
             });
-
-            if (!response.ok) throw new Error('Error del servidor');
-            const data = await response.json();
-
-            if (data.status === 'ok') {
-                // Animar y eliminar la tarjeta del producto
-                card.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
-                card.style.opacity = '0';
-                card.style.transform = 'scale(0.9)';
-                setTimeout(() => card.remove(), 400);
-
-                if (typeof Toast !== 'undefined') {
-                    Toast.fire({
-                        icon: 'info',
-                        title: 'Entendido. ¡Afinando tus gustos!'
-                    });
-                }
-            }
-        } catch (error) {
-            console.error('Error al registrar el feedback:', error);
-            if (typeof Toast !== 'undefined') {
-                Toast.fire({ icon: 'error', title: 'No se pudo registrar tu feedback.' });
-            }
+          }
         }
+      } catch (error) {
+        console.error('Error al registrar el feedback:', error);
+        if (typeof Toast !== 'undefined') {
+          Toast.fire({ icon: 'error', title: 'No se pudo registrar tu feedback.' });
+        }
+      }
     });
-});
-</script> 
+  });
+</script>
 
+<style>
+.badge-ribbon{
+  position:absolute;
+  top:10px; left:10px;
+  z-index:3;
+  background:#2563eb;
+  color:#fff;
+  font-weight:700;
+  font-size:.75rem;
+  padding:.28rem .55rem;
+  border-radius:10px;
+  box-shadow:0 6px 16px rgba(37,99,235,.18);
+}
+</style>
 
 
 

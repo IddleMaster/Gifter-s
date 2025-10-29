@@ -30,5 +30,5 @@ pandas
 openpyxl
 xhtml2pdf
 pycairo
-
+gunicorn
 

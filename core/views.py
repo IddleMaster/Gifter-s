@@ -10,8 +10,8 @@ from .forms import PostForm, RegisterForm, PerfilForm, PreferenciasUsuarioForm, 
 from .models import *
 from django.apps import apps
 from django.core.files.base import ContentFile
-from urllib.parse import quote
 from .services.recommendations import invalidate_user_reco_cache
+from urllib.parse import unquote
 # views.py
 from core.services.recommendations import recommend_products_for_user as ai_recommend_products
 from core.services.social import amigos_qs, sugerencias_qs
@@ -29,50 +29,35 @@ from django.utils import timezone
 import uuid, base64
 import requests
 from django.shortcuts import get_object_or_404
-from .models import User, Post, Like 
 from core.forms import ProfileEditForm
 from .utils import get_default_wishlist, _push_inbox
-from django.db.models import Q, Avg, Case, When
 import openai
-from django.db.models import Prefetch, Q
+
 from core.utils import get_default_wishlist
-from core.models import Wishlist, ItemEnWishlist
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from core.models import User, SolicitudAmistad, Seguidor, Evento
 from .serializers import SolicitudAmistadSerializer, UsuarioLiteSerializer
 from .serializers import *
-from core.models import Producto, Categoria, Marca
 from core.search import meili
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404, redirect, render  
-from core.models import Evento, Post, Seguidor, SolicitudAmistad
 from rest_framework.pagination import PageNumberPagination
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-from core.models import Wishlist, ItemEnWishlist, ResenaSitio
-from core.models import Conversacion, Mensaje, ParticipanteConversacion
-from core.models import NotificationDevice, PreferenciasUsuario, Perfil
 from .serializers import ConversacionLiteSerializer, MensajeSerializer
-from .models import RecommendationFeedback, Producto
 import pandas as pd
 import random
 from core.services_social import amigos_qs, sugerencias_qs, obtener_o_crear_conv_directa
 from django.contrib.auth import get_user_model
-from core.models import Post, Comentario
 from django.utils.html import escape
-from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import require_POST
 from django.urls import reverse  
 from django.views.decorators.http import require_GET
 from django.core.cache import cache
 # Para Reseña
-from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.shortcuts import redirect
 from .forms import ResenaSitioForm
-from .models import ResenaSitio
 #PDFS
 from django.template.loader import get_template
 from xhtml2pdf import pisa
@@ -84,7 +69,7 @@ from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError
-from django.db.models import Avg, Count
+from django.db.models import Avg, Count, Prefetch,Case,When,IntegerField
 from django.core.files.storage import default_storage
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 from django.utils.text import get_valid_filename
@@ -108,32 +93,43 @@ from rest_framework.permissions import IsAdminUser,IsAuthenticated, AllowAny
 from django.core.management import call_command
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
 import hashlib
-
 from django.db import transaction
 from .models import Conversacion
 from core.services.ai_recommender import rerank_products_with_embeddings
-
-
-
 # Stdlib
-import traceback
+from typing import List, Iterable
 
 # Formularios locales (solo si tienes una vista de contacto que lo use)
 from .forms import ContactForm
 User = get_user_model()
 
-
+from django.db.models.functions import Lower, Trim
 ##########
 import logging
 from django.db import connection
 log = logging.getLogger("gifters.health")  # salus de los gifters
 ##########
 
+
 #### notificaioens
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-##
+from django.http import JsonResponse, HttpResponseBadRequest, HttpResponseForbidden, HttpResponseRedirect,HttpRequest
+from django.shortcuts import get_object_or_404, redirect
+from .models import Notificacion
+from django.db.models import Q
+
+
+
+
+
+
+
+
+
+
+
+
 
 from .models import Conversacion, ConversationEvent, SecretSantaAssignment
 
@@ -161,6 +157,16 @@ def usuarios_list(request):
     { id, nombre, username, avatar, url }
     """
     query = (request.GET.get("q") or "").strip()
+    
+    if query and request.user.is_authenticated:
+         try:
+             HistorialBusqueda.objects.update_or_create(
+                 id_user=request.user, 
+                 term=f"@{query}", # Podrías añadir un prefijo para diferenciar
+                 defaults={'fecha_creacion': timezone.now()} 
+             )
+         except Exception as e:
+             print(f"Error al guardar historial de búsqueda de usuarios: {e}")
 
     # Si no hay query, mostramos vacío (o podrías redirigir a home si prefieres)
     if not query:
@@ -647,11 +653,6 @@ def obtener_info_likes_post(request, post_id):
 @login_required
 @require_POST
 def toggle_favorito(request, product_id):
-    """
-    Alterna un producto en la wishlist 'Favoritos' del usuario:
-    - Si existe, lo quita.
-    - Si no existe, lo agrega con cantidad=1.
-    """
     producto = get_object_or_404(Producto, pk=product_id, activo=True)
     wl = get_default_wishlist(request.user)
 
@@ -659,10 +660,25 @@ def toggle_favorito(request, product_id):
     if item:
         item.delete()
         state = "removed"
+        # No registramos actividad al quitar de favoritos (puedes cambiar esto si quieres)
     else:
         # Requiere que ItemEnWishlist.cantidad use MinValueValidator(1)
-        ItemEnWishlist.objects.create(id_wishlist=wl, id_producto=producto, cantidad=1)
+        new_item = ItemEnWishlist.objects.create(id_wishlist=wl, id_producto=producto, cantidad=1) # Create the item
         state = "added"
+
+        # --- MOVER EL REGISTRO DE ACTIVIDAD AQUÍ DENTRO ---
+        try:
+            RegistroActividad.objects.create(
+                id_usuario=request.user,
+                # Usamos 'NUEVO_REGALO' como aproximación a "intención de regalo"
+                tipo_actividad=RegistroActividad.TipoActividad.NUEVO_REGALO,
+                id_elemento=new_item.id_item, # Ahora 'new_item' SÍ existe en este scope
+                tabla_elemento='itemenwishlist',
+                contenido_resumen=f"Añadió '{producto.nombre_producto}' a favoritos"
+            )
+        except Exception as e:
+            print(f"Error al guardar actividad (añadir favorito): {e}")
+        # --- FIN DEL BLOQUE MOVIDO ---
 
     return JsonResponse({"status": "ok", "state": state, "product_id": product_id})
 
@@ -721,7 +737,30 @@ def productos_list(request):
         # ---- Personas que coinciden con la búsqueda ----
     personas_amigos, personas_otros = _people_matches(request, query)
 
-
+    if request.GET.get('from_suggestion') == '1' and request.user.is_authenticated:
+        term = request.GET.get('term')
+        if term:
+            try:
+                decoded_term = unquote(term)
+                # Determinar si fue por categoría o marca para dar contexto
+                prefix = "Categoría: " if categoria_id else ("Marca: " if marca_id else "")
+                HistorialBusqueda.objects.update_or_create(
+                    id_user=request.user, 
+                    term=f"{prefix}{decoded_term}",
+                    defaults={'fecha_creacion': timezone.now()} 
+                )
+            except Exception as e:
+                print(f"Error al guardar historial (sugerencia cat/marca): {e}")
+                
+    elif query and request.user.is_authenticated and not request.GET.get('from_suggestion'):
+         try:
+             HistorialBusqueda.objects.update_or_create(
+                 id_user=request.user, 
+                 term=query,
+                 defaults={'fecha_creacion': timezone.now()} 
+             )
+         except Exception as e:
+             print(f"Error al guardar historial de búsqueda directa: {e}")
     context = {
         'productos': page_obj,
         'categorias': categorias,
@@ -747,6 +786,19 @@ def producto_detalle(request, producto_id):
     productos_similares = (Producto.objects
                            .filter(id_categoria=producto.id_categoria, activo=True)
                            .exclude(id_producto=producto_id)[:4])
+    if request.GET.get('from_suggestion') == '1' and request.user.is_authenticated:
+        term = request.GET.get('term')
+        if term:
+            try:
+                # Usamos unquote para decodificar caracteres especiales
+                decoded_term = unquote(term)
+                HistorialBusqueda.objects.update_or_create(
+                    id_user=request.user, 
+                    term=decoded_term,
+                    defaults={'fecha_creacion': timezone.now()} 
+                )
+            except Exception as e:
+                print(f"Error al guardar historial (sugerencia producto): {e}")
 
     return render(request, 'productos/detalle.html', {
         'producto': producto,
@@ -812,6 +864,17 @@ def toggle_like_post_view(request, post_id):
             liked = False
         else:
             liked = True
+        try:
+                RegistroActividad.objects.create(
+                    id_usuario=request.user,
+                    tipo_actividad=RegistroActividad.TipoActividad.NUEVA_REACCION,
+                    id_elemento=like.id_like, # O post.id_post si prefieres
+                    tabla_elemento='like', # O 'post' si usas id_post
+                    contenido_resumen=f"Le dio like al post {post.id_post}"
+                )
+        except Exception as e:
+            print(f"Error al guardar actividad (nuevo like): {e}")    
+        
             
         # Contamos el total de likes actual para el post
         total_likes = post.likes.count()
@@ -1125,6 +1188,18 @@ def buscar_productos(request):
         page_number = page_number if page_number > 0 else 1
     except ValueError:
         page_number = 1
+        
+    if query and request.user.is_authenticated:
+        try:
+            # Usamos update_or_create para no duplicar búsquedas idénticas muy seguidas
+            # Podrías quitarlo si quieres CADA búsqueda individualmente
+            HistorialBusqueda.objects.update_or_create(
+                id_user=request.user, 
+                term=query,
+                defaults={'fecha_creacion': timezone.now()} # Actualiza la fecha si ya existía
+            )
+        except Exception as e:
+            print(f"Error al guardar historial de búsqueda: {e}")
 
     def _ordenar_sin_rating(qs):
         """Ordenamiento cuando no hay relación de reseñas disponible."""
@@ -1371,6 +1446,10 @@ def buscar_productos(request):
 def _user_doc_to_sug(u):
     nombre = f"{(u.nombre or '').strip()} {(u.apellido or '').strip()}".strip() or (u.nombre_usuario or '')
     username = u.nombre_usuario or ''
+    base_url = f"/u/{username}/" if username else f"/perfil/{u.id}/"
+    # --- MODIFICACIÓN ---
+    term_param = quote(f"{u.nombre} {u.apellido}".strip() or username) # Término a guardar
+    final_url = f"{base_url}?from_suggestion=1&term={term_param}"
     return {
         "tipo": "usuario",
         "texto": nombre,
@@ -1385,6 +1464,7 @@ def buscar_sugerencias(request):
     query = (request.GET.get('q') or '').strip()
     if len(query) < 2:
         return JsonResponse({'sugerencias': []})
+        
 
     sugerencias = []
 
@@ -1407,12 +1487,14 @@ def buscar_sugerencias(request):
                 p = pmap.get(h.get("id"))
                 if not p: 
                     continue
+                term_param_prod = quote(p.nombre_producto)
+                prod_url = f"/producto/{p.id_producto}/?from_suggestion=1&term={term_param_prod}"
                 sugerencias.append({
                     "tipo": "producto",
                     "texto": p.nombre_producto,
                     "marca": p.id_marca.nombre_marca if p.id_marca else "",
                     "categoria": p.id_categoria.nombre_categoria if p.id_categoria else "",
-                    "url": f"/producto/{p.id_producto}/"
+                    "url": prod_url
                 })
 
             # --- USUARIOS en Meili ----
@@ -1432,6 +1514,8 @@ def buscar_sugerencias(request):
 
             # --- Categorías / Marcas (DB) ---
             for c in Categoria.objects.filter(nombre_categoria__icontains=query)[:3]:
+                term_param_cat = quote(c.nombre_categoria)
+                cat_url = f"/productos/?categoria={c.id_categoria}&from_suggestion=1&term={term_param_cat}"
                 sugerencias.append({
                     "tipo": "categoría",
                     "texto": c.nombre_categoria,
@@ -1439,12 +1523,15 @@ def buscar_sugerencias(request):
                     "url": f"/productos/?categoria={c.id_categoria}"
                 })
             for m in Marca.objects.filter(nombre_marca__icontains=query)[:2]:
+                
+                term_param_marca = quote(m.nombre_marca)
+                marca_url = f"/productos/?marca={m.id_marca}&from_suggestion=1&term={term_param_marca}"
                 sugerencias.append({
                     "tipo": "marca",
                     "texto": m.nombre_marca,
                     "url": f"/productos/?marca={m.id_marca}"
                 })
-
+            
             return JsonResponse({'sugerencias': sugerencias})
 
         except Exception:
@@ -1481,6 +1568,7 @@ def buscar_sugerencias(request):
                 )
                 .order_by('nombre', 'apellido')[:5])
     for u in usuarios:
+        
         sugerencias.append(_user_doc_to_sug(u))
 
     # Categorías / Marcas
@@ -1997,6 +2085,28 @@ class ConversacionesList(APIView):
             if "unread_count" not in c:
                 c["unread_count"] = 0
 
+                # === Inyectar 'tipo' (y corregir is_group para EVENTO) ===
+        # Mapeo rápido para recuperar tipo y un título de respaldo
+        tipo_title_map = {
+            c.conversacion_id: (
+                str(getattr(c, "tipo", "")).lower(),
+                (getattr(c, "titulo", None) or getattr(c, "nombre", None) or "")
+            )
+            for c in qs
+        }
+
+        for d in data:
+            cid = d.get("conversacion_id")
+            if cid in tipo_title_map:
+                tipo_val, fallback_title = tipo_title_map[cid]
+                if tipo_val:
+                    d["tipo"] = tipo_val
+                # Si es EVENTO, asegúrate que NO se marque como grupo
+                if tipo_val == "evento":
+                    d["is_group"] = False
+                    if not d.get("titulo"):
+                        d["titulo"] = fallback_title        
+
         return Response(data)
 
 
@@ -2180,8 +2290,27 @@ def amistad_aceptar(request, username):
         estado=SolicitudAmistad.Estado.PENDIENTE
     )
     conv = sol.aceptar()
+    try:
+        # Registrar que el receptor ahora sigue al emisor
+        RegistroActividad.objects.create(
+            id_usuario=request.user, # El que aceptó
+            tipo_actividad=RegistroActividad.TipoActividad.NUEVO_SEGUIDOR,
+            id_elemento=emisor.id, # A quién sigue
+            tabla_elemento='user', # O 'seguidor' si prefieres
+            contenido_resumen=f"Comenzó a seguir a {emisor.nombre_usuario}"
+        )
+        # Registrar que el emisor ahora sigue al receptor
+        RegistroActividad.objects.create(
+            id_usuario=emisor, # El que envió la solicitud
+            tipo_actividad=RegistroActividad.TipoActividad.NUEVO_SEGUIDOR,
+            id_elemento=request.user.id, # A quién sigue
+            tabla_elemento='user',
+            contenido_resumen=f"Comenzó a seguir a {request.user.nombre_usuario}"
+        )
+    except Exception as e:
+        print(f"Error al guardar actividad (amistad aceptada): {e}")
 
-    # 👇 Responder JSON si es AJAX
+
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
         return JsonResponse({
             "ok": True,
@@ -2254,6 +2383,18 @@ def perfil_publico(request, username):
         pendiente_enviada = solicitudes.filter(emisor=request.user).first()
         pendiente_recibida = solicitudes.filter(emisor=usuario).first()
 
+    if request.GET.get('from_suggestion') == '1' and request.user.is_authenticated:
+        term = request.GET.get('term')
+        if term:
+            try:
+                decoded_term = unquote(term)
+                HistorialBusqueda.objects.update_or_create(
+                    id_user=request.user, 
+                    term=f"@{decoded_term}", # Podrías añadir prefijo
+                    defaults={'fecha_creacion': timezone.now()} 
+                )
+            except Exception as e:
+                print(f"Error al guardar historial (sugerencia usuario): {e}")
     # Lógica de privacidad principal: si es privado y no son amigos, bloquea.
     if usuario.is_private and not es_amigo:
         context = {
@@ -2370,22 +2511,30 @@ def post_crear(request):
     if form.is_valid():
         post = form.save(commit=False)
         post.id_usuario = request.user
-        
-        # Asignar el tipo de post
         if form.cleaned_data.get('imagen'):
-            post.tipo_post = Post.TipoPost.IMAGEN
+             post.tipo_post = Post.TipoPost.IMAGEN
         else:
-            post.tipo_post = Post.TipoPost.TEXTO
-            
+             post.tipo_post = Post.TipoPost.TEXTO
         post.save()
         messages.success(request, "¡Publicación creada con éxito!")
-    else:
-        # Si el formulario no es válido, muestra un error
-        # (puedes manejarlo de una forma más elegante si quieres)
-        messages.error(request, "No se pudo crear la publicación. Revisa los datos.")
 
+        # --- AÑADIR ESTO ---
+        try:
+            RegistroActividad.objects.create(
+                id_usuario=request.user,
+                tipo_actividad=RegistroActividad.TipoActividad.NUEVO_POST,
+                id_elemento=post.id_post,
+                tabla_elemento='post',
+                contenido_resumen=f"Creó el post: {post.contenido[:50]}..." if post.contenido else "Creó un post con imagen."
+            )
+        except Exception as e:
+            print(f"Error al guardar actividad (nuevo post): {e}")
+        # --- FIN ---
+
+    else:
+        messages.error(request, "No se pudo crear la publicación. Revisa los datos.")
     return redirect(_next_url(request))
-    
+
 @login_required
 def feed(request):
     # Si quieres súper simple: traes posts y el template usa post.comentarios.all
@@ -2403,6 +2552,17 @@ def comentario_crear(request):
     post = get_object_or_404(Post, pk=post_id)
     c = Comentario.objects.create(id_post=post, usuario=request.user, contenido=contenido)
 
+    try:
+        RegistroActividad.objects.create(
+            id_usuario=request.user,
+            tipo_actividad=RegistroActividad.TipoActividad.NUEVO_COMENT,
+            id_elemento=c.id_comentario,
+            tabla_elemento='comentario',
+            contenido_resumen=f"Comentó en el post {post_id}: {c.contenido[:50]}..."
+        )
+    except Exception as e:
+        print(f"Error al guardar actividad (nuevo comentario): {e}")
+        
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
         foto = getattr(getattr(request.user, 'perfil', None), 'profile_picture', None)
         return JsonResponse({
@@ -2466,7 +2626,7 @@ def amistad_amigos_view(request):
         try:
             amigos_qs = request.user.amigos_qs
         except AttributeError:
-            from core.services_social import amigos_qs as amigos_func
+            from core.services.social import amigos_qs as amigos_func  # ← con punto, no con guion bajo
             amigos_qs = amigos_func(request.user)
 
         amigos_qs = amigos_qs.select_related('perfil')
@@ -2767,22 +2927,27 @@ def conversacion_detalle(request, pk: int):
         })
 
     # usa 'titulo' si existe, si no 'nombre'
-    title = (getattr(conv, "titulo", None) or getattr(conv, "nombre", None) or "")  
-    # deduce grupo por tipo o por cantidad de participantes
-    tipo_val = getattr(conv, "tipo", "") or ""
+    title = (getattr(conv, "titulo", None) or getattr(conv, "nombre", None) or "")
+    tipo_val = str(getattr(conv, "tipo", "")).lower()
+
     is_group = bool(
         getattr(conv, "is_group", False) or
-        (tipo_val.lower() == "grupo") or
+        (tipo_val == "grupo") or
         (len(data_part) > 2)
     )
+
+    # Si la conversación es de tipo EVENTO, no debe contar como grupo
+    if tipo_val == "evento":
+        is_group = False
 
     return JsonResponse({
         "conversacion_id": getattr(conv, "conversacion_id", conv.pk),
         "is_group": is_group,
         "titulo": title,
+        "tipo": tipo_val,                 # <-- NUEVO
         "participantes": data_part,
-        "es_autor": (conv.creador_id == request.user.id),   # ← NECESARIO para mostrar ⋮
-        "author_id": conv.creador_id,          
+        "es_autor": (conv.creador_id == request.user.id),
+        "author_id": conv.creador_id,
     })
 
 def ayuda_view(request):
@@ -3266,87 +3431,89 @@ def chat_unread_summary(request):
     per_conv = {str(r["mensaje__conversacion_id"]): r["cnt"] for r in qs}
     total = sum(per_conv.values())
     return JsonResponse({"total": total, "per_conversation": per_conv})
-
+#################
+############
+############
 ####################DESKTOP FUNCTIONS!!!
-@api_view(['GET']) # cite: Sex.txt
-@permission_classes([IsAdminUser]) # cite: Sex.txt
-def download_active_products_csv(request): # cite: Sex.txt
+@api_view(['GET'])  
+@permission_classes([IsAdminUser])  
+def download_active_products_csv(request):  
     """
     Genera y devuelve un archivo CSV con todos los productos activos.
     """
     try:
-        productos = Producto.objects.filter(activo=True).select_related('id_categoria', 'id_marca').order_by('id_producto') # cite: Sex.txt
-        filename_base = f"productos_activos_{datetime.date.today()}" # cite: Sex.txt
+        productos = Producto.objects.filter(activo=True).select_related('id_categoria', 'id_marca').order_by('id_producto')  
+        filename_base = f"productos_activos_{datetime.date.today()}"  
 
-        response = HttpResponse( # cite: Sex.txt
+        response = HttpResponse(  
             content_type='text/csv',
             headers={'Content-Disposition': f'attachment; filename="{filename_base}.csv"'},
         )
-        response.write('\ufeff'.encode('utf8')) # BOM # cite: Sex.txt
-        writer = csv.writer(response, delimiter=';') # cite: Sex.txt
+        response.write('\ufeff'.encode('utf8')) # BOM  
+        writer = csv.writer(response, delimiter=';')  
 
         # Encabezado
-        writer.writerow([ # cite: Sex.txt
+        writer.writerow([  
             'ID Producto', 'Nombre', 'Descripcion', 'Precio',
             'Categoria ID', 'Categoria Nombre', 'Marca ID', 'Marca Nombre', 'URL Imagen'
         ])
         # Filas
-        for producto in productos: # cite: Sex.txt
-            writer.writerow([ # cite: Sex.txt
+        for producto in productos:  
+            writer.writerow([  
                 producto.id_producto, producto.nombre_producto, producto.descripcion, producto.precio,
                 producto.id_categoria_id, producto.id_categoria.nombre_categoria if producto.id_categoria else '',
                 producto.id_marca_id, producto.id_marca.nombre_marca if producto.id_marca else '',
                 request.build_absolute_uri(producto.imagen.url) if producto.imagen else ''
             ])
-        return response # cite: Sex.txt
+        return response  
 
     except Exception as e:
-        print(f"Error generando CSV de productos: {e}") # cite: Sex.txt
-        return Response({"error": f"No se pudo generar el reporte CSV: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) # cite: Sex.txt
+        print(f"Error generando CSV de productos: {e}")  
+        return Response({"error": f"No se pudo generar el reporte CSV: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)  
     
     
-@api_view(['GET']) # cite: Sex.txt
-@permission_classes([IsAdminUser]) # cite: Sex.txt
+@api_view(['GET'])  
+@permission_classes([IsAdminUser])  
 def download_active_products_pdf(request): # Nuevo nombre de función
     """
     Genera y devuelve un archivo PDF con todos los productos activos.
     """
     try:
-        productos = Producto.objects.filter(activo=True).select_related('id_categoria', 'id_marca').order_by('id_producto') # cite: Sex.txt
-        filename_base = f"productos_activos_{datetime.date.today()}" # cite: Sex.txt
+        productos = Producto.objects.filter(activo=True).select_related('id_categoria', 'id_marca').order_by('id_producto')  
+        filename_base = f"productos_activos_{datetime.date.today()}"  
 
         # Lógica de generación de PDF (la misma que tenías antes)
-        template = get_template('reports/product_report_pdf.html') # cite: Sex.txt
-        context = { # cite: Sex.txt
-            'productos': productos, # cite: Sex.txt
-            'generation_date': timezone.now() # cite: Sex.txt
+        template = get_template('reports/product_report_pdf.html')  
+        context = {  
+            'productos': productos,  
+            'generation_date': timezone.now()  
         }
-        html = template.render(context) # cite: Sex.txt
-        result = BytesIO() # cite: Sex.txt
-        pdf = pisa.pisaDocument(BytesIO(html.encode("UTF-8")), result) # cite: Sex.txt
+        html = template.render(context)  
+        result = BytesIO()  
+        pdf = pisa.pisaDocument(BytesIO(html.encode("UTF-8")), result)  
 
-        if not pdf.err: # cite: Sex.txt
-            response = HttpResponse(result.getvalue(), content_type='application/pdf') # cite: Sex.txt
-            response['Content-Disposition'] = f'attachment; filename="{filename_base}.pdf"' # cite: Sex.txt
-            return response # cite: Sex.txt
+        if not pdf.err:  
+            response = HttpResponse(result.getvalue(), content_type='application/pdf')  
+            response['Content-Disposition'] = f'attachment; filename="{filename_base}.pdf"'  
+            return response  
         else:
-            print(f"Error generando PDF: {pdf.err}") # cite: Sex.txt
-            return Response({"error": "No se pudo generar el reporte PDF."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) # cite: Sex.txt
+            print(f"Error generando PDF: {pdf.err}")  
+            return Response({"error": "No se pudo generar el reporte PDF."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)  
 
     except Exception as e:
         print(f"Error generando PDF de productos: {e}") # Mensaje específico
-        return Response({"error": f"No se pudo generar el reporte PDF: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) # cite: Sex.txt
+        return Response({"error": f"No se pudo generar el reporte PDF: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)  
     
-@api_view(['GET']) # cite: Sex.txt
-@permission_classes([IsAdminUser]) # cite: Sex.txt
+@api_view(['GET'])  
+@permission_classes([IsAdminUser])  
 def download_active_products_excel(request): # Nuevo nombre específico
     """
     Genera y devuelve un archivo Excel (.xlsx) con todos los productos activos.
     """
     try:
         # Obtener datos (igual que en las otras vistas)
-        productos = Producto.objects.filter(activo=True).select_related('id_categoria', 'id_marca').order_by('id_producto') # cite: Sex.txt
-        filename_base = f"productos_activos_{datetime.date.today()}" # cite: Sex.txt
+        productos = Producto.objects.filter(activo=True).select_related('id_categoria', 'id_marca').order_by('id_producto')  
+        filename_base = f"productos_activos_{datetime.date.today()}"  
 
         # Preparar datos para Pandas (igual que antes)
         data_list = []
@@ -3366,21 +3533,223 @@ def download_active_products_excel(request): # Nuevo nombre específico
 
         # Configurar respuesta para Excel
         response = HttpResponse(
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', # cite: Sex.txt
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',  
         )
-        response['Content-Disposition'] = f'attachment; filename="{filename_base}.xlsx"' # cite: Sex.txt
+        response['Content-Disposition'] = f'attachment; filename="{filename_base}.xlsx"'  
 
         # Escribir DataFrame a Excel en la respuesta
-        df.to_excel(response, index=False, engine='openpyxl') # cite: Sex.txt
-        return response # cite: Sex.txt
+        df.to_excel(response, index=False, engine='openpyxl')  
+        return response  
 
     except Exception as e:
         print(f"Error generando Excel de productos: {e}") # Mensaje específico
-        return Response({"error": f"No se pudo generar el reporte Excel: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) # cite: Sex.txt
+        return Response({"error": f"No se pudo generar el reporte Excel: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)  
+
+
+#
+# --- INICIO DE NUEVAS VISTAS DE REPORTES DE USUARIO (CORREGIDO) ---
+#
+
+class ModerationReportAPIView(APIView):
+    """
+    Reporte de Moderación:
+    - Usuarios que más reportan.
+    - Usuarios que más han sido reportados.
+    """
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        # Usuarios que más reportan
+        top_reporters = (
+            ReporteStrike.objects
+            .values('id_user__id', 'id_user__nombre_usuario')
+            .annotate(count=Count('id_reporte'))
+            .order_by('-count')[:20]
+        )
+
+        # Usuarios (autores de posts) que más han sido reportados
+        most_reported_users = (
+            ReporteStrike.objects
+            .exclude(id_post__id_usuario__isnull=True) # Ignorar reportes sin post o autor
+            .values('id_post__id_usuario__id', 'id_post__id_usuario__nombre_usuario')
+            .annotate(count=Count('id_reporte'))
+            .order_by('-count')[:20]
+        )
+
+        return Response({
+            "top_reporters": list(top_reporters),
+            "most_reported_users": list(most_reported_users),
+        })
+
+
+class PopularSearchReportAPIView(APIView):
+    """
+    Reporte de Búsquedas Populares:
+    - Devuelve los términos más buscados en HistorialBusqueda.
+    """
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        popular_terms = (
+            HistorialBusqueda.objects
+            .annotate(term_lower=Lower(Trim('term'))) # Normalizar
+            .values('term_lower')
+            .annotate(count=Count('id_search'))
+            .order_by('-count')[:50] # Top 50
+        )
+
+        return Response({
+            "popular_searches": list(popular_terms),
+        })
+
+
+class SiteReviewsReportAPIView(APIView):
+    """
+    Reporte de Reseñas del Sitio:
+    - Conteo de estrellas (1-5).
+    - Lista de las últimas 100 reseñas.
+    """
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        # Conteo de estrellas
+        review_stats = (
+            ResenaSitio.objects
+            .values('calificacion')
+            .annotate(count=Count('id_resena'))
+            .order_by('calificacion')
+        )
+
+        # Últimas reseñas (para "ver que dice cada una")
+        latest_reviews = (
+            ResenaSitio.objects
+            .order_by('-fecha_resena')
+            .select_related('id_usuario')
+            .values(
+                'id_usuario__nombre_usuario',
+                'calificacion',
+                'comentario',
+                'fecha_resena'
+            )[:100]
+        )
+
+        return Response({
+            "review_stats": list(review_stats),
+            "latest_reviews": list(latest_reviews),
+        })
+
+
+class TopActiveUsersReportAPIView(APIView):
+    """
+    Reporte de Top 10 Usuarios más Activos.
+    Muestra el puntaje total y un desglose por tipo de actividad
+    basado en el modelo RegistroActividad.
+    """
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        # 1. Obtener los IDs de los top 10 usuarios por actividad total
+        top_user_ids = list(
+            RegistroActividad.objects
+            .values('id_usuario')
+            .annotate(activity_score=Count('id_actividad'))
+            .order_by('-activity_score')
+            .values_list('id_usuario', flat=True)[:10] 
+        )
+
+        # 2. Obtener el desglose de actividad SOLO para esos usuarios
+        activity_details = (
+            RegistroActividad.objects
+            .filter(id_usuario__in=top_user_ids) # Filtrar por los top 10
+            .values('id_usuario__id', 'id_usuario__nombre_usuario', 'tipo_actividad') # Agrupar por usuario y tipo
+            .annotate(count=Count('id_actividad'))
+            .order_by('id_usuario__id', 'tipo_actividad') # Ordenar para procesar fácilmente
+        )
+
+        # 3. Procesar los resultados para agrupar por usuario
+        results = {}
+        for detail in activity_details:
+            user_id = detail['id_usuario__id']
+            username = detail['id_usuario__nombre_usuario']
+            activity_type = detail['tipo_actividad']
+            count = detail['count']
+
+            if user_id not in results:
+                results[user_id] = {
+                    'user_id': user_id,
+                    'nombre_usuario': username,
+                    'total_score': 0,
+                    'breakdown': { # Inicializar desglose con ceros
+                        RegistroActividad.TipoActividad.NUEVO_POST: 0,
+                        RegistroActividad.TipoActividad.NUEVO_COMENT: 0,
+                        RegistroActividad.TipoActividad.NUEVA_REACCION: 0,
+                        RegistroActividad.TipoActividad.NUEVO_SEGUIDOR: 0,
+                        RegistroActividad.TipoActividad.NUEVO_REGALO: 0,
+                        RegistroActividad.TipoActividad.OTRO: 0, 
+                    }
+                }
+            
+            # Sumar al total y al desglose específico
+            results[user_id]['total_score'] += count
+            if activity_type in results[user_id]['breakdown']:
+                 results[user_id]['breakdown'][activity_type] = count
+
+        # Convertir el diccionario a una lista ordenada por puntaje total (descendente)
+        final_list = sorted(results.values(), key=lambda x: x['total_score'], reverse=True)
+        
+        # Calcular el total general de interacciones (como antes)
+        total_interactions = RegistroActividad.objects.count()
+
+        return Response({
+            "top_active_users": final_list,
+            "total_tracked_interactions": total_interactions,
+        })
+class UserActivityDetailAPIView(APIView):
+    """
+    Reporte detallado de la actividad de UN solo usuario.
+    Ideal para ver el "perfil" de un usuario desde el admin.
+    """
+    permission_classes = [IsAdminUser]
+
+    def get(self, request, pk=None):
+        if pk is None:
+            return Response({"error": "Se requiere un ID de usuario."}, status=400)
+        
+        try:
+            user = User.objects.get(pk=pk)
+        except User.DoesNotExist:
+            return Response({"error": "Usuario no encontrado."}, status=404)
+
+        # Consultas de actividad
+        data = {
+            "user_id": user.id,
+            "nombre_usuario": user.nombre_usuario,
+            "seguidores": Seguidor.objects.filter(seguido=user).count(),
+            "siguiendo": Seguidor.objects.filter(seguidor=user).count(),
+            "solicitudes_enviadas": SolicitudAmistad.objects.filter(emisor=user).count(),
+            "bloqueos_realizados": BloqueoDeUsuario.objects.filter(blocker=user).count(),
+            "veces_bloqueado": BloqueoDeUsuario.objects.filter(blocked=user).count(),
+            "posts_creados": Post.objects.filter(id_usuario=user).count(),
+            "comentarios_escritos": Comentario.objects.filter(usuario=user).count(),
+            "likes_dados": Like.objects.filter(id_usuario=user).count(),
+            "postales_generadas": GeneratedCard.objects.filter(user=user).count(),
+            "regalos_dados": HistorialDeRegalos.objects.filter(id_user=user).count(),
+        }
+        
+        # Lista de quién ha bloqueado a este usuario
+        blocked_by_list = BloqueoDeUsuario.objects.filter(blocked=user).select_related('blocker').values_list('blocker__nombre_usuario', flat=True)
+        data["blocked_by_users"] = list(blocked_by_list)
+
+        return Response(data)
+
+# --- FIN DE NUEVAS VISTAS DE REPORTES ---
+#
 
 
 
-
+#######################
+#####################
+###################
 ##########FINN REPORTS FUNCTIONS    
 def producto_detalle(request, id_producto=None, pk=None):
     """
@@ -3445,22 +3814,25 @@ def producto_detalle(request, id_producto=None, pk=None):
     }
     return render(request, "producto_detalle.html", context)
 
-def ver_card_publica(request, token):
+def ver_card_publica(request, slug):
+    # Buscar por el token compartido (tu modelo se llama GeneratedCard)
+    card = get_object_or_404(GeneratedCard, share_token=slug)
 
-    card = None
-    try:
-        # Carga diferida del modelo para no fallar si aún no está migrado
-        from django.apps import apps
-        GeneratedCard = apps.get_model('core', 'GeneratedCard')  # core.models.GeneratedCard
-        if GeneratedCard:
-            card = GeneratedCard.objects.filter(share_token=token).first()
-    except Exception:
-        card = None
+    # Construir URLs absolutas que usará el template
+    img_abs_url = request.build_absolute_uri(card.image.url) if card.image else ""
+    page_abs_url = request.build_absolute_uri()
 
-    return render(request, "cards/ver_publica.html", {"card": card})
+    return render(request, "cards/ver_publica.html", {
+        "card": card,
+        "img_abs_url": img_abs_url,
+        "page_abs_url": page_abs_url,
+    })
 
 HF_PRIMARY  = "stabilityai/stable-diffusion-xl-base-1.0"
-HF_FALLBACK = "stabilityai/sdxl-turbo"
+HF_FALLBACK = "stabilityai/stable-diffusion-xl-base-1.0"
+
+def _bad(payload: dict):
+    return HttpResponseBadRequest(json.dumps(payload), content_type="application/json")
 
 def _hf_generate(hf_token: str, model: str, prompt: str, timeout: int = 120):
     url = f"https://api-inference.huggingface.co/models/{model}"
@@ -3472,70 +3844,62 @@ def _hf_generate(hf_token: str, model: str, prompt: str, timeout: int = 120):
     )
     return url, resp
 
-def _bad(payload: dict):
-    return HttpResponseBadRequest(json.dumps(payload), content_type="application/json")
+from urllib.parse import quote 
+
+def _pollinations_url(prompt: str, w: int = 1024, h: int = 1024):
+    q = quote(prompt)  # <-- antes: urllib.parse.quote
+    return f"https://image.pollinations.ai/prompt/{q}?width={w}&height={h}&nofeed=true"
+
 
 @login_required
 @require_POST
 def generar_card_hf(request):
     prompt = (request.POST.get("prompt") or "").strip()
-    style  = (request.POST.get("style")  or "postal colorida, fondo limpio, composición centrada").strip()
+    style  = (request.POST.get("style")  or "postal minimalista con borde sutil").strip()
     if not prompt:
         return _bad({"error": "Falta 'prompt'"})
 
-    hf_token = os.environ.get("HF_TOKEN")
-    if not hf_token:
-        return _bad({"error": "Falta HF_TOKEN en el entorno"})
-
-    hf_model = (os.environ.get("HF_MODEL") or HF_PRIMARY).strip()
-
+    # Prompt unificado para estética de postal
     full_prompt = (
-        f"Square greeting card. {style}. "
-        f"Spanish theme for: {prompt}. "
-        f"Coherent illustration, modern, soft colors, clean background, "
-        f"no random text, no gibberish letters, high quality."
+        f"{prompt}. Estilo: {style}. composición centrada, formato cuadrado 1:1, fondo claro, "
+        "tipografía limpia, borde sutil y agradable, alta calidad."
     )
 
-    tried = []
     img_bytes = None
+    used_provider = None
+    tried = []
 
-    # intento 1
-    url1, r1 = _hf_generate(hf_token, hf_model, full_prompt)
-    tried.append({"model": hf_model, "url": url1, "status": r1.status_code})
+    # 1) Intento Hugging Face si tienes token/modelo en .env
+    hf_token = os.environ.get("HF_TOKEN")
+    hf_model = (os.environ.get("HF_MODEL") or "stabilityai/sdxl-turbo").strip()
 
-    if r1.status_code == 200 and r1.content:
-        img_bytes = r1.content
-    else:
-        # errores conocidos
-        if r1.status_code in (401, 403):
-            msg = "Token inválido o sin acceso al modelo (acepta los términos en Hugging Face)."
-            return _bad({
-                "error": msg,
-                "status": r1.status_code,
-                "model": hf_model,
-                "hint": "Revisa HF_TOKEN y acepta los términos del modelo en su página.",
-                "tried": tried
-            })
-        # intento 2 (fallback dentro de HF)
-        url2, r2 = _hf_generate(hf_token, HF_FALLBACK, full_prompt)
-        tried.append({"model": HF_FALLBACK, "url": url2, "status": r2.status_code})
-        if r2.status_code == 200 and r2.content:
+    if hf_token:
+        try:
+            url_hf, r = _hf_generate(hf_token, hf_model, full_prompt)
+            tried.append({"provider": "huggingface", "url": url_hf, "status": r.status_code})
+            if r.status_code == 200 and r.content:
+                img_bytes = r.content
+                used_provider = "huggingface"
+        except Exception as e:
+            tried.append({"provider": "huggingface", "error": str(e)})
+
+    # 2) Fallback sin clave: Pollinations
+    if img_bytes is None:
+        try:
+            poll_url = _pollinations_url(full_prompt, 1024, 1024)
+            r2 = requests.get(poll_url, timeout=180)
+            tried.append({"provider": "pollinations", "url": poll_url, "status": r2.status_code})
+            if r2.status_code != 200:
+                return _bad({
+                    "error": "Proveedor de imagen no respondió con 200",
+                    "details": tried
+                })
             img_bytes = r2.content
-        elif r2.status_code in (401, 403):
-            msg = "Token inválido o sin acceso al modelo (fallback) en HF."
-            return _bad({
-                "error": msg,
-                "status": r2.status_code,
-                "model": HF_FALLBACK,
-                "hint": "Revisa HF_TOKEN y acepta los términos del modelo en su página.",
-                "tried": tried
-            })
-        else:
-            return _bad({
-                "error": "Hugging Face no devolvió imagen",
-                "tried": tried
-            })
+            used_provider = "pollinations"
+        except Exception as e:
+            return _bad({"error": "Excepción obteniendo imagen (pollinations)", "details": str(e), "tried": tried})
 
+    # 3) Guardar en GeneratedCard y responder
     try:
         GeneratedCard = apps.get_model('core', 'GeneratedCard')
         card = GeneratedCard.objects.create(user=request.user, prompt=prompt)
@@ -3547,9 +3911,10 @@ def generar_card_hf(request):
         "id": card.id,
         "url": card.image.url,
         "share": request.build_absolute_uri(f"/cards/s/{card.share_token}/"),
-        "provider_used": hf_model,
-        "tried": tried[:3],
+        "provider_used": used_provider,
+        "tried": tried
     })
+
 
 
 
@@ -3569,53 +3934,46 @@ def _is_author(conv: Conversacion, user) -> bool:
 @login_required
 @require_http_methods(["GET", "POST"])
 def events_list_create(request, conversacion_id):
-    try:
-        conv = Conversacion.objects.get(pk=conversacion_id)
-    except Conversacion.DoesNotExist:
-        return HttpResponseBadRequest("Conversación no existe")
+    conv = get_object_or_404(Conversacion, pk=conversacion_id)
 
-    if not _is_group(conv) or not _is_member(conv, request.user):
-        return HttpResponseForbidden("No permitido")
+    if request.method == 'GET':
+        if conv.tipo == Conversacion.Tipo.GRUPO:
+            qs = ConversationEvent.objects.filter(conversacion=conv).order_by('-id')
+        elif conv.tipo == Conversacion.Tipo.EVENTO:
+            qs = ConversationEvent.objects.filter(conversacion=conv)  # 1 elemento
+        else:
+            return JsonResponse({"results": []})
 
-    if request.method == "GET":
-        qs = conv.eventos.all().order_by('-creado_en')
-        data = [{
-            "id": e.id, "tipo": e.tipo, "titulo": e.titulo, "presupuesto": str(e.presupuesto_fijo) if e.presupuesto_fijo is not None else None,
-            "estado": e.estado, "creado_en": e.creado_en.isoformat()
+        results = [{
+            "id": e.id,
+            "titulo": e.titulo,
+            "estado": e.estado,
+            "presupuesto": e.presupuesto_fijo,
+            "creado_en": e.creado_en,
         } for e in qs]
-        return JsonResponse({"results": data})
 
-    # POST crear (solo autor/administrador del grupo)
-    if not _is_author(conv, request.user):
-        return HttpResponseForbidden("Solo el autor del grupo puede crear eventos")
+        return JsonResponse({"results": results})
 
-    import json
-    try:
+    # POST (crear): solo tiene sentido cuando la sala es GRUPO
+    if request.method == 'POST':
+        if conv.tipo != Conversacion.Tipo.GRUPO:
+            return JsonResponse({"error": "Solo los grupos pueden crear múltiples eventos."}, status=400)
+
         payload = json.loads(request.body or "{}")
-    except Exception:
-        payload = {}
+        titulo = (payload.get("titulo") or "").strip() or "Amigo Secreto"
+        presupuesto = payload.get("presupuesto_fijo") or None
 
-    tipo = (payload.get('tipo') or 'secret_santa').strip()
-    if tipo != 'secret_santa':
-        return HttpResponseBadRequest("Tipo no soportado")
+        ce = ConversationEvent.objects.create(
+            conversacion=conv,
+            tipo='secret_santa',
+            creado_por=request.user,
+            titulo=titulo,
+            presupuesto_fijo=presupuesto,
+            estado='borrador'
+        )
+        return JsonResponse({"id": ce.id}, status=201)
 
-    titulo = (payload.get('titulo') or 'Amigo Secreto').strip()
-    presupuesto = payload.get('presupuesto')
-    try:
-        from decimal import Decimal
-        presupuesto = Decimal(str(presupuesto)) if presupuesto not in (None, '') else None
-    except Exception:
-        presupuesto = None
-
-    ev = ConversationEvent.objects.create(
-        conversacion=conv,
-        tipo='secret_santa',
-        creado_por=request.user,
-        titulo=titulo,
-        presupuesto_fijo=presupuesto,
-        estado='borrador'
-    )
-    return JsonResponse({"ok": True, "id": ev.id})
+    return JsonResponse({"error": "Método no permitido"}, status=405)
 
 @login_required
 @require_http_methods(["GET"])
@@ -3641,48 +3999,150 @@ def event_detail(request, evento_id):
         ]
     return JsonResponse(payload)
 
+def _conversation_member_ids(conv: Conversacion) -> list[int]:
+
+    # 1) Si tienes un related_name explícito para la tabla intermedia:
+    if hasattr(conv, "participantes"):
+        # p.ej.: conv.participantes.filter(activo=True).values_list('usuario_id', flat=True)
+        try:
+            return list(conv.participantes.values_list('usuario_id', flat=True))
+        except Exception:
+            pass
+
+    # 2) Si tienes un M2M directo (conv.members / conv.miembros):
+    for attr in ("members", "miembros", "usuarios"):
+        if hasattr(conv, attr):
+            try:
+                return list(getattr(conv, attr).values_list('id', flat=True))
+            except Exception:
+                continue
+
+    return []
+
+
+def _is_user_conversation_admin(user: User, conv: Conversacion) -> bool:
+    """
+    Define quién puede sortear:
+    - Creador/autor de la conversación, o
+    - Staff, opcionalmente, o
+    - (Gestión) organizador del evento (se valida más abajo).
+    """
+    # Si tu modelo tiene 'autor'/'author':
+    if hasattr(conv, "autor_id") and conv.autor_id == user.id:
+        return True
+    # Permitir staff como fallback (opcional)
+    if getattr(user, "is_staff", False):
+        return True
+    return False
+
+
+def _derangement(user_ids: List[int], max_tries: int = 500) -> List[int]:
+    """
+    Genera un derangement (perm sin puntos fijos). Si no encuentra, usa rotación básica.
+    Para n=2, la rotación da un cruce correcto.
+    Retorna la lista 'receivers' alineada con 'givers' = user_ids.
+    """
+    if len(user_ids) < 2:
+        raise ValueError("Se requieren al menos 2 participantes")
+
+    givers = user_ids[:]
+    receivers = user_ids[:]
+    tries = 0
+    while tries < max_tries:
+        random.shuffle(receivers)
+        if all(g != r for g, r in zip(givers, receivers)):
+            return receivers
+        tries += 1
+
+    # Fallback determinista: rotación simple
+    return user_ids[1:] + user_ids[:1]
+
+
 @login_required
-@require_http_methods(["POST"])
-def event_draw(request, evento_id):
-    try:
-        ev = ConversationEvent.objects.select_related('conversacion').get(pk=evento_id)
-    except ConversationEvent.DoesNotExist:
-        return HttpResponseBadRequest("Evento no existe")
-
+@require_POST
+@transaction.atomic
+def event_draw(request, evento_id: int):
+    """
+    Sortea un Amigo Secreto para el ConversationEvent dado:
+    - Valida permisos (organizador del evento o admin de la conversación).
+    - Borra asignaciones previas y crea nuevas (derangement).
+    - Publica un mensaje 'público' + un mensaje 'privado' por usuario (visible_para).
+    """
+    # 1) Cargar evento + conversación
+    ev = get_object_or_404(
+        ConversationEvent.objects.select_related("conversacion", "creado_por"),
+        pk=evento_id
+    )
     conv = ev.conversacion
-    if not _is_group(conv) or not _is_author(conv, request.user):
-        return HttpResponseForbidden("Solo autor del grupo")
+    if not conv:
+        return HttpResponseBadRequest("El evento no tiene conversación asociada")
 
-    # Participantes = todos los miembros del grupo (ajusta si tienes una relación distinta)
-    participantes = list(conv.participantes.all())
-    if len(participantes) < 2:
-        return HttpResponseBadRequest("Se requieren al menos 2 participantes")
+    # 2) Permisos: organizador del evento o admin/autor de la conversación
+    user = request.user
+    if not (ev.creado_por_id == user.id or _is_user_conversation_admin(user, conv)):
+        return HttpResponseForbidden("No tienes permisos para sortear este evento")
 
-    import random
-    # Sorteo simple: permutación sin puntos fijos (reintenta si hay self-assignment)
-    ids = [p.id for p in participantes]
-    for _ in range(30):
-        perm = ids[:]  # copia
-        random.shuffle(perm)
-        if all(g != r for g, r in zip(ids, perm)):
-            break
-    else:
-        return HttpResponseBadRequest("No se pudo generar una asignación válida, intenta de nuevo")
+    # 3) Participantes: miembros actuales de la conversación
+    member_ids = _conversation_member_ids(conv)
+    member_ids = [int(x) for x in member_ids if int(x) > 0]
+    member_ids = sorted(set(member_ids))
+    if len(member_ids) < 2:
+        return HttpResponseBadRequest("Se requieren al menos 2 participantes en el chat del evento")
 
-    with transaction.atomic():
-        ev.asignaciones.all().delete()
-        for giver_id, receiver_id in zip(ids, perm):
-            SecretSantaAssignment.objects.create(evento=ev, da_id=giver_id, recibe_id=receiver_id)
-        ev.estado = 'sorteado'
-        ev.ejecutado_en = timezone.now()
-        ev.save(update_fields=['estado', 'ejecutado_en'])
-    parts_qs = ev.participantes.select_related('usuario').all()
-    if parts_qs.exists():
-        participantes = [ep.usuario for ep in parts_qs]   # standalone
-    else:
-        participantes = list(conv.participantes.all())    # grupo (tu flujo anterior)    
+    # 4) Generar derangement
+    receivers = _derangement(member_ids, max_tries=600)
 
-    return JsonResponse({"ok": True})
+    # 5) Persistir asignaciones (reemplaza si ya había)
+    SecretSantaAssignment.objects.filter(event=ev).delete()
+    SecretSantaAssignment.objects.bulk_create([
+        SecretSantaAssignment(event=ev, da_id=g, recibe_id=r)
+        for g, r in zip(member_ids, receivers)
+    ])
+
+    # 6) Cambiar estado del evento
+    ev.estado = "sorteado"
+    ev.ejecutado_en = timezone.now()
+    ev.save(update_fields=["estado", "ejecutado_en"])
+
+    # 7) Mensaje público
+    Mensaje.objects.create(
+        conversacion=conv,
+        autor=user,
+        texto="El sorteo fue realizado. Revisa tu asignado.",
+        # tipo='sistema'  # si tienes este campo
+    )
+
+    # 8) Mensajes privados por usuario (visible_para = ese usuario)
+    users_map = {u.id: u for u in User.objects.filter(id__in=set(member_ids + receivers))}
+    privados_creados = 0
+    for g, r in zip(member_ids, receivers):
+        asignado = users_map.get(r)
+        if asignado:
+            Mensaje.objects.create(
+                conversacion=conv,
+                autor=user,  # puedes usar ev.creado_por si prefieres
+                texto=f"Te tocó: {asignado.get_full_name() or '@'+asignado.username}",
+                # tipo='secret_assignment',  # si manejas tipos; opcional
+                visible_para_id=g
+            )
+            privados_creados += 1
+
+    # 9) (Opcional) Notificaciones por WebSocket
+    # Si tienes helpers de Channels, emite un "chat_updated" general y un "new_message" privado por usuario
+    # try:
+    #     channels_notify_conversation_updated(conversation_id=conv.id)
+    #     for g in member_ids:
+    #         channels_notify_user(user_id=g, kind="new_private_assignment", conversation_id=conv.id)
+    # except Exception:
+    #     pass
+
+    return JsonResponse({
+        "ok": True,
+        "evento_id": ev.id,
+        "conversacion_id": conv.id,
+        "participantes": len(member_ids),
+        "privados_creados": privados_creados
+    }, status=200)
 
 @login_required
 @require_http_methods(["POST"])
@@ -3895,12 +4355,249 @@ def recommendation_feedback(request):
 
 
 
+@require_POST
+@login_required
+def notificaciones_mark_all(request):
+    """Marca todas las notificaciones del usuario como leídas."""
+    Notificacion.objects.filter(usuario=request.user, leida=False).update(leida=True)
+    return JsonResponse({"ok": True})
+
+@login_required
+def notificacion_click(request, notificacion_id):
+    """
+    Marca como leída la notificación y redirige:
+    - a payload["url"] si existe
+    - si no, al perfil o a home como fallback
+    """
+    n = get_object_or_404(Notificacion, usuario=request.user, notificacion_id=notificacion_id)
+    if not n.leida:
+        n.leida = True
+        n.save(update_fields=["leida"])
+
+    # payload puede ser dict o string; tratamos de obtener "url"
+    url = None
+    try:
+        if isinstance(n.payload, dict):
+            url = n.payload.get("url")
+    except Exception:
+        url = None
+
+    if not url:
+        try:
+            url = reverse("perfil")
+        except Exception:
+            url = "/"
+
+    return HttpResponseRedirect(url)
 
 @require_POST
 @login_required
-def notificaciones_mark_all_read(request):
-    Notificacion.objects.filter(usuario=request.user, leida=False).update(leida=True, leida_en=None)
+def notificacion_mark_one(request, notificacion_id):
+    """
+    Marca una notificación como leída (solo esa).
+    Responde JSON {ok: True}.
+    """
+    n = get_object_or_404(Notificacion, usuario=request.user, notificacion_id=notificacion_id)
+    if not n.leida:
+        n.leida = True
+        n.save(update_fields=["leida"])
     return JsonResponse({"ok": True})
 
 
+#############################################
+#######################################
 
+
+@login_required
+@require_POST
+@transaction.atomic
+def event_create_with_chat(request):
+    """
+    Crea:
+      1) Conversación tipo EVENTO (nombre = título, creador = request.user)
+      2) ParticipanteConversacion para cada usuario (incluye al creador)
+      3) ConversationEvent (tipo='secret_santa', presupuesto opcional)
+      4) EventParticipant por cada usuario seleccionado
+    Recibe JSON: { "titulo": str, "presupuesto_fijo": number|null, "miembros": [user_id, ...] }
+    """
+    try:
+        try:
+            payload = json.loads(request.body or "{}")
+        except Exception:
+            return HttpResponseBadRequest("JSON inválido")
+
+        titulo = (payload.get("titulo") or "").strip() or "Amigo Secreto"
+        presupuesto_raw = payload.get("presupuesto_fijo", None)
+        miembros_ids = payload.get("miembros") or []
+
+        # normaliza participantes (incluye siempre al creador)
+        try:
+            miembros_ids = [int(x) for x in miembros_ids if int(x) > 0]
+        except Exception:
+            miembros_ids = []
+        if request.user.id not in miembros_ids:
+            miembros_ids.append(request.user.id)
+        if len(miembros_ids) < 2:
+            return JsonResponse({"ok": False, "error": "Debes elegir al menos 1 amigo."}, status=400)
+
+        # presupuesto (opcional, decimal positivo)
+        presupuesto = None
+        if presupuesto_raw not in (None, ""):
+            try:
+                presupuesto = float(str(presupuesto_raw).replace(",", "."))
+                if presupuesto < 0:
+                    return JsonResponse({"ok": False, "error": "El monto no puede ser negativo."}, status=400)
+            except Exception:
+                return JsonResponse({"ok": False, "error": "Monto inválido."}, status=400)
+
+        User = get_user_model()
+        users = list(User.objects.filter(id__in=miembros_ids))
+
+        # 1) Conversación de EVENTO
+        conv = Conversacion.objects.create(
+            tipo=Conversacion.Tipo.EVENTO,
+            nombre=titulo,
+            creador=request.user,
+        )
+
+        # 2) Participantes de conversación (through)
+        pcs = []
+        for u in users:
+            pc, _ = ParticipanteConversacion.objects.get_or_create(
+                conversacion=conv,
+                usuario=u,
+                defaults={"rol": ParticipanteConversacion.Rol.MIEMBRO}
+            )
+            pcs.append(pc)
+
+        # 3) ConversationEvent (tu modelo de evento real)
+        ce = ConversationEvent.objects.create(
+            conversacion=conv,
+            tipo='secret_santa',
+            creado_por=request.user,
+            titulo=titulo,
+            presupuesto_fijo=presupuesto if presupuesto is not None else None,
+            estado='borrador'
+        )
+
+        # 4) EventParticipant (participantes del evento; aquí van **User**)
+        for u in users:
+            EventParticipant.objects.get_or_create(
+                evento=ce,
+                usuario=u,
+                defaults={"estado": "inscrito"}
+            )
+
+        # (opcional) Mensaje de sistema en el chat del evento
+        try:
+            Mensaje.objects.create(
+                conversacion=conv,
+                remitente=request.user,
+                tipo=Mensaje.Tipo.SISTEMA,
+                contenido=f"🎉 Se creó el evento “{titulo}”."
+            )
+        except Exception:
+            pass
+
+        return JsonResponse({
+            "ok": True,
+            "conversation_event_id": ce.id,
+            "conversacion_id": conv.conversacion_id,
+            "participantes": [u.id for u in users]
+        }, status=201)
+
+    except Exception as e:
+        traceback.print_exc()
+        return JsonResponse({"ok": False, "error": str(e)}, status=500)
+
+@login_required
+def search_friends_for_thanks(request):
+    """
+    Busca amigos por nombre o nombre de usuario para el modal de agradecimiento.
+    Devuelve una lista simple de usuarios en formato JSON.
+    """
+    query = request.GET.get('q', '').strip()
+    if not query:
+        return JsonResponse([], safe=False)
+
+    # Usamos tu propiedad amigos_qs que es muy eficiente
+    amigos = request.user.amigos_qs.filter(
+        Q(nombre__icontains=query) |
+        Q(apellido__icontains=query) |
+        Q(nombre_usuario__icontains=query)
+    ).select_related('perfil')[:10] # Limitamos a 10 resultados
+
+    results = []
+    for amigo in amigos:
+        avatar_url = static('img/Gifters/favicongift.png')
+        if amigo.perfil and amigo.perfil.profile_picture:
+            avatar_url = amigo.perfil.profile_picture.url
+        
+        results.append({
+            'id': amigo.id,
+            'text': f"{amigo.nombre} {amigo.apellido} (@{amigo.nombre_usuario})",
+            'avatar': avatar_url,
+        })
+    return JsonResponse(results, safe=False)
+
+
+@login_required
+@require_POST
+def create_thank_you_post(request):
+    """
+    Crea una publicación (Post) de agradecimiento en el feed del usuario.
+    """
+    try:
+        product_id = request.POST.get('product_id')
+        thanked_user_id = request.POST.get('thanked_user_id')
+        
+        producto = get_object_or_404(Producto, pk=product_id)
+        thanked_user = get_object_or_404(User, pk=thanked_user_id)
+
+        contenido = (
+            f"¡Muchas gracias a @{thanked_user.nombre_usuario} por este increíble regalo! 🎁\n\n"
+            f"Recibí un {producto.nombre_producto}."
+        )
+
+        Post.objects.create(
+            id_usuario=request.user,
+            contenido=contenido,
+            tipo_post=Post.TipoPost.TEXTO, # O puedes crear un tipo 'agradecimiento'
+            es_publico=True
+        )
+        return JsonResponse({'status': 'ok', 'message': 'Publicación de agradecimiento creada.'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+@login_required
+@require_POST
+def send_thank_you_notification(request):
+    """
+    Envía una notificación privada de agradecimiento a otro usuario.
+    """
+    try:
+        product_id = request.POST.get('product_id')
+        thanked_user_id = request.POST.get('thanked_user_id')
+        message = request.POST.get('message', '').strip()
+
+        producto = get_object_or_404(Producto, pk=product_id)
+        thanked_user = get_object_or_404(User, pk=thanked_user_id)
+
+        titulo = f"🎁 ¡{request.user.nombre} te ha enviado un agradecimiento!"
+        
+        if not message:
+            mensaje_notif = f"Te agradece por el regalo: {producto.nombre_producto}."
+        else:
+            mensaje_notif = message
+
+        Notificacion.objects.create(
+            usuario=thanked_user,
+            tipo=Notificacion.Tipo.SISTEMA, # O un nuevo tipo 'agradecimiento'
+            titulo=titulo,
+            mensaje=mensaje_notif,
+            payload={'sender_id': request.user.id, 'product_id': producto.id}
+        )
+        return JsonResponse({'status': 'ok', 'message': 'Notificación de agradecimiento enviada.'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)

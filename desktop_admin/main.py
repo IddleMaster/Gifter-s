@@ -4,7 +4,7 @@ import os
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QMessageBox, QDialog, QFormLayout, QFileDialog, QStatusBar,
-    QStackedWidget, QTableWidget, QTableWidgetItem, QHeaderView,QAbstractItemView,QComboBox, QSpinBox, QDoubleSpinBox
+    QStackedWidget, QTableWidget, QTableWidgetItem, QHeaderView,QAbstractItemView,QComboBox, QSpinBox, QDoubleSpinBox,QGroupBox# Agregado
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
@@ -226,35 +226,36 @@ class MainWindow(QMainWindow):
         return sidebar_widget
 
     def create_reportes_page(self):
-        """Crea la página de Reportes con selector de formato (CSV/PDF/exceln)."""
-        page = QWidget() # cite: Sex.txt
-        layout = QVBoxLayout(page) # cite: Sex.txt
-        layout.setContentsMargins(20, 20, 20, 20) # cite: Sex.txt
+        """
+        Crea la página de Reportes, que ahora contiene un StackedWidget
+        para navegar entre el menú de reportes y los reportes individuales.
+        """
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0) # Sin márgenes
 
-        title = QLabel("Reportes") # cite: Sex.txt
-        title.setFont(QFont("Arial", 24, QFont.Weight.Bold)) # cite: Sex.txt
-        layout.addWidget(title) # cite: Sex.txt
+        # 1. Crear el StackedWidget para los reportes
+        self.reports_stack = QStackedWidget()
+        layout.addWidget(self.reports_stack)
 
-        # --- Selector de Formato ---
-        format_layout = QHBoxLayout()
-        format_label = QLabel("Selecciona el formato del reporte:")
-        self.combo_report_format = QComboBox() # cite: Sex.txt
-        self.combo_report_format.addItems(["CSV", "Excel (.xlsx)", "PDF"]) # <-- CSV y PDF # cite: Sex.txt
-        format_layout.addWidget(format_label)
-        format_layout.addWidget(self.combo_report_format) # Añadir ComboBox
-        format_layout.addStretch()
-        layout.addLayout(format_layout) # Añadir layout H
-        # ------------------------------------
+        # 2. Crear las páginas (Widgets) para el stack
+        report_menu_page = self.create_report_main_menu_page()
+        self.moderation_report_page = self.create_moderation_report_page()
+        self.search_report_page = self.create_search_report_page()
+        self.reviews_report_page = self.create_reviews_report_page()
+        self.top_users_report_page = self.create_top_users_report_page()
 
-        layout.addStretch() # Empuja botón al fondo # cite: Sex.txt
+        # 3. Añadir las páginas al stack
+        self.reports_stack.addWidget(report_menu_page)          # Índice 0
+        self.reports_stack.addWidget(self.moderation_report_page) # Índice 1
+        self.reports_stack.addWidget(self.search_report_page)     # Índice 2
+        self.reports_stack.addWidget(self.reviews_report_page)      # Índice 3
+        self.reports_stack.addWidget(self.top_users_report_page)    # Índice 4
 
-        # Botón Descargar (sin cambios en conexión o estilo)
-        self.btn_download_report = QPushButton("Descargar Reporte de Productos Activos") # cite: Sex.txt
-        self.btn_download_report.setStyleSheet("background-color: #28a745; color: white; padding: 10px; font-size: 14px;") # cite: Sex.txt
-        self.btn_download_report.clicked.connect(self.handle_download_report) # cite: Sex.txt
-        layout.addWidget(self.btn_download_report) # cite: Sex.txt
+        # 4. Conectar los botones del menú a las páginas
+        # (Esto se hace en create_report_main_menu_page)
 
-        return page # cite: Sex.txt
+        return page
     
     def create_admin_page(self):
         """Crea la página de Administración (Mockup 3)."""
@@ -689,7 +690,412 @@ class MainWindow(QMainWindow):
         else:
             self.statusBar.showMessage("Creación de producto cancelada.", 3000)
 
+    # -----------------------------------------------------------------
+    # --- MÉTODOS DE LA PÁGINA DE REPORTES (NUEVOS) ---
+    # -----------------------------------------------------------------
 
+    def create_report_main_menu_page(self):
+        """
+        Crea el widget para el MENÚ PRINCIPAL de reportes (Índice 0).
+        """
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(20) # Espacio entre los grupos
+
+        # --- 1. Grupo: Reporte de Productos (el que ya tenías) ---
+        products_group = QGroupBox("Reporte de Catálogo")
+        products_group.setFont(QFont("Arial", 14, QFont.Weight.Bold))
+        products_layout = QVBoxLayout(products_group)
+
+        # Copiamos la UI que tenías en create_reportes_page
+        format_layout = QHBoxLayout()
+        format_label = QLabel("Selecciona el formato del reporte de productos:")
+        self.combo_report_format = QComboBox()
+        self.combo_report_format.addItems(["CSV", "Excel (.xlsx)", "PDF"])
+        format_layout.addWidget(format_label)
+        format_layout.addWidget(self.combo_report_format)
+        format_layout.addStretch()
+        
+        self.btn_download_report = QPushButton("Descargar Reporte de Productos Activos")
+        self.btn_download_report.setStyleSheet("background-color: #28a745; color: white; padding: 10px; font-size: 14px;")
+        self.btn_download_report.clicked.connect(self.handle_download_report)
+        
+        products_layout.addLayout(format_layout)
+        products_layout.addWidget(self.btn_download_report)
+        layout.addWidget(products_group)
+
+        # --- 2. Grupo: Reportes de Actividad (NUEVO) ---
+        activity_group = QGroupBox("Reportes de Actividad de Usuario")
+        activity_group.setFont(QFont("Arial", 14, QFont.Weight.Bold))
+        activity_layout = QVBoxLayout(activity_group)
+        activity_layout.setSpacing(10)
+
+        # Botones para cada reporte de actividad
+        self.btn_goto_moderation = QPushButton("Ver Reporte de Moderación")
+        self.btn_goto_search = QPushButton("Ver Búsquedas Populares")
+        self.btn_goto_reviews = QPushButton("Ver Reporte de Reseñas del Sitio")
+        self.btn_goto_top_users = QPushButton("Ver Top 10 Usuarios Activos")
+
+        # Estilo para los botones nuevos
+        btn_style = "background-color: #007bff; color: white; padding: 10px; font-size: 14px;"
+        self.btn_goto_moderation.setStyleSheet(btn_style)
+        self.btn_goto_search.setStyleSheet(btn_style)
+        self.btn_goto_reviews.setStyleSheet(btn_style)
+        self.btn_goto_top_users.setStyleSheet(btn_style)
+
+        # Conectar botones para cambiar el índice del QStackedWidget
+        self.btn_goto_moderation.clicked.connect(lambda: self.reports_stack.setCurrentIndex(1))
+        self.btn_goto_search.clicked.connect(lambda: self.reports_stack.setCurrentIndex(2))
+        self.btn_goto_reviews.clicked.connect(lambda: self.reports_stack.setCurrentIndex(3))
+        self.btn_goto_top_users.clicked.connect(lambda: self.reports_stack.setCurrentIndex(4))
+
+        activity_layout.addWidget(self.btn_goto_moderation)
+        activity_layout.addWidget(self.btn_goto_search)
+        activity_layout.addWidget(self.btn_goto_reviews)
+        activity_layout.addWidget(self.btn_goto_top_users)
+        
+        layout.addWidget(activity_group)
+
+        layout.addStretch() # Empuja todo hacia arriba
+        return page
+
+    def create_back_button(self, text="Volver al Menú de Reportes"):
+        """Helper para crear un botón de 'Volver'."""
+        back_button = QPushButton(text)
+        back_button.setStyleSheet("background-color: #6c757d; color: white; padding: 8px; font-size: 14px;")
+        # Conecta el botón para volver al índice 0 (el menú)
+        back_button.clicked.connect(lambda: self.reports_stack.setCurrentIndex(0))
+        return back_button
+
+    def populate_table(self, table_widget, headers, data):
+        """Helper para llenar un QTableWidget con datos."""
+        table_widget.blockSignals(True) # Evitar que se disparen signals de edición
+        table_widget.setRowCount(0) # Limpiar tabla
+        
+        table_widget.setColumnCount(len(headers))
+        table_widget.setHorizontalHeaderLabels(headers)
+        
+        if not data:
+            table_widget.blockSignals(False)
+            return
+
+        table_widget.setRowCount(len(data))
+        
+        for row_idx, row_data in enumerate(data):
+            for col_idx, header in enumerate(headers):
+                # El header debe coincidir con la clave del JSON de la API
+                # Hacemos un mapeo simple para claves que no coinciden
+                key_in_json = header # Por defecto
+                if header == "ID": key_in_json = list(row_data.keys())[0] # Asumir que la ID es la primera clave
+                if header == "Usuario": key_in_json = list(row_data.keys())[1] # Asumir que el nombre es la segunda
+                if header == "Conteo": key_in_json = "count"
+                if header == "Término": key_in_json = "term_lower"
+                if header == "Puntaje": key_in_json = "activity_score"
+                
+                value = row_data.get(key_in_json, "N/A")
+                
+                item = QTableWidgetItem(str(value))
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable) # Hacer no editable
+                table_widget.setItem(row_idx, col_idx, item)
+                
+        table_widget.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        table_widget.blockSignals(False)
+
+    # --- PÁGINA 1: MODERACIÓN ---
+    def create_moderation_report_page(self):
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        layout.addWidget(self.create_back_button())
+        
+        title = QLabel("Reporte de Moderación")
+        title.setFont(QFont("Arial", 20, QFont.Weight.Bold))
+        layout.addWidget(title)
+
+        refresh_button = QPushButton("Actualizar Datos")
+        refresh_button.clicked.connect(self.load_moderation_report)
+        layout.addWidget(refresh_button)
+
+        layout.addWidget(QLabel("Usuarios que más reportan:"))
+        self.table_top_reporters = QTableWidget()
+        layout.addWidget(self.table_top_reporters)
+        
+        layout.addWidget(QLabel("Usuarios más reportados:"))
+        self.table_most_reported = QTableWidget()
+        layout.addWidget(self.table_most_reported)
+        
+        # Conectar el botón del menú para cargar los datos la primera vez
+        self.btn_goto_moderation.clicked.connect(self.load_moderation_report)
+        return page
+
+    def load_moderation_report(self):
+        self.statusBar.showMessage("Cargando reporte de moderación...")
+        QApplication.processEvents()
+        data, error = self.api_client.get_moderation_report()
+        
+        if error:
+            QMessageBox.critical(self, "Error", error)
+            self.statusBar.showMessage("Error al cargar reporte de moderación.", 5000)
+            return
+
+        self.populate_table(
+            self.table_top_reporters, 
+            ["ID", "Usuario", "Conteo"], 
+            data.get('top_reporters', [])
+        )
+        self.populate_table(
+            self.table_most_reported, 
+            ["ID", "Usuario", "Conteo"], 
+            data.get('most_reported_users', [])
+        )
+        self.statusBar.showMessage("Reporte de moderación cargado.", 3000)
+
+    # --- PÁGINA 2: BÚSQUEDAS ---
+    def create_search_report_page(self):
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        layout.addWidget(self.create_back_button())
+        title = QLabel("Reporte de Búsquedas Populares")
+        title.setFont(QFont("Arial", 20, QFont.Weight.Bold))
+        layout.addWidget(title)
+
+        refresh_button = QPushButton("Actualizar Datos")
+        refresh_button.clicked.connect(self.load_search_report)
+        layout.addWidget(refresh_button)
+
+        self.table_popular_searches = QTableWidget()
+        layout.addWidget(self.table_popular_searches)
+        
+        self.btn_goto_search.clicked.connect(self.load_search_report)
+        return page
+
+    def load_search_report(self):
+        self.statusBar.showMessage("Cargando reporte de búsquedas...")
+        QApplication.processEvents()
+        data, error = self.api_client.get_popular_search_report()
+        
+        if error:
+            QMessageBox.critical(self, "Error", error)
+            self.statusBar.showMessage("Error al cargar reporte de búsquedas.", 5000)
+            return
+
+        self.populate_table(
+            self.table_popular_searches, 
+            ["Término", "Conteo"], 
+            data.get('popular_searches', [])
+        )
+        self.statusBar.showMessage("Reporte de búsquedas cargado.", 3000)
+
+    # --- PÁGINA 3: RESEÑAS ---
+    def create_reviews_report_page(self):
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        layout.addWidget(self.create_back_button())
+        title = QLabel("Reporte de Reseñas del Sitio")
+        title.setFont(QFont("Arial", 20, QFont.Weight.Bold))
+        layout.addWidget(title)
+
+        refresh_button = QPushButton("Actualizar Datos")
+        refresh_button.clicked.connect(self.load_reviews_report)
+        layout.addWidget(refresh_button)
+
+        layout.addWidget(QLabel("Estadísticas de Calificación:"))
+        self.table_review_stats = QTableWidget()
+        layout.addWidget(self.table_review_stats)
+        
+        layout.addWidget(QLabel("Últimas Reseñas:"))
+        self.table_latest_reviews = QTableWidget()
+        layout.addWidget(self.table_latest_reviews)
+        
+        self.btn_goto_reviews.clicked.connect(self.load_reviews_report)
+        return page
+
+    def load_reviews_report(self):
+        self.statusBar.showMessage("Cargando reporte de reseñas...")
+        QApplication.processEvents()
+        data, error = self.api_client.get_site_reviews_report()
+        
+        if error:
+            QMessageBox.critical(self, "Error", error)
+            self.statusBar.showMessage("Error al cargar reporte de reseñas.", 5000)
+            return
+
+        # --- CORRECCIÓN AQUÍ (Tabla de Estadísticas) ---
+        # Le decimos explícitamente qué claves usar
+        self.populate_table_with_keys(
+            self.table_review_stats, 
+            ["Calificación", "Conteo"], 
+            data.get('review_stats', []),
+            key_map={"Calificación": "calificacion", "Conteo": "count"} # Mapeo explícito
+        )
+        
+        # --- CORRECCIÓN AQUÍ (Tabla de Últimas Reseñas) ---
+        # Le decimos explícitamente qué claves usar
+        self.populate_table_with_keys(
+            self.table_latest_reviews, 
+            ["Usuario", "Calificación", "Comentario", "Fecha"], 
+            data.get('latest_reviews', []),
+            key_map={ # Mapeo explícito
+                "Usuario": "id_usuario__nombre_usuario", 
+                "Calificación": "calificacion", 
+                "Comentario": "comentario", 
+                "Fecha": "fecha_resena"
+            }
+        )
+        # -----------------------------------------------
+
+        self.statusBar.showMessage("Reporte de reseñas cargado.", 3000)
+
+    # --- PÁGINA 4: TOP USUARIOS ---
+    def create_top_users_report_page(self):
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        layout.addWidget(self.create_back_button())
+        title = QLabel("Reporte de Top Usuarios Activos")
+        title.setFont(QFont("Arial", 20, QFont.Weight.Bold))
+        layout.addWidget(title)
+
+        refresh_button = QPushButton("Actualizar Datos")
+        refresh_button.clicked.connect(self.load_top_users_report)
+        layout.addWidget(refresh_button)
+
+        self.label_total_interactions = QLabel("Total de interacciones (según RegistroActividad): N/A")
+        layout.addWidget(self.label_total_interactions)
+
+        self.table_top_users = QTableWidget()
+        # --- CAMBIAR CABECERAS ---
+        self.table_top_users_headers = [
+            "ID", "Usuario", "Puntaje Total", "Posts", "Comentarios", 
+            "Likes", "Seguidores Nuevos", "Favoritos Añadidos", "Otros"
+        ]
+        self.table_top_users.setColumnCount(len(self.table_top_users_headers))
+        self.table_top_users.setHorizontalHeaderLabels(self.table_top_users_headers)
+        # -------------------------
+        layout.addWidget(self.table_top_users)
+        
+        self.btn_goto_top_users.clicked.connect(self.load_top_users_report)
+        return page
+
+    def load_top_users_report(self):
+        self.statusBar.showMessage("Cargando reporte de top usuarios...")
+        QApplication.processEvents()
+        data, error = self.api_client.get_top_active_users_report()
+        
+        if error:
+            QMessageBox.critical(self, "Error", error)
+            self.statusBar.showMessage("Error al cargar reporte de top usuarios.", 5000)
+            return
+
+        total_interactions = data.get('total_tracked_interactions', 'N/A')
+        self.label_total_interactions.setText(f"Total de interacciones (según RegistroActividad): {total_interactions}")
+
+        top_users_data = data.get('top_active_users', [])
+
+        # --- REEMPLAZAR LLAMADA A populate_table CON ESTE CÓDIGO ---
+        self.table_top_users.blockSignals(True)
+        self.table_top_users.setRowCount(0) # Limpiar tabla
+        self.table_top_users.setRowCount(len(top_users_data))
+
+        # Mapeo de tipos de actividad del modelo a nombres de columna legibles
+        # (Asegúrate que coincidan con RegistroActividad.TipoActividad)
+        activity_key_map = {
+            'nuevo_post': "Posts",
+            'nuevo_comentario': "Comentarios",
+            'nueva_reaccion': "Likes",
+            'nuevo_seguidor': "Seguidores Nuevos",
+            'nuevo_regalo': "Favoritos Añadidos", # Mapeamos 'nuevo_regalo' a esta columna
+            'otro': "Otros" 
+        }
+
+        for row_idx, user_data in enumerate(top_users_data):
+            user_id = user_data.get('user_id', 'N/A')
+            username = user_data.get('nombre_usuario', 'N/A')
+            total_score = user_data.get('total_score', 0)
+            breakdown = user_data.get('breakdown', {})
+
+            # Crear items para las columnas fijas (ID, Usuario, Puntaje Total)
+            item_id = QTableWidgetItem(str(user_id))
+            item_username = QTableWidgetItem(str(username))
+            item_score = QTableWidgetItem(str(total_score))
+            
+            # Hacer no editables
+            item_id.setFlags(item_id.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            item_username.setFlags(item_username.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            item_score.setFlags(item_score.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            
+            # Poner items en la tabla
+            self.table_top_users.setItem(row_idx, 0, item_id)
+            self.table_top_users.setItem(row_idx, 1, item_username)
+            self.table_top_users.setItem(row_idx, 2, item_score)
+
+            # Llenar las columnas de desglose
+            for activity_key, column_name in activity_key_map.items():
+                # Encontrar el índice de la columna por su nombre
+                try:
+                    col_idx = self.table_top_users_headers.index(column_name)
+                    count = breakdown.get(activity_key, 0) # Obtener el conteo del desglose
+                    item_breakdown = QTableWidgetItem(str(count))
+                    item_breakdown.setFlags(item_breakdown.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                    self.table_top_users.setItem(row_idx, col_idx, item_breakdown)
+                except ValueError:
+                    print(f"Advertencia: No se encontró la columna '{column_name}' en las cabeceras.")
+                    
+        self.table_top_users.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        # Ajustar el tamaño de la columna ID si es necesario
+        self.table_top_users.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents) 
+        self.table_top_users.blockSignals(False)
+        # -----------------------------------------------------------
+
+        self.statusBar.showMessage("Reporte de top usuarios cargado.", 3000)
+    def populate_table_with_keys(self, table_widget, headers, data, key_map):
+        """
+        Helper MEJORADO para llenar un QTableWidget, usando un mapeo explícito de claves.
+        key_map: Un diccionario como {"Header Columna": "clave_en_json"}
+        """
+        table_widget.blockSignals(True)
+        table_widget.setRowCount(0)
+        
+        table_widget.setColumnCount(len(headers))
+        table_widget.setHorizontalHeaderLabels(headers)
+        
+        if not data:
+            table_widget.blockSignals(False)
+            return
+
+        table_widget.setRowCount(len(data))
+        
+        for row_idx, row_data in enumerate(data):
+            for col_idx, header in enumerate(headers):
+                # Usar la clave del key_map si existe, si no, intentar adivinar (fallback)
+                key_in_json = key_map.get(header, header) # Usa el mapeo
+                
+                value = row_data.get(key_in_json, "N/A")
+
+                # Formatear la fecha si es la columna "Fecha"
+                if header == "Fecha" and value != "N/A":
+                    try:
+                        # Intenta parsear la fecha ISO y formatearla
+                        dt = datetime.datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+                        value = dt.strftime('%Y-%m-%d %H:%M') # Formato más legible
+                    except (ValueError, TypeError):
+                        value = str(value) # Si no es fecha válida, mostrar como string
+                else:
+                     value = str(value) # Convertir todo lo demás a string
+
+                item = QTableWidgetItem(value)
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                table_widget.setItem(row_idx, col_idx, item)
+                
+        table_widget.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        table_widget.blockSignals(False)
 if __name__ == '__main__':
     """
     (Esta sección no necesita cambios)

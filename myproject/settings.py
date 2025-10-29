@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     'rest_framework', 
     'django_bootstrap5',
     'core.apps.CoreConfig',
+    
 
 ]
 

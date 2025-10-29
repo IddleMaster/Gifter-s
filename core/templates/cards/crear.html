@@ -6,7 +6,10 @@
 {% block extra_css %}
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 <style>
-  .max-w { max-width: 780px; margin: 0 auto; }
+  .max-w {
+    max-width: 780px;
+    margin: 0 auto;
+  }
 </style>
 {% endblock %}
 
@@ -46,12 +49,11 @@
             <a id="card-dl" class="btn btn-primary" download>
               <i class="bi bi-download"></i> Descargar
             </a>
-            <a id="card-share" class="btn btn-outline-secondary" target="_blank">
-              <i class="bi bi-box-arrow-up-right"></i> Abrir enlace
-            </a>
+
             <button class="btn btn-outline-secondary" id="btn-copy">
               <i class="bi bi-link-45deg"></i> Copiar enlace
             </button>
+
             <a id="card-wa" class="btn btn-success" target="_blank" rel="noopener">
               <i class="bi bi-whatsapp"></i> WhatsApp
             </a>
@@ -63,9 +65,15 @@
     <p class="text-muted small">La primera generación del día puede tardar algunos segundos.</p>
   </div>
 </section>
+<script>
+  function getCookie(name) {
+    const m = document.cookie.match(new RegExp('(^|; )' + name + '=([^;]+)'));
+    return m ? decodeURIComponent(m[2]) : null;
+  }
+</script>
 
 <script>
-async function crearPostal(e){
+async function crearPostal(e) {
   e.preventDefault();
   const form = e.target;
   const btn = document.getElementById('btn-generar');
@@ -79,49 +87,62 @@ async function crearPostal(e){
     const fd = new FormData(form);
     const res = await fetch("{% url 'cards_generar' %}", {
       method: "POST",
-      headers: {"X-CSRFToken": "{{ csrf_token }}"},
+      headers: { "X-CSRFToken": getCookie('csrftoken') },
       body: fd
     });
 
-    if(!res.ok){
+    if (!res.ok) {
       const txt = await res.text();
       throw new Error(txt || 'Error inesperado');
     }
 
     const data = await res.json();
 
-    // Mostrar resultado
-    document.getElementById('card-img').src = data.url;
+    // --- Mostrar resultado (si existen los elementos) ---
+    const img = document.getElementById('card-img');
+    if (img) img.src = data.url;
 
     const dl = document.getElementById('card-dl');
-    dl.href = data.url;
-    dl.download = "gifters_postal.png";
+    if (dl) {
+      dl.href = data.url;
+      dl.download = "gifters_postal.png";
+    }
 
-    const sh = document.getElementById('card-share');
-    sh.href = data.share;
-
+    // WhatsApp (solo si existe el botón)
     const wa = document.getElementById('card-wa');
-    wa.href = "https://wa.me/?text=" + encodeURIComponent("Te hice esta postal: " + data.share);
+    if (wa) {
+      wa.href = "https://wa.me/?text=" + encodeURIComponent("Te hice esta postal: " + data.share);
+    }
 
-    document.getElementById('card-result').style.display = '';
+    // Mostrar el bloque del resultado
+    const result = document.getElementById('card-result');
+    if (result) result.style.display = '';
 
+    // Botón copiar enlace
     const btnCopy = document.getElementById('btn-copy');
-    btnCopy.onclick = async () => {
-      try {
-        await navigator.clipboard.writeText(data.share);
-        btnCopy.innerHTML = '<i class="bi bi-check2-circle"></i> Enlace copiado';
-        setTimeout(()=> btnCopy.innerHTML = '<i class="bi bi-link-45deg"></i> Copiar enlace', 1500);
-      } catch { alert('No se pudo copiar el enlace'); }
-    };
+    if (btnCopy) {
+      btnCopy.onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(data.share);
+          btnCopy.innerHTML = '<i class="bi bi-check2-circle"></i> Enlace copiado';
+          setTimeout(() => btnCopy.innerHTML = '<i class="bi bi-link-45deg"></i> Copiar enlace', 1500);
+        } catch {
+          alert('No se pudo copiar el enlace');
+        }
+      };
+    }
 
     hint.textContent = '';
-  } catch (err){
+  } catch (err) {
     alert(err.message || 'No se pudo generar la postal');
   } finally {
     btn.disabled = false;
     btn.innerHTML = '<i class="bi bi-magic"></i> Generar postal';
   }
+
   return false;
 }
 </script>
+
+
 {% endblock %}

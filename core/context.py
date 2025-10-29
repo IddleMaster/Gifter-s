@@ -66,32 +66,56 @@ def _sync_eventos_a_notifs(user, dias=30):
         with transaction.atomic():
             Notificacion.objects.bulk_create(nuevos, ignore_conflicts=True)
 
+
+
 def navbar_notifications(request):
     """
-    Context processor: inyecta en todas las plantillas:
-    - notif_count: cantidad NO leídas
-    - notif_items: últimas 8 notificaciones (mezcladas) mostrando especialmente eventos
+    Inyecta en todas las plantillas:
+    - notif_count / notif_unread_count: cantidad NO leídas
+    - notif_items / notif_latest: últimas 8 notificaciones (cada item trae 'id')
     """
     user = getattr(request, "user", None)
     if not user or not user.is_authenticated:
-        return {"notif_count": 0, "notif_items": []}
+        return {
+            "notif_count": 0,
+            "notif_items": [],
+            "notif_unread_count": 0,
+            "notif_latest": [],
+        }
 
-    # sincroniza eventos → notificaciones (rápido)
+    # Sincroniza eventos → notificaciones (si existe)
     try:
-        _sync_eventos_a_notifs(user, dias=30)
+        _sync_eventos_a_notifs(user, dias=30)  # noqa: F821 si no existe, cae en except
     except Exception:
-        # si algo falla, no rompe el render
+        # Si algo falla, no rompe el render
         pass
 
-    # Trae últimas 8
-    items = (Notificacion.objects
-             .filter(usuario=user)
-             .order_by("-creada_en")
-             .values("notificacion_id", "tipo", "titulo", "mensaje", "payload", "leida", "creada_en")[:8])
+    # Trae últimas 8 y mapea 'notificacion_id' -> 'id' para el template
+    raw_items = (Notificacion.objects
+                 .filter(usuario=user)
+                 .order_by("-creada_en")
+                 .values("notificacion_id", "tipo", "titulo", "mensaje", "payload", "leida", "creada_en")[:8])
+
+    items = []
+    for r in raw_items:
+        items.append({
+            "id": r["notificacion_id"],                 # <- lo que usa tu data-id="{{ n.id }}"
+            "tipo": r.get("tipo"),
+            "titulo": r.get("titulo"),
+            "mensaje": r.get("mensaje"),
+            "payload": r.get("payload"),
+            "leida": r.get("leida"),
+            "creada_en": r.get("creada_en"),
+            # "url": (r.get("payload") or {}).get("url")  # opcional, si la guardas en payload
+        })
 
     unread = sum(1 for i in items if not i["leida"])
 
     return {
+        # nombres originales
         "notif_count": unread,
-        "notif_items": list(items),
+        "notif_items": items,
+        # alias que espera tu dropdown
+        "notif_unread_count": unread,
+        "notif_latest": items,
     }

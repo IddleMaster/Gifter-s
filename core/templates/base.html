@@ -705,7 +705,7 @@
               <a href="{% url 'account_login' %}?next={% url 'perfil' %}%3Ftab%3Damigos">Amigos</a>
               {% endif %}
             </li>
-            <li><a href="{% url 'home' %}#portfolio">Regalos</a></li>
+            <li><a href="{% url 'home' %}#portfolio">Productos</a></li>
             <li><a href="{% url 'home' %}feed">Feed</a></li>
           </ul>
           <i class="mobile-nav-toggle d-none"></i>
@@ -714,24 +714,25 @@
 
         {% if user.is_authenticated %}
 
-        <!-- 🔔 Campanita de notificaciones (hermana del menú de usuario) -->
+        <!-- 🔔 Campanita de notificaciones -->
         <div class="nav-item dropdown me-2">
           <a class="nav-link position-relative" href="#" id="notifDropdown" role="button" data-bs-toggle="dropdown"
             aria-expanded="false" aria-label="Notificaciones">
             <i class="bi bi-bell" style="font-size:1.3rem;"></i>
-            {% if notif_unread_count and notif_unread_count > 0 %}
+            {% if notif_count and notif_count > 0 %}
             <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
               id="notifBadge" style="font-size:.7rem;">
-              {{ notif_unread_count }}
+              {{ notif_count }}
               <span class="visually-hidden">unread</span>
             </span>
             {% endif %}
           </a>
+
           <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="notifDropdown"
-            style="min-width:320px;max-height:70vh;overflow:auto;">
+            style="min-width:320px;max-height:70vh;overflow:auto;" data-bs-auto-close="outside">
             <li class="px-3 py-2 d-flex justify-content-between align-items-center">
               <span class="fw-semibold">Notificaciones</span>
-              {% if notif_unread_count and notif_unread_count > 0 %}
+              {% if notif_count and notif_count > 0 %}
               <button class="btn btn-sm btn-outline-secondary" id="markAllBtn">Marcar todo leído</button>
               {% endif %}
             </li>
@@ -739,15 +740,21 @@
               <hr class="dropdown-divider">
             </li>
 
-            {% if notif_latest %}
-            {% for n in notif_latest %}
+            {% if notif_items %}
+            {% for n in notif_items %}
             <li>
               <a class="dropdown-item d-flex gap-2 align-items-start notif-item {% if not n.leida %}fw-semibold{% endif %}"
-                href="{{ n.url|default:'#' }}" data-id="{{ n.id }}">
+                href="#" {% if n.notificacion_id %} data-id="{{ n.notificacion_id }}"
+                data-click-url="{% url 'notificacion_click' n.notificacion_id %}" {% else %} data-id=""
+                data-click-url="#" {% endif %}>
                 <span class="mt-1">
-                  {% if n.tipo == 'alerta' %}<i class="bi bi-exclamation-triangle"></i>
-                  {% elif n.tipo == 'evento' %}<i class="bi bi-calendar-event"></i>
-                  {% else %}<i class="bi bi-info-circle"></i>{% endif %}
+                  {% if n.tipo == 'alerta' %}
+                  <i class="bi bi-exclamation-triangle"></i>
+                  {% elif n.tipo == 'evento' %}
+                  <i class="bi bi-calendar-event"></i>
+                  {% else %}
+                  <i class="bi bi-info-circle"></i>
+                  {% endif %}
                 </span>
                 <span class="flex-grow-1">
                   <span class="d-block">{{ n.titulo }}</span>
@@ -765,6 +772,7 @@
             {% endif %}
           </ul>
         </div>
+
 
 
         <div class="nav-item dropdown">
@@ -1027,10 +1035,12 @@
         <!-- ✅ Mueve groupsList aquí adentro para que “inset:0” funcione -->
         <div id="groupsList" class="chat-list"
           style="display:none; position:absolute; inset:0; overflow:auto; background:#fff;"></div>
+
+        <div id="eventsList" class="chat-list"
+          style="display:none; position:absolute; inset:0; overflow:auto; background:#fff;"></div>
       </div>
 
-      <div id="eventsList" class="chat-list"
-        style="display:none; position:absolute; inset:0; overflow:auto; background:#fff;"></div>
+
 
       <!-- Columna derecha (mensajes) -->
       <div class="chat-pane" style="flex:1; display:flex; flex-direction:column;">
@@ -1074,6 +1084,8 @@
       eventoDraw: "{% url 'event_draw' 0 %}",
       eventoLock: "{% url 'event_lock' 0 %}",
       eventoMine: "{% url 'event_my_assignment' 0 %}",
+      /* NUEVO: crea evento con su propio chat */
+      eventCreateWithChat: "{% url 'event_create_with_chat' %}",
 
     };
   </script>
@@ -1371,7 +1383,12 @@
         }
 
         // 🚫 fuera los grupos en la pestaña "Chats"
-        const chatsOnly = items.filter(c => !(c.is_group || String(c.tipo || '').toLowerCase() === 'grupo'));
+        const chatsOnly = items.filter(c => {
+          const t = String(c.tipo || '').toLowerCase();
+          const isGroup = c.is_group || t === 'grupo';
+          const isEvent = t === 'evento';
+          return !(isGroup || isEvent);
+        });
 
         const filtered = chatsOnly.filter(conv => {
           if (Number(conv.conversacion_id) === Number(window.currentConvId)) return true;
@@ -1978,6 +1995,36 @@
               ? 'Grupos'
               : titulo;
           }
+          const esEvento = String(meta?.tipo || '').toLowerCase() === 'evento';
+
+          // zona de acciones a la derecha de la barra (ya existe en tu HTML)
+          const actionsRight = document.querySelector('.phone-header .d-flex.align-items-center.gap-2');
+
+          // limpia botón previo si hubiera
+          let oldBtn = document.getElementById('btnEventDraw');
+          if (oldBtn) oldBtn.remove();
+
+          // si es evento y NO está sorteado, inyecta el botón
+          if (esEvento && meta?.evento && meta.evento.estado !== 'sorteado') {
+            const drawBtn = document.createElement('button');
+            drawBtn.id = 'btnEventDraw';
+            drawBtn.className = 'btn btn-sm btn-warning';
+            drawBtn.textContent = 'Sortear';
+            drawBtn.addEventListener('click', async () => {
+              if (!confirm('¿Confirmas realizar el sorteo?')) return;
+              try {
+                const url = window.URLS.eventoDraw.replace('/0/', `/${meta.evento.id}/`);
+                const r = await fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': (window.CSRF_TOKEN || '') } });
+                if (!r.ok) throw 0;
+                // refresca mensajes y mete estado “sorteado”
+                if (typeof window.loadMessagesOnce === 'function') await window.loadMessagesOnce();
+                drawBtn.remove();
+              } catch {
+                alert('No fue posible sortear.');
+              }
+            });
+            actionsRight?.prepend(drawBtn);
+          }
 
           // === Mostrar/ocultar menú kebab “junto a la bandeja” ===
           // === Mostrar/ocultar menús kebab (autor vs miembro) ===
@@ -2144,6 +2191,7 @@
       const chatsEl = drawer.querySelector('#chatList');
       const friendsEl = drawer.querySelector('#friendsList');
       const groupsEl = drawer.querySelector('#groupsList');
+      const eventsEl = drawer.querySelector('#eventsList');
       const leftCol = chatsEl?.parentElement;
       if (leftCol && getComputedStyle(leftCol).position === 'static') {
         leftCol.style.position = 'relative';
@@ -2428,9 +2476,10 @@
         try {
           const res = await fetch(window.URLS.conversaciones, { credentials: 'same-origin' });
           const data = await res.json();
-          const grupos = (data || []).filter(c =>
-            c.is_group || String(c.tipo || '').toLowerCase() === 'grupo'
-          );
+          const grupos = (data || []).filter(c => {
+            const t = String(c.tipo || '').toLowerCase();
+            return (t === 'grupo') || (c.is_group && t !== 'evento');
+          });
 
           const list = document.createElement('div');
           list.className = 'px-2';
@@ -2523,6 +2572,17 @@
           if (typeof loadConversations === 'function') {
             loadConversations().finally(() => { try { refreshGlobalUnreadDot(); } catch { } });
           }
+
+        } else if (tab === 'eventos') {
+          friendsEl.style.display = 'none';
+          chatsEl.style.visibility = 'hidden';
+          groupsEl.style.display = 'none';
+          eventsEl.style.display = 'block';
+          if (headerTitleEl) headerTitleEl.textContent = "Eventos";
+
+          if (typeof window.renderEventsTabHeader === 'function') window.renderEventsTabHeader();
+          if (typeof window.loadEventsInbox === 'function') window.loadEventsInbox();
+          if (typeof window.loadEventsForCurrentGroup === 'function') window.loadEventsForCurrentGroup();
         } else { // grupos
           friendsEl.style.display = 'none';
           chatsEl.style.visibility = 'hidden';
@@ -3360,482 +3420,507 @@
   <script>
     (function () {
       const eventsEl = document.getElementById('eventsList');
-      let eventsLoaded = false;
+      if (!eventsEl) return;
 
-      async function loadEvents() {
+      function headerHTML() {
+        return `
+      <div class="d-flex justify-content-between align-items-center p-2">
+        <span class="fw-semibold">Eventos</span>
+        <button class="btn btn-sm btn-primary" id="btnCreateEvent"><i class="bi bi-plus-lg"></i> Crear evento</button>
+      </div>`;
+      }
+
+      function renderEventsTabHeader() {
+        // solo header; la lista se pinta abajo según contexto (grupo abierto)
+        if (!eventsEl) return;
+        const existingHeader = eventsEl.querySelector('[data-role="events-header"]');
+        if (existingHeader) existingHeader.remove();
+        const hdr = document.createElement('div');
+        hdr.setAttribute('data-role', 'events-header');
+        hdr.innerHTML = headerHTML();
+        eventsEl.prepend(hdr);
+        eventsEl.querySelector('#btnCreateEvent')?.addEventListener('click', openCreateEventModal);
+      }
+
+      async function loadEventsInbox() {
+        if (!eventsEl) return;
+        // pide todas las conversaciones
+        const r = await fetch(window.URLS.conversaciones, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
+        if (!r.ok) { eventsEl.innerHTML = headerHTML() + '<div class="p-3 text-danger">No se pudieron cargar eventos.</div>'; return; }
+        const data = await r.json();
+
+        const eventos = (data || []).filter(c => String(c.tipo || '').toLowerCase() === 'evento');
+        const rows = eventos.map(c => {
+          const last = c.ultimo_mensaje || {};
+          const prev = (last.tipo === 'imagen' || last.archivo_url) ? '📷 Imagen' : String(last.contenido || '').slice(0, 72);
+          const when = last.creado_en ? new Date(last.creado_en).toLocaleDateString() : '';
+          return `
+      <div class="chat-list-item d-flex justify-content-between align-items-center" data-conv-id="${c.conversacion_id}">
+        <div class="chat-names">
+          <div class="line1">${c.titulo || 'Amigo Secreto'}</div>
+          <div class="line2">${prev}</div>
+        </div>
+        <div class="chat-time">${when}</div>
+      </div>`;
+        }).join('');
+
+        eventsEl.innerHTML = headerHTML() + `<div class="px-2">${rows || '<div class="p-3 text-muted">Sin eventos</div>'}</div>`;
+        eventsEl.querySelector('#btnCreateEvent')?.addEventListener('click', openCreateEventModal);
+        eventsEl.querySelectorAll('[data-conv-id]').forEach(row => {
+          row.addEventListener('click', () => {
+            const cid = Number(row.dataset.convId);
+            if (cid && typeof window.openConversation === 'function') window.openConversation(cid);
+          });
+        });
+      }
+      async function loadEventsForCurrentGroup() {
+        // Si hay grupo abierto, listamos sus events (para ofrecer "Sortear" ahí).
         if (!window.currentConvId) {
-          eventsEl.innerHTML = '<div class="p-3 text-muted">Abre un grupo para ver sus eventos.</div>';
+          eventsEl.innerHTML = headerHTML() + '<div class="p-3 text-muted">Abre un grupo para ver sus eventos.</div>';
+          eventsEl.querySelector('#btnCreateEvent')?.addEventListener('click', openCreateEventModal);
           return;
         }
-        eventsEl.innerHTML = '<div class="p-3 text-muted">Cargando eventos…</div>';
         try {
           const url = window.URLS.eventosListCreate.replace('/0/', `/${window.currentConvId}/`);
           const r = await fetch(url, { credentials: 'same-origin' });
           if (!r.ok) throw 0;
           const j = await r.json();
           const list = Array.isArray(j.results) ? j.results : [];
-          if (!list.length) {
-            eventsEl.innerHTML = `
-          <div class="p-3">
-            <div class="mb-2 text-muted">Aún no hay eventos.</div>
-            ${window.currentConvIsGroup ? '<button class="btn btn-sm btn-primary" id="btnNewEvent">Nuevo Amigo Secreto</button>' : ''}
-          </div>`;
-          } else {
-            eventsEl.innerHTML = `
-          <div class="d-flex justify-content-between align-items-center p-2">
-            <span class="fw-semibold">Eventos</span>
-            ${window.currentConvIsGroup ? '<button class="btn btn-sm btn-primary" id="btnNewEvent">Nuevo</button>' : ''}
+
+          const rows = list.map(e => `
+        <div class="chat-list-item d-flex justify-content-between align-items-center" data-event-id="${e.id}">
+          <div class="chat-names">
+            <div class="line1">${e.titulo || 'Amigo Secreto'}</div>
+            <div class="line2">${e.estado}${e.presupuesto ? ' • $' + e.presupuesto : ''}</div>
           </div>
-          <div class="px-2">
-            ${list.map(e => `
-              <div class="chat-list-item" data-event-id="${e.id}">
-                <div class="chat-names">
-                  <div class="line1">${e.titulo || 'Amigo Secreto'}</div>
-                  <div class="line2">${e.estado}${e.presupuesto ? ' • $' + e.presupuesto : ''}</div>
-                </div>
-                <div class="chat-time">${new Date(e.creado_en).toLocaleDateString()}</div>
-              </div>`).join('')}
-          </div>`;
-          }
+          <div class="d-flex align-items-center gap-2">
+            <div class="chat-time">${new Date(e.creado_en).toLocaleDateString()}</div>
+            ${e.estado !== 'sorteado' ? `<button class="btn btn-sm btn-warning" data-draw="${e.id}">Sortear</button>` : ''}
+          </div>
+        </div>
+      `).join('');
 
-          eventsEl.querySelector('#btnNewEvent')?.addEventListener('click', openCreateEvent);
-          eventsEl.querySelectorAll('.chat-list-item[data-event-id]')?.forEach(row => {
-            row.addEventListener('click', () => openEventDetail(Number(row.dataset.eventId)));
+          eventsEl.innerHTML = headerHTML() + `<div class="px-2">${rows || '<div class="p-3 text-muted">Sin eventos</div>'}</div>`;
+          eventsEl.querySelector('#btnCreateEvent')?.addEventListener('click', openCreateEventModal);
+
+          // Sorteo por fila
+          eventsEl.querySelectorAll('[data-draw]')?.forEach(btn => {
+            btn.addEventListener('click', async () => {
+              const id = Number(btn.dataset.draw);
+              if (!id) return;
+              if (!confirm('¿Confirmas realizar el sorteo?')) return;
+              try {
+                const url = window.URLS.eventoDraw.replace('/0/', `/${id}/`);
+                const r = await fetch(url, {
+                  method: 'POST',
+                  credentials: 'same-origin',
+                  headers: { 'X-CSRFToken': (window.CSRF_TOKEN || '') }
+                });
+                if (!r.ok) throw 0;
+                await loadEventsForCurrentGroup();
+                // refrescar mensajes si el chat abierto es el del evento
+                if (typeof window.loadMessagesOnce === 'function') await window.loadMessagesOnce();
+              } catch {
+                alert('No fue posible sortear.');
+              }
+            });
           });
-
-        } catch (e) {
-          eventsEl.innerHTML = '<div class="p-3 text-danger">No se pudieron cargar eventos.</div>';
+        } catch {
+          eventsEl.innerHTML = headerHTML() + '<div class="p-3 text-danger">No se pudieron cargar eventos.</div>';
+          eventsEl.querySelector('#btnCreateEvent')?.addEventListener('click', openCreateEventModal);
         }
       }
 
-      async function openCreateEvent() {
-        // Minimal: crea evento con defaults
-        const url = window.URLS.eventosListCreate.replace('/0/', `/${window.currentConvId}/`);
-        try {
-          const r = await fetch(url, {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': (window.CSRF_TOKEN || '') },
-            body: JSON.stringify({ tipo: 'secret_santa', titulo: 'Amigo Secreto', presupuesto: null })
-          });
-          if (!r.ok) throw 0;
-          await loadEvents();
-        } catch { alert('No se pudo crear el evento.'); }
-      }
+      Object.assign(window, {
+        renderEventsTabHeader,
+        loadEventsInbox,
+        loadEventsForCurrentGroup
+      });
 
-      async function openEventDetail(eventId) {
-        try {
-          const r = await fetch(window.URLS.eventoDetail.replace('/0/', `/${eventId}/`), { credentials: 'same-origin' });
-          if (!r.ok) throw 0;
-          const j = await r.json();
-          // Admin: permitir sortear; todos: ver mi asignación (si ya sorteado/cerrado)
-          const isAdmin = !!document.getElementById('groupKebab')?.style?.display && document.getElementById('groupKebab').style.display !== 'none';
-
-          let actions = '';
-          if (isAdmin && (j.estado === 'borrador' or j.estado === 'sorteado')) {
-            actions += `<button class="btn btn-sm btn-primary" id="btnDraw">Sortear</button>`;
-            if (j.estado === 'sorteado') actions += ` <button class="btn btn-sm btn-outline-secondary" id="btnLock">Cerrar</button>`;
-          }
-          const body = document.createElement('div');
-          body.className = 'p-3';
-          body.innerHTML = `
-        <div class="mb-2"><strong>${j.titulo || 'Amigo Secreto'}</strong></div>
-        <div class="mb-3 text-muted">Estado: ${j.estado}${j.presupuesto ? ' • Presupuesto: $' + j.presupuesto : ''}</div>
-        <div class="mb-3" id="mineBox"></div>
-        <div>${actions}</div>
-      `;
-
-          // Modal básico reutilizando tus helpers
-          const MODAL_ID = 'modalEventDetail';
-          let modal = document.getElementById(MODAL_ID);
-          if (!modal) {
-            modal = document.createElement('div');
-            modal.id = MODAL_ID;
-            modal.className = 'modal';
-            modal.tabIndex = -1;
-            modal.innerHTML = `
-          <div class="modal-dialog"><div class="modal-content">
+      // ===== Modal Crear Evento (con amigos) =====
+      function ensureCreateEventModal() {
+        let m = document.getElementById('modalCrearEvento');
+        if (m) return m;
+        m = document.createElement('div');
+        m.className = 'modal';
+        m.id = 'modalCrearEvento';
+        m.tabIndex = -1;
+        m.innerHTML = `
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form id="formCrearEvento" autocomplete="off">
             <div class="modal-header">
-              <h5 class="modal-title">Evento</h5>
-              <button type="button" class="btn-close" data-close></button>
+              <h5 class="modal-title">Crear evento (Amigo Secreto)</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
-            <div class="modal-body" id="${MODAL_ID}-body"></div>
-            <div class="modal-footer"><button class="btn btn-light" data-close>Cerrar</button></div>
-          </div></div>`;
-            document.body.appendChild(modal);
-          }
-          document.getElementById(`${MODAL_ID}-body`).innerHTML = '';
-          document.getElementById(`${MODAL_ID}-body`).appendChild(body);
-          openBasicModal(MODAL_ID);
+            <div class="modal-body">
+              <div class="mb-2">
+                <label class="form-label">Título</label>
+                <input type="text" class="form-control" name="titulo" placeholder="Ej: Amigo Secreto fin de año" required>
+              </div>
+              <div class="mb-2">
+                <label class="form-label">Monto estimado</label>
+                <input type="number" class="form-control" name="monto" min="0" step="1" placeholder="Ej: 10000">
+              </div>
 
-          // “Mi asignación”
-          if (j.estado !== 'borrador') {
-            try {
-              const r2 = await fetch(window.URLS.eventoMine.replace('/0/', `/${eventId}/`), { credentials: 'same-origin' });
-              const m = await r2.json();
-              const mineBox = body.querySelector('#mineBox');
-              if (m.has) {
-                const n = [m.usuario.nombre, m.usuario.apellido].filter(Boolean).join(' ') || ('@' + (m.usuario.username || ''));
-                mineBox.innerHTML = `<div class="alert alert-info">Te tocó: <strong>${n}</strong></div>`;
-              } else {
-                mineBox.innerHTML = `<div class="text-muted">Aún no tienes asignación visible.</div>`;
-              }
-            } catch { }
-          }
-
-          // Acciones admin
-          body.querySelector('#btnDraw')?.addEventListener('click', async () => {
-            if (!confirm('¿Realizar sorteo ahora?')) return;
-            try {
-              const rr = await fetch(window.URLS.eventoDraw.replace('/0/', `/${eventId}/`), {
-                method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': (window.CSRF_TOKEN || '') }
-              });
-              if (!rr.ok) throw 0;
-              await openEventDetail(eventId);
-            } catch { alert('No se pudo sortear.'); }
-          });
-          body.querySelector('#btnLock')?.addEventListener('click', async () => {
-            try {
-              const rr = await fetch(window.URLS.eventoLock.replace('/0/', `/${eventId}/`), {
-                method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': (window.CSRF_TOKEN || '') }
-              });
-              if (!rr.ok) throw 0;
-              await openEventDetail(eventId);
-            } catch { alert('No se pudo cerrar.'); }
-          });
-
-        } catch { alert('No se pudo abrir el evento.'); }
+              <hr class="my-2">
+              <label class="form-label d-block">Participantes</label>
+              <!-- Aquí se inyecta el picker -->
+              <div id="eventFriendPicker"></div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+              <button type="submit" class="btn btn-primary">Crear evento</button>
+            </div>
+          </form>
+        </div>
+      </div>`;
+        document.body.appendChild(m);
+        return m;
       }
 
-      // Hook del tab
-      (function hookTabs() {
-        const drawer = document.getElementById('chatDrawer');
-        if (!drawer) return;
-        drawer.addEventListener('click', (e) => {
-          const btn = e.target.closest('.tab-btn[data-tab]');
-          if (!btn) return;
-          const tab = btn.dataset.tab;
-          if (tab !== 'eventos') return;
+      async function openCreateEventModal() {
+        const modalEl = ensureCreateEventModal();
 
-          // Mostrar panel eventos, ocultar otros en columna izquierda
-          document.getElementById('friendsList')?.style && (document.getElementById('friendsList').style.display = 'none');
-          document.getElementById('groupsList')?.style && (document.getElementById('groupsList').style.display = 'none');
-          document.getElementById('chatList')?.style && (document.getElementById('chatList').style.visibility = 'hidden');
-          eventsEl.style.display = 'block';
-          loadEvents();
-        });
-      })();
+        // 1) Cargar amigos una sola vez y dibujar el picker
+        try {
+          await fetchFriendsForPicker();
+          renderEventFriendPicker('eventFriendPicker');
+        } catch (e) {
+          console.error(e);
+          alert('No pude cargar tus amigos.');
+          return;
+        }
 
-      // Cuando abras una conversación de grupo, si el usuario cambia a “Eventos”, ya existe currentConvId
+        // 2) Abrir modal (Bootstrap o fallback)
+        if (window.bootstrap?.Modal) {
+          const bs = bootstrap.Modal.getOrCreateInstance(modalEl);
+          bs.show();
+        } else {
+          modalEl.style.display = 'block';
+          document.body.style.overflow = 'hidden';
+        }
+
+        // 3) Submit
+        // dentro del mismo IIFE de Eventos
+        const form = modalEl.querySelector('#formCrearEvento');
+        form.onsubmit = async (ev) => {
+          ev.preventDefault();
+
+          const titulo = form.querySelector('[name="titulo"]').value.trim();
+          const montoStr = form.querySelector('[name="monto"]').value.trim();
+          const presupuesto_fijo = montoStr ? Number(montoStr) : null;
+
+          const miembros = getSelectedFriendIds('eventFriendPicker'); // IDs de usuario
+          if (!titulo) return alert('Escribe un título.');
+          if (!miembros.length) return alert('Selecciona al menos 1 amigo.');
+
+          try {
+            const r = await fetch(window.URLS.eventCreateWithChat, {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/json', 'X-CSRFToken': (window.CSRF_TOKEN || '') },
+              body: JSON.stringify({ titulo, presupuesto_fijo, miembros })
+            });
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            const j = await r.json();
+
+            // cierra el modal
+            if (window.bootstrap?.Modal) bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+            else { modalEl.style.display = 'none'; document.body.style.overflow = ''; }
+
+            // 👉 Abre la conversación del evento y activa la pestaña "Eventos"
+            if (j?.conversacion_id && typeof window.openConversation === 'function') {
+              await window.openConversation(j.conversacion_id);
+            }
+            const btnEventos = document.querySelector('.phone-tabs .tab-btn[data-tab="eventos"]');
+            btnEventos?.click();
+          } catch (e) {
+            console.error(e);
+            alert('Error al crear el evento.');
+          }
+        };
+      }
+
+      // Exponer helpers al ámbito del drawer
+      Object.assign(window, {
+        renderEventsTabHeader,
+        loadEventsForCurrentGroup,
+        openCreateEventModal
+      });
+    })();
+
+  </script>
+
+
+
+
+
+
+
+
+
+  <script>
+    // Cache de amigos para reusar
+    window._friendsCache = window._friendsCache || null;
+
+    async function fetchFriendsForPicker() {
+      if (Array.isArray(window._friendsCache) && window._friendsCache.length) return window._friendsCache;
+      const r = await fetch(window.URLS.amigos, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+      if (!r.ok) throw new Error('No pude cargar amigos (HTTP ' + r.status + ')');
+      const data = await r.json();
+      const list = (data?.amigos || data || []).map(a => ({
+        id: Number(a.id ?? a.user_id ?? a.pk),
+        nombre: a.nombre_completo
+          ?? [a.nombre, a.apellido].filter(Boolean).join(' ')
+          ?? a.display_name ?? a.username ?? a.nombre_usuario ?? 'Amigo',
+        avatar: a.avatar_url || a.avatar || a.foto_url || a.foto || null,
+      })).filter(x => Number.isFinite(x.id));
+      window._friendsCache = list;
+      return list;
+    }
+
+    function renderEventFriendPicker(containerId, preselected = []) {
+      const cont = document.getElementById(containerId);
+      if (!cont) return;
+      cont.innerHTML = '';
+
+      const friends = window._friendsCache || [];
+      if (!friends.length) { cont.innerHTML = '<div class="text-muted small">Sin amigos.</div>'; return; }
+
+      const search = document.createElement('input');
+      search.type = 'search';
+      search.className = 'form-control form-control-sm mb-2';
+      search.placeholder = 'Buscar amigo…';
+      cont.appendChild(search);
+
+      const list = document.createElement('div');
+      list.className = 'list-group list-group-flush';
+      cont.appendChild(list);
+
+      const draw = (term = '') => {
+        list.innerHTML = '';
+        const t = term.trim().toLowerCase();
+        friends
+          .filter(f => !t || (f.nombre || '').toLowerCase().includes(t))
+          .forEach(f => {
+            const row = document.createElement('label');
+            row.className = 'list-group-item d-flex align-items-center gap-2';
+            row.style.cursor = 'pointer';
+
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.className = 'form-check-input me-2';
+            cb.value = String(f.id);
+            if (preselected.includes(f.id)) cb.checked = true;
+
+            const avatar = document.createElement('img');
+            avatar.src = f.avatar || '{% static "img/Gifters/user-default.png" %}';
+            avatar.width = 24; avatar.height = 24;
+            avatar.className = 'rounded-circle';
+
+            const name = document.createElement('span');
+            name.textContent = f.nombre;
+
+            row.append(cb, avatar, name);
+            list.appendChild(row);
+          });
+      };
+      search.addEventListener('input', () => draw(search.value));
+      draw();
+    }
+
+    function getSelectedFriendIds(containerId) {
+      const cont = document.getElementById(containerId);
+      if (!cont) return [];
+      return Array.from(cont.querySelectorAll('input[type="checkbox"]:checked'))
+        .map(i => Number(i.value))
+        .filter(Number.isFinite);
+    }
+  </script>
+
+
+
+
+
+  <script>
+    (function () {
+      // --- Helpers ya existentes ---
+      const bellToggle = document.getElementById('notifDropdown');
+      function getCSRFCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return decodeURIComponent(parts.pop().split(';').shift());
+      }
+      const CSRFTOKEN = getCSRFCookie('csrftoken');
+
+      function unreadInList() {
+        return document.querySelectorAll('.dropdown-menu .notif-item .badge.bg-primary').length;
+      }
+      function ensureBellBadge() {
+        let b = bellToggle?.querySelector('.badge.rounded-pill');
+        if (!b && bellToggle) {
+          b = document.createElement('span');
+          b.className = 'position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger';
+          b.style.fontSize = '.7rem';
+          const hidden = document.createElement('span');
+          hidden.className = 'visually-hidden';
+          hidden.textContent = 'unread';
+          b.appendChild(hidden);
+          bellToggle.appendChild(b);
+        }
+        return b;
+      }
+      function updateBell(unread) {
+        const badge = bellToggle?.querySelector('.badge.rounded-pill');
+        if (!bellToggle) return;
+        if (unread <= 0) {
+          badge?.remove();
+          document.getElementById('markAllBtn')?.remove();
+        } else {
+          const b = badge || ensureBellBadge();
+          if (b) {
+            if (!b.firstChild || b.firstChild.nodeType !== Node.TEXT_NODE) {
+              b.insertBefore(document.createTextNode(String(unread) + ' '), b.firstChild);
+            } else {
+              b.firstChild.nodeValue = String(unread) + ' ';
+            }
+          }
+        }
+      }
+
+      // --- CLICK en una notificación: no navegar, no cerrar, marcar en servidor y actualizar contador ---
+      document.addEventListener('click', async (e) => {
+        const a = e.target.closest('.notif-item');
+        if (!a) return;
+
+        // Evita navegación a href="#" y evita que Bootstrap cierre el dropdown
+        e.preventDefault();
+        e.stopPropagation();
+
+        const notifId = a.getAttribute('data-id') || '';
+
+        // Optimista: quita "nuevo" y negrita al instante
+        const newBadge = a.querySelector('.badge.bg-primary');
+        const wasUnread = !!newBadge || a.classList.contains('fw-semibold');
+        if (newBadge) newBadge.remove();
+        a.classList.remove('fw-semibold');
+        if (wasUnread) updateBell(unreadInList());
+
+        if (!notifId) return; // sin id no podemos persistir
+
+        try {
+          // POST con keepalive para que NO se cancele si el menú se cierra o el usuario cliquea rápido
+          await fetch(`/notificaciones/click/${notifId}/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': CSRFTOKEN },
+            credentials: 'same-origin',
+            keepalive: true,
+          });
+          // No navegamos: nos quedamos en el dropdown (lo pediste así).
+          // Si en el futuro quieres abrir una URL, hazlo aquí manualmente.
+        } catch (err) {
+          console.warn('No se pudo marcar como leída en servidor:', err);
+          // (Opcional) revertir UI si quieres:
+          // a.classList.add('fw-semibold');
+          // const badge = document.createElement('span'); badge.className='badge bg-primary rounded-pill'; badge.textContent='nuevo'; a.appendChild(badge);
+          // updateBell(unreadInList());
+        }
+      }, true);
+
+      // --- Marcar TODO leído (si ya lo tienes, puedes dejar el tuyo) ---
+      document.addEventListener('click', async (e) => {
+        const btn = e.target.closest('#markAllBtn');
+        if (!btn) return;
+        e.preventDefault();
+        try {
+          const r = await fetch("{% url 'notificaciones_mark_all' %}", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "X-CSRFToken": getCSRFCookie('csrftoken') }
+          });
+          if (!r.ok) throw 0;
+          document.querySelectorAll('.notif-item .badge.bg-primary').forEach(el => el.remove());
+          document.querySelectorAll('.notif-item.fw-semibold').forEach(el => el.classList.remove('fw-semibold'));
+          updateBell(0);
+          btn.remove();
+        } catch (err) {
+          console.error('mark-all failed', err);
+          alert('No se pudo marcar como leído.');
+        }
+      });
+
+      // Ajusta la campana al cargar
+      updateBell(unreadInList());
     })();
   </script>
-<script>
-(() => {
-  const eventsEl = document.getElementById('eventsList');
-  if (!eventsEl) return;
 
-  // ------- Helpers generales -------
-  const getCSRF = () => (window.CSRF_TOKEN || (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '');
-  const fmtMoney = v => (v == null || v === '') ? '' : `$${Number(v).toLocaleString('es-CL')}`;
-  const nowISO = () => new Date().toISOString();
 
-  // Modal básico reutilizable (no toca tu HTML)
-  function ensureModal(id, title = '') {
-    let m = document.getElementById(id);
-    if (!m) {
-      m = document.createElement('div');
-      m.id = id;
-      m.className = 'modal';
-      m.tabIndex = -1;
-      m.innerHTML = `
-        <div class="modal-dialog modal-dialog-scrollable">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title">${title || ''}</h5>
-              <button type="button" class="btn-close" data-close></button>
-            </div>
-            <div class="modal-body" id="${id}-body"></div>
-            <div class="modal-footer" id="${id}-footer">
-              <button class="btn btn-light" data-close>Cancelar</button>
-            </div>
-          </div>
-        </div>`;
-      document.body.appendChild(m);
-    } else {
-      m.querySelector('.modal-title').textContent = title || '';
-    }
-    return m;
-  }
-  function openModal(id) {
-    const m = document.getElementById(id);
-    if (!m) return;
-    m.style.display = 'block';
-    document.body.style.overflow = 'hidden';
-  }
-  function closeModal(id) {
-    const m = document.getElementById(id);
-    if (!m) return;
-    m.style.display = 'none';
-    document.body.style.overflow = '';
-  }
-  document.addEventListener('click', (e) => {
-    const m = e.target.closest('.modal');
-    if (!m) return;
-    if (e.target.matches('.btn-close,[data-close]') || e.target === m) {
-      m.style.display = 'none';
-      document.body.style.overflow = '';
-    }
-  });
+  <script>
+    (function () {
+      // Utilidad CSRF si la estás usando en otros POST; para GET no hace falta:
+      function getCookie(name) {
+        const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+        return m ? m.pop() : '';
+      }
+      const CSRFTOKEN = getCookie('csrftoken');
 
-  // ------- Carga de eventos por conversación (grupo) -------
-  async function loadEvents() {
-    // Si no hay grupo abierto:
-    if (!window.currentConvId || !window.currentConvIsGroup) {
-      eventsEl.innerHTML = '<div class="p-3 text-muted">Abre un <strong>grupo</strong> para ver y crear eventos.</div>';
-      return;
-    }
-    eventsEl.innerHTML = '<div class="p-3 text-muted">Cargando eventos…</div>';
-
-    try {
-      const url = window.URLS.eventosListCreate.replace('/0/', `/${window.currentConvId}/`);
-      const r = await fetch(url, { credentials: 'same-origin' });
-      if (!r.ok) throw 0;
-      const j = await r.json();
-      const list = Array.isArray(j.results) ? j.results : (Array.isArray(j) ? j : []);
-
-      const header = `
-        <div class="d-flex justify-content-between align-items-center p-2">
-          <span class="fw-semibold">Eventos</span>
-          <button class="btn btn-sm btn-primary" id="btnNewEvent">Nuevo Amigo Secreto</button>
-        </div>`;
-
-      if (!list.length) {
-        eventsEl.innerHTML = `
-          ${header}
-          <div class="px-2 pb-3 text-muted">Aún no hay eventos en este grupo.</div>`;
-      } else {
-        eventsEl.innerHTML = `
-          ${header}
-          <div class="px-2">
-            ${list.map(e => `
-              <div class="chat-list-item d-flex align-items-center justify-content-between" data-event-id="${e.id}">
-                <div class="chat-names">
-                  <div class="line1">${e.titulo || 'Amigo Secreto'}</div>
-                  <div class="line2">
-                    ${e.estado || 'borrador'}${e.presupuesto ? ' • ' + fmtMoney(e.presupuesto) : ''}
-                  </div>
-                </div>
-                <div class="chat-time">${e.creado_en ? new Date(e.creado_en).toLocaleDateString('es-CL') : ''}</div>
-              </div>`).join('')}
-          </div>`;
+      // Contador de la campanita
+      function updateBadge(delta) {
+        const badge = document.getElementById('notifBadge');
+        if (!badge) return;
+        const curr = parseInt(badge.textContent.trim(), 10);
+        const next = Math.max(0, (isNaN(curr) ? 0 : curr) + delta);
+        if (next === 0) {
+          badge.remove();
+        } else {
+          badge.textContent = next;
+        }
       }
 
-      eventsEl.querySelector('#btnNewEvent')?.addEventListener('click', openCreateEventModal);
-      eventsEl.querySelectorAll('[data-event-id]').forEach(row => {
-        row.addEventListener('click', () => openEventDetail(Number(row.dataset.eventId)));
-      });
-    } catch {
-      eventsEl.innerHTML = '<div class="p-3 text-danger">No se pudieron cargar los eventos.</div>';
-    }
-  }
+      // Click en un item: marca leído en servidor y luego actualiza UI
+      document.addEventListener('click', async (e) => {
+        const a = e.target.closest('.notif-item');
+        if (!a) return;
 
-  // ------- Crear evento (modal con nombre, presupuesto y participantes) -------
-  async function openCreateEventModal() {
-    // Traer miembros del grupo para pre-seleccionar
-    let miembros = [];
-    try {
-      const url = window.URLS.grupoMiembros.replace('/0/', `/${window.currentConvId}/`);
-      const r = await fetch(url, { credentials: 'same-origin' });
-      if (r.ok) {
-        const j = await r.json();
-        miembros = (j.miembros || j.participantes || []).map(m => ({
-          id: Number(m.id),
-          nombre: (m.nombre_completo || [m.nombre, m.apellido].filter(Boolean).join(' ') || m.username || m.nombre_usuario || 'Miembro')
-        }));
-      }
-    } catch { /* noop */ }
+        e.preventDefault(); // no navegar
+        e.stopPropagation(); // no cerrar el dropdown
 
-    const MODAL_ID = 'modalCreateEvent';
-    const m = ensureModal(MODAL_ID, 'Nuevo Amigo Secreto');
-    const body = m.querySelector(`#${MODAL_ID}-body`);
-    const footer = m.querySelector(`#${MODAL_ID}-footer`);
+        // Si ya estaba leída en UI, no hagas nada más
+        if (!a.classList.contains('fw-semibold')) return;
 
-    body.innerHTML = `
-      <div class="mb-2">
-        <label class="form-label">Nombre del evento</label>
-        <input id="evName" class="form-control" maxlength="80" value="Amigo Secreto">
-      </div>
-      <div class="mb-2">
-        <label class="form-label">Presupuesto estimado (opcional)</label>
-        <input id="evBudget" class="form-control" type="number" min="0" step="1" placeholder="Ej: 15000">
-      </div>
-      <div class="mb-2">
-        <label class="form-label">Participantes</label>
-        <div id="evParticipants" class="d-grid gap-2" style="max-height: 320px; overflow:auto;">
-          ${
-            miembros.length
-              ? miembros.map(m => `
-                  <label class="d-flex align-items-center gap-2">
-                    <input type="checkbox" value="${m.id}" checked>
-                    <span>${m.nombre}</span>
-                  </label>`).join('')
-              : '<div class="text-muted">No se pudieron cargar los miembros del grupo.</div>'
-          }
-        </div>
-        <small class="text-muted">Puedes desmarcar quienes no participen.</small>
-      </div>`;
+        const url = a.getAttribute('data-click-url');
+        if (!url) return; // protección
 
-    footer.innerHTML = `
-      <button class="btn btn-light" data-close>Cancelar</button>
-      <button id="evCreate" class="btn btn-primary">Crear evento</button>`;
-
-    footer.querySelector('#evCreate').onclick = submitCreateEvent;
-    openModal(MODAL_ID);
-  }
-
-  async function submitCreateEvent() {
-    const MODAL_ID = 'modalCreateEvent';
-    const name = (document.getElementById('evName')?.value || '').trim();
-    const budgetRaw = document.getElementById('evBudget')?.value || '';
-    const ids = Array.from(document.querySelectorAll('#evParticipants input[type=checkbox]:checked'))
-                .map(i => Number(i.value));
-
-    if (!name) { document.getElementById('evName')?.focus(); return; }
-    if (!ids.length) { alert('Selecciona al menos un participante.'); return; }
-
-    const url = window.URLS.eventosListCreate.replace('/0/', `/${window.currentConvId}/`);
-    const payload = {
-      tipo: 'secret_santa',
-      titulo: name,
-      presupuesto: budgetRaw === '' ? null : Number(budgetRaw),
-      participantes: ids
-    };
-
-    try {
-      const r = await fetch(url, {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
-        body: JSON.stringify(payload)
-      });
-      if (!r.ok) throw 0;
-      closeModal(MODAL_ID);
-      await loadEvents();
-    } catch {
-      alert('No se pudo crear el evento.');
-    }
-  }
-
-  // ------- Detalle del evento (sortear / cerrar / ver mi asignación) -------
-  async function openEventDetail(eventId) {
-    const MODAL_ID = 'modalEventDetail';
-    const m = ensureModal(MODAL_ID, 'Detalle del evento');
-    const body = m.querySelector(`#${MODAL_ID}-body`);
-    const footer = m.querySelector(`#${MODAL_ID}-footer`);
-
-    body.innerHTML = '<div class="text-muted">Cargando…</div>';
-    footer.innerHTML = `<button class="btn btn-light" data-close>Cerrar</button>`;
-
-    try {
-      const r = await fetch(window.URLS.eventoDetail.replace('/0/', `/${eventId}/`), { credentials: 'same-origin' });
-      if (!r.ok) throw 0;
-      const j = await r.json();
-
-      const soyAdmin = !!j.soy_admin;   // ← usamos el flag del backend si existe
-      const estado = j.estado || 'borrador';
-      const presupuesto = j.presupuesto ? fmtMoney(j.presupuesto) : null;
-
-      // Cuerpo
-      body.innerHTML = `
-        <div class="mb-2"><strong>${j.titulo || 'Amigo Secreto'}</strong></div>
-        <div class="mb-2 text-muted">Estado: ${estado}${presupuesto ? ' • Presupuesto: ' + presupuesto : ''}</div>
-        <div class="mb-3" id="mineBox"></div>
-        <div class="small text-muted">Creado: ${j.creado_en ? new Date(j.creado_en).toLocaleString('es-CL') : ''}</div>
-      `;
-
-      // Footer (acciones)
-      const btns = [];
-      if (soyAdmin && (estado === 'borrador' || estado === 'sorteado')) {
-        btns.push(`<button id="btnDraw" class="btn btn-primary">Sortear</button>`);
-      }
-      if (soyAdmin && estado === 'sorteado') {
-        btns.push(`<button id="btnLock" class="btn btn-outline-secondary">Cerrar</button>`);
-      }
-      btns.push(`<button id="btnMine" class="btn btn-success">Ver mi asignación</button>`);
-      btns.push(`<button class="btn btn-light" data-close>Cerrar</button>`);
-      footer.innerHTML = btns.join(' ');
-
-      // Listeners
-      footer.querySelector('#btnDraw')?.addEventListener('click', async () => {
-        if (!confirm('¿Confirmas realizar el sorteo?')) return;
         try {
-          const r = await fetch(window.URLS.eventoDraw.replace('/0/', `/${eventId}/`), {
-            method: 'POST', credentials: 'same-origin',
-            headers: { 'X-CSRFToken': getCSRF() }
+          // Llamada real al backend (GET) para persistir el "leído"
+          const r = await fetch(url, {
+            method: 'GET',
+            credentials: 'same-origin'
+            // No hace falta CSRF en GET
           });
-          if (!r.ok) throw 0;
-          await openEventDetail(eventId); // recarga detalle
-          // opcional: refrescar listado
-          loadEvents();
-        } catch { alert('No se pudo realizar el sorteo.'); }
+
+          if (!r.ok) throw new Error('request-failed');
+
+          // Si el servidor marcó como leída, ahora ajusta UI:
+          a.classList.remove('fw-semibold');
+          const badgeNuevo = a.querySelector('.badge.bg-primary');
+          if (badgeNuevo) badgeNuevo.remove();
+          updateBadge(-1); // decrementa contador en la campana
+        } catch (err) {
+          console.error('No se pudo marcar como leída:', err);
+          // opcional: mostrar toast/error
+        }
       });
 
-      footer.querySelector('#btnLock')?.addEventListener('click', async () => {
-        if (!confirm('Al cerrar el evento se congela la asignación. ¿Continuar?')) return;
-        try {
-          const r = await fetch(window.URLS.eventoLock.replace('/0/', `/${eventId}/`), {
-            method: 'POST', credentials: 'same-origin',
-            headers: { 'X-CSRFToken': getCSRF() }
-          });
-          if (!r.ok) throw 0;
-          await openEventDetail(eventId);
-          loadEvents();
-        } catch { alert('No se pudo cerrar el evento.'); }
-      });
+      // (Opcional) Asegúrate de que el dropdown no se cierre con clics adentro:
+      const menu = document.querySelector('#notifDropdown + .dropdown-menu');
+      if (menu) menu.setAttribute('data-bs-auto-close', 'outside');
+    })();
+  </script>
 
-      footer.querySelector('#btnMine')?.addEventListener('click', () => showMyAssignment(eventId));
 
-      // Mostrar mi asignación si ya está sorteado/cerrado
-      if (estado === 'sorteado' || estado === 'cerrado') showMyAssignment(eventId);
 
-      openModal(MODAL_ID);
-    } catch {
-      body.innerHTML = '<div class="text-danger">No se pudo cargar el evento.</div>';
-      openModal(MODAL_ID);
-    }
-  }
-
-  async function showMyAssignment(eventId) {
-    const box = document.getElementById('mineBox');
-    if (!box) return;
-    box.innerHTML = '<div class="text-muted">Buscando tu asignación…</div>';
-    try {
-      const r = await fetch(window.URLS.eventoMine.replace('/0/', `/${eventId}/`), { credentials: 'same-origin' });
-      if (!r.ok) throw 0;
-      const j = await r.json();
-      const a = j.asignacion || j.assignment || null;
-      if (!a) {
-        box.innerHTML = '<div class="text-muted">Aún no tienes una asignación.</div>';
-        return;
-      }
-      const nombre = a.nombre_completo || [a.nombre, a.apellido].filter(Boolean).join(' ') || a.username || a.nombre_usuario || 'Tu persona';
-      box.innerHTML = `
-        <div class="alert alert-success">
-          <div class="fw-semibold">¡Tu “amigo secreto” es:</div>
-          <div>${nombre}</div>
-        </div>`;
-    } catch {
-      box.innerHTML = '<div class="text-danger">No se pudo consultar tu asignación.</div>';
-    }
-  }
-
-  // Exponer el loader para que tu tab “eventos” lo llame
-  window.loadEvents = loadEvents;
-
-  // Si ya tienes manejador de tabs, basta con que, al entrar a "eventos",
-  // llames: loadEvents() y muestres #eventsList (como ya haces).
-})();
-</script>
 
 </body>
 

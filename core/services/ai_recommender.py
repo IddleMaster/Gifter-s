@@ -1,10 +1,12 @@
 # core/services/ai_recommender.py
-from typing import Iterable, List, Optional, Sequence, Tuple
+from typing import Iterable, List, Optional, Sequence, Tuple, Dict, Any
 from core.models import Producto, Wishlist, ItemEnWishlist
 from core.services.openai_client import get_openai_client
+import json 
 
 # Modelo de embeddings barato y efectivo
 EMBED_MODEL = "text-embedding-3-small"  # 1536 dims
+LLM_RERANK_MODEL = "gpt-4o-mini"
 
 # ========== utilidades matemáticas (sin numpy) ==========
 def _norm(v: Sequence[float]) -> float:
@@ -124,3 +126,64 @@ def rerank_products_with_embeddings(usuario, candidatos: Iterable[Producto], top
 
     scored.sort(key=lambda t: t[0], reverse=True)
     return [p for _s, p in scored[:top_k]]
+
+_SYSTEM_PROMPT_FOF = (
+    "Eres un re-ranker para 'Amigos que quizá conozcas'. "
+    "Usa SOLO señales de amigos en común: 'mutual_count' (principal) y 'last_login_ts' como desempate. "
+    "Devuelve JSON con un arreglo 'ranked' de objetos {id, score, reason}. "
+    "score: 0-100. reason: breve (<=90 chars) y menciona hasta 3 amigos en común si vienen en 'mutual_names'."
+)
+
+def rerank_fof(usuario, candidatos: List[Dict[str, Any]], take: int = 20) -> List[Dict[str, Any]]:
+    """
+    Reordena candidatos FoF usando OpenAI. Si la API falla, hace fallback determinista.
+    - candidatos: [{"id","username","full_name","mutual_count","mutual_names","last_login_ts"}, ...]
+    - take: recorte para costo (solo los primeros N viajan a la IA)
+    """
+    if not candidatos:
+        return []
+
+    subset = candidatos[:take]
+    client = get_openai_client(timeout_seconds=15)
+
+    payload = {
+        "user": getattr(usuario, "nombre_usuario", str(usuario.id)),
+        "candidates": subset,
+    }
+
+    try:
+        resp = client.chat.completions.create(
+            model=LLM_RERANK_MODEL,
+            temperature=0.1,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": _SYSTEM_PROMPT_FOF},
+                {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+            ],
+        )
+        data = json.loads(resp.choices[0].message.content)
+        ranked = data.get("ranked", [])
+        if not isinstance(ranked, list) or not ranked:
+            raise ValueError("Formato inesperado")
+
+        base_by_id = {c["id"]: c for c in candidatos}
+        ranked.sort(key=lambda x: x.get("score", 0), reverse=True)
+
+        final = []
+        for r in ranked:
+            cid = r.get("id")
+            if cid not in base_by_id:
+                continue
+            c = base_by_id[cid].copy()
+            c["score"] = r.get("score", 0)
+            c["reason"] = r.get("reason") or f"{c.get('mutual_count',0)} amigos en común"
+            final.append(c)
+        return final
+
+    except Exception:
+        # Fallback determinista si la IA falla
+        return sorted(
+            candidatos,
+            key=lambda x: (x.get("mutual_count", 0), x.get("last_login_ts", 0)),
+            reverse=True,
+        )
