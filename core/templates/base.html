@@ -648,6 +648,298 @@
 
 
 
+
+  <style>
+    /* Scrollbar minimalista */
+    /* Scrollbar minimalista */
+    /* ================== Notificaciones – estilo limpio ================== */
+
+    /* Contenedor del menú (tu <ul> actual) */
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] {
+      --g-blue: #377dff;
+      --g-border: #e6eaf2;
+      --g-shadow: 0 12px 28px rgba(16, 24, 40, .12);
+      border: 1px solid var(--g-border);
+      border-radius: 14px;
+      box-shadow: var(--g-shadow);
+      padding: .25rem 0 .5rem;
+      backdrop-filter: saturate(140%) blur(2px);
+    }
+
+    /* Header fijo (primer <li>) */
+    ul.dropdown-menu[aria-labelledby="notifDropdown"]>li:first-child {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #fff;
+      border-bottom: 1px solid var(--g-border);
+    }
+
+    /* Divider más sutil */
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .dropdown-divider {
+      margin: 0;
+      border-color: var(--g-border);
+    }
+
+    /* Cada <li> que contiene una notificación */
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] li.px-2 {
+      padding: .2rem .5rem;
+    }
+
+    /* Tarjeta de notificación (tu .dropdown-item.notif-item) */
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item {
+      gap: .65rem;
+      padding: .65rem .75rem;
+      border-radius: 12px;
+      transition: background .18s ease, box-shadow .18s ease;
+    }
+
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item:hover {
+      background: #f9fbff;
+      box-shadow: 0 1px 0 rgba(16, 24, 40, .06) inset;
+    }
+
+    /* No leída (ya tienes fw-semibold) */
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item.fw-semibold {
+      background: #eef5ff;
+      box-shadow: inset 0 0 0 1px rgba(55, 125, 255, .12);
+    }
+
+    /* Icono izquierdo (tu <span class="mt-1"> … </span>) */
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item>span.mt-1 {
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      background: rgba(55, 125, 255, .10);
+      color: var(--g-blue);
+      font-size: 1rem;
+      margin-top: 2px;
+    }
+
+    /* Bloque de texto principal (link o span con .flex-grow-1) */
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item .flex-grow-1 {
+      min-width: 0;
+      /* para que el truncado funcione */
+      text-decoration: none;
+      color: #1c1f23;
+      line-height: 1.28;
+    }
+
+    /* Título (primer .d-block) */
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item .flex-grow-1>.d-block:first-child {
+      font-weight: 600;
+      margin-bottom: .05rem;
+    }
+
+    /* Mensaje */
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item .flex-grow-1 small.text-muted {
+      color: #6b7280 !important;
+      display: block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Meta (la última línea “hace X tiempo”) */
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item .flex-grow-1 small.text-muted:last-child {
+      color: #98a2b3 !important;
+      font-size: .8rem;
+      margin-top: .15rem;
+    }
+
+    /* Botón ✓ (js-notif-mark-one) */
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item .js-notif-mark-one {
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border-radius: 9px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: #97a1b2;
+      font-weight: 700;
+      transition: all .15s ease;
+    }
+
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item .js-notif-mark-one:hover {
+      color: var(--g-blue);
+      background: rgba(55, 125, 255, .10);
+      border-color: rgba(55, 125, 255, .18);
+    }
+
+    /* Badge “nuevo” en azul del tema */
+    #notifBadge {
+      background: var(--g-blue) !important;
+      box-shadow: 0 1px 0 rgba(0, 0, 0, .06);
+      font-weight: 700;
+    }
+
+    /* Botón “x” (js-notif-dismiss) */
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item .js-notif-dismiss {
+      color: #b3bac6;
+      padding: 0 .25rem;
+      border-radius: 6px;
+    }
+
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item .js-notif-dismiss:hover {
+      color: #7a869a;
+      background: #eef1f6;
+    }
+
+    /* Scrollbar discreto (WebKit) */
+    ul.dropdown-menu[aria-labelledby="notifDropdown"]::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ul.dropdown-menu[aria-labelledby="notifDropdown"]::-webkit-scrollbar-thumb {
+      background: #d1d8e6;
+      border-radius: 8px;
+    }
+
+    ul.dropdown-menu[aria-labelledby="notifDropdown"]::-webkit-scrollbar-thumb:hover {
+      background: #bec8db;
+    }
+  </style>
+
+  <style>
+    /* ======= Ajustes finos de estilo (sobre lo ya pegado) ======= */
+
+    /* Más espacio bajo el header y apertura más suave */
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] {
+      margin-top: .55rem;
+      border-radius: 16px;
+    }
+
+    /* Header: botones menos “duros” */
+    #markAllBtn,
+    #hideReadBtn,
+    #hideAllBtn {
+      border-color: rgba(55, 125, 255, .18) !important;
+      color: #3f4a5a !important;
+      background: transparent !important;
+    }
+
+    #markAllBtn:hover,
+    #hideReadBtn:hover,
+    #hideAllBtn:hover {
+      background: rgba(55, 125, 255, .10) !important;
+      color: #2b6bff !important;
+    }
+
+    /* Cada item: tipografía y respiración */
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item {
+      padding: .6rem .75rem;
+      line-height: 1.28;
+    }
+
+    /* Título semibold, resto normal (evita “gritar”) */
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item .flex-grow-1>.d-block:first-child {
+      font-weight: 600;
+    }
+
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item {
+      font-weight: 400;
+      /* base normal */
+    }
+
+    /* “No leída”: barra lateral azul en vez de bloque pesado */
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item.fw-semibold {
+      background: #ffffff;
+      /* quita fondo azulazo */
+      box-shadow: none;
+      /* sin borde interno */
+      position: relative;
+    }
+
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item.fw-semibold::before {
+      content: "";
+      position: absolute;
+      left: 6px;
+      top: 8px;
+      bottom: 8px;
+      width: 3px;
+      border-radius: 3px;
+      background: #377dff;
+      /* acento azul */
+    }
+
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item.fw-semibold .notif-icon {
+      background: rgba(55, 125, 255, .12);
+      color: #2b6bff;
+    }
+
+    /* Texto: jerarquía más clara */
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item .flex-grow-1 small.text-muted {
+      color: #667085 !important;
+    }
+
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item .flex-grow-1 small.text-muted:last-child {
+      color: #98a2b3 !important;
+      letter-spacing: .1px;
+    }
+
+    /* Acciones: alineación y sutileza */
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item .js-notif-mark-one,
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item .js-notif-dismiss {
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      color: #a0a8b7;
+      opacity: .9;
+    }
+
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item .js-notif-dismiss {
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item .js-notif-mark-one:hover,
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item .js-notif-dismiss:hover {
+      color: #2b6bff;
+      background: rgba(55, 125, 255, .10);
+      border-color: rgba(55, 125, 255, .18);
+    }
+
+    /* Icono burbuja igualado a la nueva escala */
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item>span.mt-1 {
+      width: 26px;
+      height: 26px;
+      font-size: .95rem;
+      background: rgba(55, 125, 255, .10);
+      color: #2b6bff;
+    }
+
+    /* Badge del contador: un poco más compacto y elegante */
+    #notifBadge {
+      padding: .28rem .44rem;
+      font-weight: 700;
+      filter: saturate(115%);
+    }
+
+    /* Pequeños ajustes de spacing entre items */
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] li.px-2+li.px-2 {
+      margin-top: .1rem;
+    }
+  </style>
+
+  <style>
+    /* Fade + slide para el menú de notificaciones */
+    ul.dropdown-menu[aria-labelledby="notifDropdown"] {
+      opacity: 0;
+      transform: translateY(-4px);
+      transition: opacity .18s ease, transform .18s ease;
+    }
+
+    ul.dropdown-menu[aria-labelledby="notifDropdown"].show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+
+
   {% block extra_css %}{% endblock %}
 </head>
 
@@ -719,7 +1011,7 @@
         <!-- 🔔 Campanita de notificaciones -->
         <div class="nav-item dropdown me-2">
           <a class="nav-link position-relative" href="#" id="notifDropdown" role="button" data-bs-toggle="dropdown"
-            aria-expanded="false" aria-label="Notificaciones">
+            data-bs-auto-close="outside" aria-expanded="false" aria-label="Notificaciones">
             <i class="bi bi-bell" style="font-size:1.3rem;"></i>
             {% if notif_count and notif_count > 0 %}
             <span id="notifBadge"
@@ -783,6 +1075,12 @@
                 {% if not n.leida %}
                 <span class="badge bg-primary rounded-pill ms-1 flex-shrink-0">nuevo</span>
                 {% endif %}
+
+                <button type="button" class="btn btn-sm btn-link text-muted js-notif-dismiss ms-1 flex-shrink-0"
+                  title="Ocultar esta notificación" aria-label="Ocultar" data-id="{{ n.notificacion_id|default:n.id }}">
+                  &times;
+                </button>
+
               </div>
             </li>
             {% endfor %}
@@ -887,7 +1185,7 @@
             <p>Viena 998</p>
             <p>New York, NY 535022</p>
             <p class="mt-3"><strong>Teléfono:</strong> <span>+1 234 567 8900</span></p>
-            <p><strong>Email:</strong> <span>info@gifters.com</span></p>
+            <p><strong>Email:</strong> <span>giftersg4@gmail.com</span></p>
           </div>
         </div>
 
@@ -3949,6 +4247,14 @@
 
 
 
+
+
+
+
+
+
+
+
   <script>
     (function () {
       // === CSRF (único) ===
@@ -4188,7 +4494,150 @@
     })();
   </script>
 
+  <script>
+    /* =========================================================
+       NOTIFICACIONES — Ocultar en vista (sin borrar BD)
+       Guarda IDs ocultos en localStorage y los aplica al abrir.
+       Controles:
+         - “×” en cada item => oculta uno
+         - “Ocultar leídas” => oculta los que no están en negrita
+         - “Limpiar lista”  => oculta todos
+         - “Restaurar”      => muestra todo de nuevo
+       ========================================================= */
+    (function () {
+      const STORAGE_KEY = 'notif_hidden_ids_v1';
 
+      function loadHidden() {
+        try { return new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')); }
+        catch { return new Set(); }
+      }
+      function saveHidden(set) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify([...set]));
+      }
+
+      function hideItemEl(li) {
+        if (!li) return;
+        li.classList.add('d-none');
+      }
+      function showItemEl(li) {
+        if (!li) return;
+        li.classList.remove('d-none');
+      }
+
+      // Aplica ocultos actuales al DOM
+      function applyHiddenToDOM() {
+        const hidden = loadHidden();
+        document.querySelectorAll('.dropdown-menu .notif-item').forEach(item => {
+          const id = item.getAttribute('data-id') || item.querySelector('[data-id]')?.getAttribute('data-id');
+          if (!id) return;
+          if (hidden.has(String(id))) hideItemEl(item.closest('li') || item);
+          else showItemEl(item.closest('li') || item);
+        });
+      }
+
+      // Oculta UNA por id (y guarda)
+      function hideOneById(id, li) {
+        if (!id) return;
+        const hidden = loadHidden();
+        hidden.add(String(id));
+        saveHidden(hidden);
+        hideItemEl(li);
+      }
+
+      // Handlers de los botones del header
+      const hideReadBtn = document.getElementById('hideReadBtn');
+      const hideAllBtn = document.getElementById('hideAllBtn');
+      const restoreBtn = document.getElementById('restoreHiddenBtn');
+
+      if (hideReadBtn) {
+        hideReadBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const hidden = loadHidden();
+          document.querySelectorAll('.dropdown-menu .notif-item').forEach(item => {
+            const li = item.closest('li') || item;
+            const id = item.getAttribute('data-id') || item.querySelector('[data-id]')?.getAttribute('data-id');
+            const isUnread = item.classList.contains('fw-semibold') || !!item.querySelector('.badge.bg-primary');
+            if (!id || isUnread) return;   // solo leídas
+            hidden.add(String(id));
+            hideItemEl(li);
+          });
+          saveHidden(hidden);
+        });
+      }
+
+      if (hideAllBtn) {
+        hideAllBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const hidden = loadHidden();
+          document.querySelectorAll('.dropdown-menu .notif-item').forEach(item => {
+            const li = item.closest('li') || item;
+            const id = item.getAttribute('data-id') || item.querySelector('[data-id]')?.getAttribute('data-id');
+            if (!id) return;
+            hidden.add(String(id));
+            hideItemEl(li);
+          });
+          saveHidden(hidden);
+        });
+      }
+
+      if (restoreBtn) {
+        restoreBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          localStorage.removeItem(STORAGE_KEY);
+          document.querySelectorAll('.dropdown-menu .notif-item').forEach(item => {
+            showItemEl(item.closest('li') || item);
+          });
+        });
+      }
+
+      // Botón “×” en cada item
+      document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.js-notif-dismiss');
+        if (!btn) return;
+
+        e.preventDefault();
+        const id = btn.getAttribute('data-id')
+          || btn.closest('.notif-item')?.getAttribute('data-id');
+        const li = btn.closest('li') || btn.closest('.notif-item');
+
+        // Si la que ocultas está NO leída, intenta marcarla leída primero para mantener el badge coherente.
+        const item = btn.closest('.notif-item');
+        const isUnread = item && (item.classList.contains('fw-semibold') || item.querySelector('.badge.bg-primary'));
+        const markBtn = item && item.querySelector('.js-notif-mark-one');
+
+        if (isUnread && markBtn) {
+          // Reutiliza el flujo de “marcar una”: dispara el click al ✓
+          markBtn.click();
+          // (El badge se actualizará con tu lógica actual)
+          // Oculta visualmente ya:
+          hideOneById(id, li);
+        } else {
+          hideOneById(id, li);
+        }
+      });
+
+      // Ejecuta cuando el menú exista en DOM (por si se renderiza luego)
+      document.addEventListener('DOMContentLoaded', applyHiddenToDOM);
+      // Y también al abrir el dropdown (por si cambió el contenido)
+      document.getElementById('notifDropdown')?.addEventListener('click', () => {
+        // pequeño delay para asegurar que el menú esté en el DOM
+        setTimeout(applyHiddenToDOM, 0);
+      });
+    })();
+  </script>
+
+
+
+
+
+
+
+
+
+  <!-- -->
+  <!-- -->
+  <!-- -->
+  <!-- -->
 
 
 
@@ -4397,7 +4846,7 @@
     })();
   </script>
 
-
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </body>
 
 </html>

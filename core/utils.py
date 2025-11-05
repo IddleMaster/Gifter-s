@@ -37,3 +37,4 @@ def _push_inbox(user_ids, payload: dict):
     except Exception:
         # No romper el flujo si no hay WS configurado
         pass
+

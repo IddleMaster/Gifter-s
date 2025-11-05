@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Cuenta no verificada | Gifter’s{% endblock %}
+
+{% block content %}
+<section class="section" style="padding:60px 0;">
+    <div class="container" style="max-width:720px;">
+        <div class="card shadow-sm border-0" style="border-radius:16px;">
+            <div class="card-body text-center p-5">
+                <i class="bi bi-envelope-x" style="font-size:3rem;color:#f43f5e;"></i>
+                <h2 class="mt-3 mb-2">Tu cuenta aún no está verificada</h2>
+                <p class="text-muted mb-4">
+                    Debes verificar tu correo electrónico antes de poder iniciar sesión en Gifter’s.
+                </p>
+
+                <a href="{% url 'resend_verification' %}" class="btn btn-primary">
+                    Reenviar correo de verificación
+                </a>
+                <a href="{% url 'account_login' %}" class="btn btn-outline-primary ms-2">
+                    Volver al inicio de sesión
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- SweetAlert2 -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    Swal.fire({
+        icon: 'warning',
+        title: 'Cuenta no verificada',
+        html: 'Antes de iniciar sesión, verifica tu correo electrónico.<br>Te enviaremos un nuevo enlace si lo necesitas.',
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: '#6c63ff',
+        backdrop: true
+    });
+</script>
+{% endblock %}

@@ -57,3 +57,28 @@
   </div>
 </section>
 {% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+{% if messages %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    {% for message in messages %}
+    Swal.fire({
+      toast: true,
+      position: 'top-end',
+      icon:
+        "{{ message.tags|default:'info' }}" === 'error' ? 'error' :
+          "{{ message.tags|default:'info' }}" === 'warning' ? 'warning' :
+            "{{ message.tags|default:'info' }}" === 'success' ? 'success' : 'info',
+      title: `{{ message|escapejs }}`,
+      showConfirmButton: false,
+      timer: 3500,
+      timerProgressBar: true
+    });
+    {% endfor %}
+  });
+</script>
+{% endif %}
+{% endblock %}

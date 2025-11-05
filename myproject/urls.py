@@ -84,7 +84,8 @@ urlpatterns = [
     # Feed
     path('feed/', views.feed_view, name='feed'),
     path('post/<int:post_id>/like/', views.toggle_like_post_view, name='toggle_like'),
-    path('api/post/<int:post_id>/comments/', views.get_comments_view, name='get_comments'),
+    path('api/post/<int:post_id>/comments/', views.api_post_comments, name='get_comments'),
+
     path('post/crear/', views.post_crear, name='post_crear'),
     path('post/<int:pk>/eliminar/', views.post_eliminar, name='post_eliminar'), 
     path('post/<int:post_id>/report/', views.report_post, name='report_post'),
@@ -140,6 +141,8 @@ urlpatterns = [
     path('api/amistad/solicitudes/<int:pk>/cancelar/', views.CancelarSolicitud.as_view(), name='api_amistad_cancelar'),
     path('api/amistad/amigos/', views.AmigosList.as_view(), name='api_amigos_list'),
     path('api/amistad/amigos/<int:pk>/', views.EliminarAmigo.as_view(), name='api_amigos_eliminar'),
+    path('api/categorias/', views.CategoriaListAPIView.as_view(), name='api_categoria_list'),
+    path('api/marcas/', views.MarcaListAPIView.as_view(), name='api_marca_list'),
     path("amistad/eliminar/<str:username>/", views.amistad_eliminar, name="amistad_eliminar"),
     path("amistad/rechazar/<str:username>/", views.amistad_rechazar, name="amistad_rechazar"),
 
@@ -269,8 +272,10 @@ urlpatterns = [
              template_name='registration/password_reset_complete.html' # Usa nuestra plantilla de "completado"
          ),
          name='password_reset_complete'),
-    # --- Fin URLs para Restablecimiento ---
 
+
+    # --- Fin URLs para Restablecimiento ---
+    path("accounts/resend-verification/", views.resend_verification_view, name="resend_verification"),
 ###apartadiño de evento (amigo secret)
     path('chat/<int:conversacion_id>/events/', views.events_list_create, name='events_list_create'),           # GET lista, POST crear
     path('chat/events/<int:evento_id>/', views.event_detail, name='event_detail'),                             # GET detalle (admin)             # POST sortear

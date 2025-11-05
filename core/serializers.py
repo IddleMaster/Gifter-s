@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from core.models import User, SolicitudAmistad, Conversacion, Mensaje, ParticipanteConversacion, Producto, Notificacion, NotificationDevice, PreferenciasUsuario
+from core.models import *
 
 
 
@@ -177,7 +177,23 @@ class ProductoSerializer(serializers.ModelSerializer):
             'activo' 
         )
         read_only_fields = ('categoria_nombre', 'marca_nombre','id_producto') 
-        
+
+
+class CategoriaSerializer(serializers.ModelSerializer):
+    """
+    Serializer simple para listar categorías.
+    """
+    class Meta:
+        model = Categoria
+        fields = ['id_categoria', 'nombre_categoria'] 
+
+class MarcaSerializer(serializers.ModelSerializer):
+    """
+    Serializer simple para listar marcas.
+    """
+    class Meta:
+        model = Marca
+        fields = ['id_marca', 'nombre_marca'] 
 # ---- Usuarios (Admin) ----
 class AdminUserSerializer(serializers.ModelSerializer):
     class Meta:

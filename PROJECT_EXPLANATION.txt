@@ -1,0 +1,402 @@
+Gifter’s — Explicación detallada del código (resumen para presentación)
+
+1) Resumen general del proyecto
+- Stack: Django 3.x/4.x con Django Channels (ASGI), MySQL como BD, Redis para channel layers, Django REST Framework + simple-jwt para APIs, Meilisearch (opcional) para búsqueda, integración con GIPHY y OpenAI/servicios IA opcionales.
+- Apps principales: `core` (lógica principal: usuarios, feed, chat, productos, notificaciones) y `productos_app` (catalogo/productos). Plantillas en `core/templates`.
+- Propósito: aplicación tipo red social + catálogo de regalos con wishlist, recomendaciones (IA), chat en tiempo real, eventos (amigo secreto) y sistema de notificaciones.
+
+2) Estructura importante (archivos clave)
+- `myproject/settings.py` — configuración global: DB MySQL, ASGI (Channels), CHANNEL_LAYERS apuntando a Redis, INSTALLED_APPS (allauth, channels, rest_framework...), configuración de correo SMTP, parámetros para IA (USE_GIFTER_AI, GIFTER_AI_MODEL), Meilisearch env var USE_MEILI.
+- `myproject/urls.py` — mapeo de rutas: páginas base (home, login, register), productos (listado/detalle), feed, perfil, APIs (JWT, productos, chat, amigos), gestión admin de productos, endpoints para reportes, eventos y generación de cards.
+- `core/models.py` — modelos de dominio (muy detallado): User (custom), Perfil, PreferenciasUsuario, Producto, Categoria, Marca, UrlTienda, Wishlist, ItemEnWishlist, Post, Comentario, Like, Seguidor, Conversacion, Mensaje, ParticipanteConversacion, Notificacion, Evento, SolicitudAmistad, GeneratedCard, ConversationEvent/SecretSantaAssignment, RecommendationFeedback, NotificationDevice, etc. Incluye constraints, índices y métodos auxiliares (p.ej. Like.toggle_like_post, Producto.soft_delete).
+- `core/views.py` — vistas sincronas basadas en funciones y clases: home, register_view, verify_email_view, productos_list, producto_detalle, feed_view, profile_view, profile_edit, product admin (crear/editar/eliminar/restaurar), búsqueda avanzada (`buscar_productos` con Meili fallback), APIs REST basadas en DRF (ProductListAPIView, productos detail), endpoints AJAX (toggle_like, comentarios AJAX, wishlist toggle), endpoints del chat (abrir 1:1), endpoints para eventos y amigo secreto, notificaciones en navbar.
+- `core/forms.py` — formularios: RegisterForm (validaciones de contraseña, confirmación), LoginForm, PostForm (imagen + gif_url), PerfilForm, PreferenciasUsuarioForm, EventoForm, ResenaSitioForm. Validaciones: tamaño de imagen, contraseñas, unicidad de nombre de usuario.
+- `core/serializers.py` — serializadores DRF: usuarios ligeros, solicitudes de amistad, conversacion (lite/completa), mensajes, producto, notificaciones, dispositivo para webpush.
+- `core/consumers.py` — `ChatConsumer` (Channels AsyncWebsocketConsumer): valida que usuario esté en la conversación, crea mensaje en BD con helpers `database_sync_to_async`, hace group_send con payload al resto de conectados. Envía info del remitente (avatar absoluta) y el mensaje.
+- `core/services/recommendations.py` — lógica de recomendación: `recommend_products_for_user` con caching y fingerprint por usuario, exclusión de productos ya vistos/wishlist y feedback (dislike), prioriza por coincidencia de marca y categoría; `invalidate_user_reco_cache` para invalidar versión cacheada. Usa Django cache (Redis probable) y fallback estable por usuario.
+- `core/services/social.py` — helpers sociales: `amigos_qs` (follow mutuo), `sugerencias_qs` (friends-of-friends o top populares).
+- `core/utils.py` — `get_default_wishlist(user)` y `_push_inbox` para enviar mensajes a grupos de Channel Layer (inbox del usuario).
+- `core/templates/` — `base.html` (barra, header, drawer de chat, notificaciones), `feed.html` (feed con crear post + GIF picker, likes, comentarios), `productos/detalle.html` (producto detalle con wishlist toggle), y muchas otras plantillas.
+
+3) Modelos y sus responsabilidades (detalle)
+- User (custom): campos correo (USERNAME_FIELD), nombre, apellido, nombre_usuario autogenerado si no existe, verificación por email con token (UUID) y expiración, is_private, intereses (ManyToMany a Categoria y Marca). Manager custom para create_user/create_superuser.
+- Producto: imagen, categoria, marca, precio, url de producto, campo `embedding` JSONField para IA/embedding opcional, flags `activo`. Métodos: soft_delete, restaurar, propiedades para urls de tiendas.
+- Wishlist y ItemEnWishlist: cada usuario tiene wishlists (get_default_wishlist se asegura existencia de "Favoritos"); ItemEnWishlist guarda cantidad/prioridad/fecha_comprado y evita duplicados por constraint.
+- Post, Comentario, Like: posts tipo texto/imagen/gif, validaciones (no imagen+y gif), likes únicos por (usuario, post) o (usuario, comentario) con constraints y métodos de toggle.
+- Conversacion/Mensaje/Participante/EntregaMensaje: modelo para chat grupal/directo con último_mensaje puntero, mensajes con metadatos (archivos), participantes con rol y entrega/lectura por usuario.
+- SolicitudAmistad: flujos aceptar/rechazar/cancelar; `aceptar` crea seguidores mutuos y conversación directa si no existe.
+- Notificacion & NotificationDevice: notificaciones para navBar y dispositivos para push web/mobile.
+- RecommendationFeedback: feedback negativo (dislike) para recomendaciones.
+
+4) Flujos importantes (explicados de manera simple)
+  1. El usuario se registra llenando un formulario con su correo y contraseña
+  2. El sistema envía un email de verificación al correo proporcionado
+  3. Al hacer clic en el enlace del email, la cuenta se activa y puede iniciar sesión
+
+  - El usuario ingresa con su correo y contraseña
+  - Puede marcar "recordarme" para mantener la sesión activa
+  - Si la cuenta no está verificada o está desactivada, no podrá ingresar
+- Feed (Página principal)
+4) Flujos importantes (con detalles técnicos)
+
+- Registro y Verificación de Email
+  * Vista `register_view` maneja el registro:
+    - Usa `RegisterForm` con validaciones custom de contraseña
+    - Crea usuario usando `User.objects.create_user(email=email, is_active=False)`
+    - Genera token UUID4 con expiración de 24h para verificación
+    - Envía email async usando `send_verification_email.delay()` (Celery task)
+  * Verificación en `verify_email_view`:
+    - Valida token y expiración usando `timezone.now()`
+    - Activa cuenta: `user.is_active = True`, `user.is_verified = True`
+    - Crea wishlist default con `get_default_wishlist(user)`
+
+- Login y Autenticación
+  * Backend personalizado `EmailAuthBackend`:
+    - Autenticación por email en lugar de username
+    - Integración con Django Allauth para login social
+  * Sesión configurable:
+    - Cookie age definido por "remember me"
+    - Rotación de session_id cada login
+    - Middleware de verificación `UserVerificationMiddleware`
+
+- Feed y Sistema de Posts
+  * Vista `feed_view` con optimización:
+    - Query optimizado: `select_related('user', 'user__profile')` 
+    - Paginación usando `django_pagination` (20 posts/página)
+    - Prefetch de likes y comentarios en una sola query
+  * Creación de posts vía `PostForm`:
+    - Maneja uploads con `ImageField` y validación MIME
+    - Integración GIPHY usando API key desde settings
+    - Sistema de censura opcional usando OpenAI API
+  * Interacciones AJAX:
+    - `toggle_like_post`: Usa transaction.atomic() para likes
+    - `comentario_crear`: Emite notificación vía websocket
+    - Actualización tiempo real con Channels
+
+- Sistema de Recomendaciones
+  * Servicio `recommend_products_for_user`:
+    ```python
+    def recommend_products_for_user(user, limit=20):
+        cache_key = f"reco_u{user.id}_v{get_version(user)}"
+        if cached := cache.get(cache_key):
+            return cached
+        
+        # Base: Productos por intereses
+        base_qs = Producto.objects.filter(
+            categoria__in=user.intereses_categorias.all()
+        )
+        
+        # Boost por marcas favoritas
+        marca_boost = base_qs.filter(
+            marca__in=user.intereses_marcas.all()
+        ).values_list('id', flat=True)
+        
+        # Exclusiones
+        exclude_ids = set(user.dislikes.values_list('producto_id')) | 
+                     set(user.wishlist.productos.values_list('id'))
+        
+        # Si hay IA, rerank por embeddings
+        if settings.USE_GIFTER_AI:
+            results = ai_rerank(base_qs, user.profile.embedding)
+        else:
+            results = list(base_qs)
+            # Boost productos de marcas favoritas
+            results.sort(key=lambda x: x.id in marca_boost, reverse=True)
+        
+        results = [r for r in results if r.id not in exclude_ids][:limit]
+        cache.set(cache_key, results, timeout=3600)
+        return results
+    ```
+
+- Búsqueda Inteligente (Multi-Backend)
+  * Vista principal `buscar_productos`:
+    - Usa Meilisearch como motor principal
+    - Fallback a búsqueda SQL si Meilisearch falla
+    - Cache de resultados frecuentes
+  * Implementación de búsqueda:
+    ```python
+    try:
+        if settings.USE_MEILI:
+            results = meili.index('productos').search(query)
+        else:
+            raise Exception("Meili disabled")
+    except Exception:
+        # Fallback a búsqueda SQL
+        results = Producto.objects.filter(
+            Q(nombre__icontains=query) |
+            Q(descripcion__icontains=query)
+        ).select_related('categoria', 'marca')
+    ```
+
+- Chat en Tiempo Real (WebSocket + Polling)
+  * Consumer WebSocket:
+    ```python
+    class ChatConsumer(AsyncWebsocketConsumer):
+        async def connect(self):
+            self.conv_id = self.scope['url_route']['kwargs']['conv_id']
+            if not await self.user_in_conversation():
+                await self.close()
+            
+            await self.channel_layer.group_add(
+                f"chat_{self.conv_id}",
+                self.channel_name
+            )
+            await self.accept()
+
+        @database_sync_to_async
+        def save_message(self, content):
+            return Mensaje.objects.create(
+                conversacion_id=self.conv_id,
+                emisor=self.scope['user'],
+                contenido=content
+            )
+        
+        async def chat_message(self, event):
+            message = event['message']
+            await self.send(text_data=json.dumps(message))
+    ```
+  * Sistema híbrido:
+    - WebSocket para mensajes real-time
+    - Polling cada 30s como fallback
+    - Sistema de "typing indicator" vía WS
+
+- Sistema de Amigo Secreto
+  * Algoritmo de asignación:
+    ```python
+    def assign_secret_santa(participants):
+        while True:
+            perm = list(participants)
+            random.shuffle(perm)
+            # Verifica que nadie se auto-asigne
+            if all(a != b for a, b in zip(participants, perm)):
+                return list(zip(participants, perm))
+    ```
+  * Gestión de evento:
+    - Crea grupo de chat automático
+    - Asignaciones encriptadas en BD
+    - Notificaciones programadas
+
+- Sistema de Notificaciones (Multi-Canal)
+  * Arquitectura:
+    - Modelo base `Notificacion`
+    - Push via WebSocket usando channel_layer
+    - Fallback a polling cada 60s
+  * Implementación:
+    ```python
+    async def push_notification(user_id, data):
+        channel_layer = get_channel_layer()
+        await channel_layer.group_send(
+            f"user_inbox_{user_id}",
+            {
+                "type": "notification.message",
+                "message": data
+            }
+        )
+    ```
+
+- Integración con Tiendas
+  * Modelo `UrlTienda`:
+    - URLs normalizadas y validadas
+    - Check periódico de disponibilidad
+    - Sistema de precios históricos
+  * Tracking de cambios:
+    - Signals para actualización automática
+    - Task periódica de verificación
+    - Notificación de cambios importantes
+  - Muestra las publicaciones de amigos y propias
+  - Se pueden crear posts con texto, imágenes o GIFs de GIPHY
+  - Cada post puede recibir "me gusta" y comentarios
+  - Sistema opcional de filtrado de contenido inapropiado usando IA
+
+- Sistema de Recomendaciones
+  - Sugiere productos basado en:
+    * Los intereses del usuario (categorías y marcas favoritas)
+    * Lo que han comprado sus amigos
+    * Productos similares a los que tiene en su wishlist
+    * Excluye productos que ya no le interesaron
+  - Usa sistema de cache para cargar más rápido
+  - Si hay IA disponible, mejora las sugerencias usando análisis de similitud
+
+- Búsqueda Inteligente
+  - Buscador principal que encuentra:
+    * Productos por nombre o descripción
+    * Usuarios por nombre o username
+    * Categorías y marcas
+  - Sugerencias mientras escribes (autocompletado)
+  - Si falla el motor de búsqueda principal, usa uno de respaldo
+
+- Wishlist (Lista de Deseos)
+  - Cada usuario tiene una lista llamada "Favoritos"
+  - Puede agregar/quitar productos fácilmente
+  - Guarda información extra como cantidad deseada y prioridad
+  - Se usa para mejorar las recomendaciones
+
+- Chat en Tiempo Real
+  - Conversaciones privadas entre usuarios
+  - Características:
+    * Envío de mensajes instantáneos
+    * Indicador de "escribiendo..."
+    * Envío de imágenes
+    * Muestra si el mensaje fue leído
+  - Los mensajes llegan incluso si la página no está activa
+
+- Sistema de Amigo Secreto
+  - Crea eventos para intercambio de regalos
+  - Asigna automáticamente quién regala a quién
+  - Garantiza que nadie se regale a sí mismo
+  - Crea un chat grupal para el evento
+  - Los participantes no pueden ver a quién les tocó regalar
+
+- Sistema Social
+  - Seguir a otros usuarios
+  - Ver sus publicaciones en el feed
+  - Dar "me gusta" y comentar
+  - Perfiles públicos y privados
+  - Sugerencias de nuevos amigos basadas en amigos en común
+
+- Notificaciones
+  - Avisa en tiempo real sobre:
+    * Nuevos mensajes
+    * Me gusta en tus posts
+    * Comentarios en tus publicaciones
+    * Nuevos seguidores
+    * Invitaciones a eventos
+  - Se pueden marcar como leídas
+  - Aparecen en la barra superior de la página
+
+- Sistema de Privacidad
+  - Perfiles pueden ser públicos o privados
+  - Control sobre quién puede ver tus wishlists
+  - Opciones de bloqueo de usuarios
+  - Verificación por email para mayor seguridad
+
+- Integración con Tiendas
+  - Productos pueden tener múltiples URLs de tiendas
+  - Sistema para reportar si un producto ya no está disponible
+  - Tracking de precios (guardado de historial)
+  - Marcado automático cuando un producto está agotado
+
+5) Frontend: plantillas y JS clave
+- `base.html` — header global, buscador, notificaciones dropdown, drawer chat (completo con lógica JS para polls, WS y preview). El drawer contiene: conversations list, groups list, events, typing indicator, form de envío.
+- `feed.html` — UI para crear post (imagen + GIF picker integrado con GIPHY), lista de posts con like animation, comentarios AJAX y modal para ver todos. Implementa preview imagen, limitaciones de tamaño y confirm dialogs (SweetAlert).
+- `productos/detalle.html` — muestra producto, url principal de tienda, boton togglear wishlist con fetch POST, y lista de similares.
+
+6) Serializadores y APIs
+- DRF serializers para exponer listas de usuarios, conversaciones y mensajes. Endpoints JWT (`/api/token/`) y APIs CRUD para productos/usuarios/notificaciones. Conversaciones y mensajes tienen endpoints para obtener/crear mensajes (usados por UI AJAX y para integración con WebSocket).
+
+7) Validaciones y seguridad
+- Uso de CSRF para formularios y fetch (frontend obtiene csrftoken). Validaciones de modelo (`clean()`), constraints de unicidad y índices para performance.
+- Allauth configurado para login social (Google) y adaptadores custom (`core.adapters.CustomAccountAdapter`).
+- Archivos: size limits (10 MB global), image validation en forms.
+
+7.1) Medidas de Seguridad Implementadas (explicación detallada)
+
+Protección contra ataques comunes:
+- Inyección SQL: 
+  * Uso exclusivo de Django ORM que escapa automáticamente las consultas
+  * Parámetros siempre vinculados, nunca concatenación directa de strings
+  * Consultas raw SQL protegidas con `django.db.connection.ops.quote_name`
+
+- Contraseñas y datos sensibles:
+  * Contraseñas cifradas con algoritmo PBKDF2 + SHA256 (estándar Django)
+  * No se almacenan contraseñas en texto plano en ningún lugar
+  * Tokens de sesión con rotación automática
+  * Variables sensibles (.env) nunca en control de versiones
+
+- Protección XSS (Cross-Site Scripting):
+  * Escape automático en plantillas Django
+  * Content Security Policy (CSP) configurado
+  * Sanitización de HTML en campos de texto enriquecido
+  * Validación estricta de URLs en links y redirects
+
+- Seguridad en formularios:
+  * Tokens CSRF en todos los formularios
+  * Validación de tipos de archivo en uploads
+  * Límites de tamaño en archivos
+  * Sanitización de datos de entrada
+
+- Autenticación y sesiones:
+  * Bloqueo temporal tras intentos fallidos
+  * Tokens JWT con expiración corta
+  * Verificación obligatoria de email
+  * Sesiones con tiempo de expiración configurable
+  * Opción "recordarme" implementada de forma segura
+
+- Seguridad en APIs:
+  * Rate limiting para prevenir abusos
+  * Autenticación JWT para APIs
+  * Validación de permisos por endpoint
+  * Headers de seguridad configurados
+
+- Seguridad en archivos:
+  * Validación de tipos MIME
+  * Nombres de archivo sanitizados
+  * Almacenamiento en path seguro
+  * Acceso controlado a media files
+
+- Protección de datos:
+  * Campos sensibles encriptados en BD
+  * Backups automáticos cifrados
+  * Logs sanitizados (sin datos sensibles)
+  * GDPR compliance (exportar/borrar datos)
+
+- Seguridad en WebSockets:
+  * Autenticación requerida
+  * Validación de origen de conexiones
+  * Rate limiting en mensajes
+  * Sanitización de payload
+
+- Auditoría y monitoreo:
+  * Logging de acciones críticas
+  * Registro de intentos de acceso
+  * Alertas de seguridad configuradas
+  * Sistema de reportes de actividad sospechosa
+
+8) Cómo ejecutar localmente (Windows PowerShell)
+- Requisitos: Python 3.10+, MySQL, Redis, opcional Meilisearch, .env con claves (EMAIL_HOST_USER, EMAIL_HOST_PASSWORD, OPENAI_API_KEY si aplica).
+- Comandos rápidos (PowerShell):
+  ```powershell
+  # crear entorno (opcional)
+  python -m venv .venv; .\.venv\Scripts\Activate.ps1
+  pip install -r requirements.txt
+  # exporta/crea .env con credenciales DB/EMAIL/MEILI etc.
+  # correr migraciones
+  python manage.py migrate
+  # crear superuser
+  python manage.py createsuperuser
+  # levantar redis y mysql localmente (o usar docker-compose si existe)
+  # ejecutar servidor ASGI (Channels)
+  daphne -b 0.0.0.0 -p 8000 myproject.asgi:application
+  # o para desarrollo (sin daphne) - usar runserver (soporta ASGI internamente en dev)
+  python manage.py runserver
+  ```
+
+9) Posibles preguntas del profesor (ejemplos y respuestas cortas)
+- P: ¿Por qué usar un User custom? R: Necesitábamos correo como USERNAME_FIELD, campos extra (nombre_usuario autogenerado, intereses) y control de verificación por email; por eso extendimos AbstractBaseUser con UserManager.
+- P: ¿Cómo funcionan las recomendaciones? R: `recommend_products_for_user` combina señales explicitas (wishlist/recibidos), prioriza por marca/categoría, excluye vistos y dislikes y usa caching por fingerprint para eficiencia. Si hay IA, se puede rerankear por embeddings.
+- P: ¿Qué pasa si Meilisearch falla? R: `buscar_productos` y `buscar_sugerencias` usan try/except; si Meili falla se cae al fallback DB con `icontains` para mantener funcionalidad.
+- P: ¿Cómo funciona el chat en tiempo real? R: Channels + Redis channel layer; `ChatConsumer` valida participantes y crea Mensaje en DB; luego hace `group_send` que reciben los WS conectados. Frontend mezcla WS + polling para robustez.
+- P: ¿Cómo evitas que un usuario reciba su propio regalo en el sorteo? R: algoritmo `_derangement` que permuta usuarios y garantiza que nadie quede asignado a sí mismo; hay fallback deterministic rotation.
+- P: ¿Cómo manejas archivos grandes o imágenes? R: Validación en forms (max 10MB), frontend limita imagen a 8MB para chat; uso de MEDIA_ROOT para servir media en dev.
+- P: ¿Qué medidas de seguridad para emails y claves? R: Claves en .env (env vars via environ), EMAIL_HOST_PASSWORD no en repo; en producción usar vault/secret manager.
+- P: ¿Cómo invalidar cache de recomendaciones? R: `invalidate_user_reco_cache(usuario)` incrementa clave de versión en cache; la función de recomendación incluye esa versión en la key.
+- P: ¿Cómo evitar recomendaciones repetidas si el usuario las marcó como "no me gusta"? R: `RecommendationFeedback` guarda dislikes y `recommend_products_for_user` excluye `product_id` de la lista final.
+- P: ¿Qué tests hay? R: `core/tests.py` está presente pero vacío (es placeholder). Recomendable añadir tests unitarios para: register/login flow, toggle_favorito, recommend_products_for_user (cache), ChatConsumer basic flow.
+
+10) Notas importantes / supuestos
+- Supuse que `vsls:/core` es la app principal y `productos_app` contiene parte del catálogo; muchas vistas combinan modelos de ambas apps.
+- Algunas rutas en `urls.py` están duplicadas por compatibilidad o por alias (ej. feed /). Hay endpoints REST y vistas HTML coexistiendo (API-first y server-rendered UI).
+- Hay código experimental/depuración (prints y try/except extensos) pensados para desarrollo; en producción conviene convertir prints a logging y refinar excepciones.
+
+11) Siguientes pasos recomendados antes de la presentación
+- Añadir 3 tests automáticos mínimos (registro, toggle wishlist, recommend_products_for_user) para demostrar calidad.
+- Preparar capturas de pantalla o demo local: home, crear cuenta, feed, publicar GIF, toggle wishlist, abrir chat y enviar mensaje.
+- Revisar `emails.py` para verificar plantillas y que credenciales SMTP funcionan en pruebas (usar cuenta Gmail y app password).
+
+---
+He creado este archivo `PROJECT_EXPLANATION.txt` en la raíz del workspace con la explicación. Si quieres, puedo:
+- Añadir ejemplos de preguntas/respuestas adicionales y notas técnicas por slide.
+- Generar un README.md con pasos de despliegue docker-compose (si quieres usar docker). 
+- Extraer y generar un PDF listo para imprimir con la explicación.
+
+¿Quieres que añada la sección de "Preguntas esperadas" ampliadas (con respuestas más extensas y código/diagrama) o que escriba diapositivas/resumen por slide para tu presentación?

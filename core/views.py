@@ -16,7 +16,6 @@ from .services.recommendations import invalidate_user_reco_cache
 from urllib.parse import unquote
 from collections import deque
 from core.services.profanity_filter import censurar_con_openai
-# views.py
 from core.services.recommendations import recommend_products_for_user as ai_recommend_products
 from core.services.social import amigos_qs, sugerencias_qs
 from .emails import send_verification_email, send_welcome_email, send_report_email
@@ -144,6 +143,8 @@ from django.http import JsonResponse, HttpResponseBadRequest, HttpResponseForbid
 from django.shortcuts import get_object_or_404, redirect
 from .models import Notificacion
 from django.db.models import Q
+from .models import Notificacion
+
 
 import os, json, requests
 from urllib.parse import quote
@@ -161,6 +162,7 @@ from django.http import Http404
 import traceback
 
 from django.apps import apps 
+from allauth.account.models import EmailAddress
 
 
 
@@ -917,7 +919,7 @@ def producto_detalle(request, producto_id):
 
 
 # Protege la página para que solo usuarios logueados puedan verla
-##TODo LO QUE TENGA QUE VER CON EL FEED AQUI
+## TODO LO QUE TENGA QUE VER CON EL FEED AQUI
 @login_required
 def feed_view(request):
     """
@@ -935,7 +937,7 @@ def feed_view(request):
             # --- decidir tipo de post de forma segura ---
             gif_url = (request.POST.get('gif_url') or '').strip()
             has_image = bool(nuevo_post.imagen)
-            has_text  = bool((nuevo_post.contenido or '').strip())
+            has_text = bool((nuevo_post.contenido or '').strip())
 
             # prioridad: si hay GIF, es GIF (y anulamos imagen)
             if gif_url:
@@ -952,6 +954,7 @@ def feed_view(request):
                 # nada válido: vuelve con el form y un error simple
                 form.add_error(None, "Debes escribir algo, subir una imagen o elegir un GIF.")
                 # caerá al render de abajo con el error agregado
+
             if not form.errors:
                 nuevo_post.save()
                 return redirect('feed')
@@ -965,14 +968,14 @@ def feed_view(request):
         all_posts = (
             Post.objects.filter(id_usuario_id__in=amigos_ids)
             .select_related('id_usuario')
-            .prefetch_related('likes')
+            .prefetch_related('likes', 'comentarios__usuario__perfil')
             .order_by('-fecha_publicacion')
         )
     except Exception:
         all_posts = (
             Post.objects.all()
             .select_related('id_usuario')
-            .prefetch_related('likes') 
+            .prefetch_related('likes', 'comentarios__usuario__perfil')
             .order_by('-fecha_publicacion')
         )
 
@@ -986,25 +989,50 @@ def feed_view(request):
     for post in all_posts:
         post.user_has_liked = post.id_post in liked_post_ids
 
-    # 4) 🔥 NUEVO: leer toggle del filtro de malas palabras
+    # 4) Leer toggle del filtro de malas palabras (?filtro_malas_palabras=1)
     usar_filtro = request.GET.get("filtro_malas_palabras") == "1"
 
-    # 5) 🔥 NUEVO: generar versión censurada del contenido si aplica
+    # 5) Generar versión censurada del contenido si aplica (POSTS)
+    MAX_POSTS_AI = 15  # para no matar la API ni el tiempo de respuesta
+
     if usar_filtro:
-        for post in all_posts:
-            # asumimos que el texto está en post.contenido
-            post.contenido_censurado = censurar_con_openai(post.contenido or "")
+        for idx, post in enumerate(all_posts):
+            if idx < MAX_POSTS_AI:
+                # asumimos que el texto está en post.contenido
+                post.contenido_censurado = censurar_con_openai(post.contenido or "")
+            else:
+                # a partir del post 16, dejamos el contenido tal cual
+                post.contenido_censurado = post.contenido
     else:
         for post in all_posts:
             post.contenido_censurado = None
+
+    # 6) Generar versión censurada del contenido si aplica (COMENTARIOS DEL FEED)
+    MAX_COMMENTS_AI = 40  # límite global
+
+    if usar_filtro:
+        censurados = 0
+        for post in all_posts:
+            for c in post.comentarios.all():
+                if censurados < MAX_COMMENTS_AI:
+                    c.contenido_censurado = censurar_con_openai(c.contenido or "")
+                    censurados += 1
+                else:
+                    c.contenido_censurado = c.contenido
+    else:
+        for post in all_posts:
+            for c in post.comentarios.all():
+                c.contenido_censurado = None
 
     context = {
         'posts': all_posts,
         'form': form,
         'GIPHY_API_KEY': getattr(settings, 'GIPHY_API_KEY', ''),  # <-- para el buscador
-        'usar_filtro': usar_filtro,  
+        'usar_filtro': usar_filtro,
     }
     return render(request, 'feed.html', context)
+
+
 
 
 
@@ -2694,17 +2722,43 @@ def feed(request):
     posts = Post.objects.select_related('id_usuario__perfil').order_by('-fecha_publicacion')
     return render(request, 'feed/feed.html', {'posts': posts})
 
+logger = logging.getLogger(__name__)
+
+
 @login_required
 @require_POST
 def comentario_crear(request):
     post_id = request.POST.get('post_id')
     contenido = (request.POST.get('contenido') or '').strip()
+
     if not post_id or not contenido:
-        return redirect(_next_url(request))  # vuelve al feed, no al index
+        # vuelve al feed (respetando ?next si viene)
+        return redirect(_next_url(request))
 
     post = get_object_or_404(Post, pk=post_id)
-    c = Comentario.objects.create(id_post=post, usuario=request.user, contenido=contenido)
 
+    # Guardamos SIEMPRE el texto original
+    c = Comentario.objects.create(
+        id_post=post,
+        usuario=request.user,
+        contenido=contenido,
+    )
+
+    # Versión censurada
+    try:
+        contenido_censurado = censurar_con_openai(contenido)
+    except Exception as e:
+        print("[comentario_crear] Error al censurar:", e)
+        contenido_censurado = contenido
+
+    # Guardar también la versión censurada en la BD
+    try:
+        c.contenido_censurado = contenido_censurado
+        c.save(update_fields=["contenido_censurado"])
+    except Exception as e:
+        print("[comentario_crear] Error al guardar contenido_censurado:", e)
+
+    # Registro actividad
     try:
         RegistroActividad.objects.create(
             id_usuario=request.user,
@@ -2715,7 +2769,8 @@ def comentario_crear(request):
         )
     except Exception as e:
         print(f"Error al guardar actividad (nuevo comentario): {e}")
-        
+
+    # AJAX → devolvemos JSON
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
         foto = getattr(getattr(request.user, 'perfil', None), 'profile_picture', None)
         return JsonResponse({
@@ -2725,11 +2780,16 @@ def comentario_crear(request):
                 'id': c.id_comentario,
                 'nombre_usuario': request.user.nombre_usuario,
                 'autor_foto': (foto.url if foto else None),
-                'contenido': c.contenido,
+                'contenido': c.contenido,                     # original
+                'contenido_censurado': contenido_censurado,   # filtrado
                 'creado_en': c.fecha_comentario.strftime('%d %b, %Y %H:%M'),
             }
         })
+
+    # Petición normal → redirect (con next)
     return redirect(_next_url(request))
+
+
 
 @login_required
 @require_POST
@@ -3297,17 +3357,54 @@ class UserListAPIView(generics.ListAPIView):
     permission_classes = [IsAdminUser] # Solo admins pueden listar usuarios
     # Puedes añadir paginación si tienes muchos usuarios, igual que con productos
 
-class UserDetailAPIView(generics.RetrieveUpdateAPIView): # Usamos RetrieveUpdate, no Destroy
+class UserDetailAPIView(generics.RetrieveUpdateDestroyAPIView): # <-- CAMBIO AQUÍ
     """
-    Vista de API para ver y actualizar (parcial) un usuario específico.
+    Vista de API para ver, actualizar (parcial) o ELIMINAR un usuario específico.
     Accesible en /api/users/<int:pk>/
     Donde <int:pk> es el id del usuario.
     """
     queryset = User.objects.all()
     serializer_class = AdminUserSerializer
-    permission_classes = [IsAdminUser] # Solo admins pueden ver/editar usuarios
-    lookup_field = 'pk' # El ID vendrá como 'pk' en la URL
+    permission_classes = [IsAdminUser] # Solo admins pueden ver/editar/eliminar
+    lookup_field = 'pk'
+    
+    def destroy(self, request, *args, **kwargs):
+        """
+        Anula el método de borrado para añadir una capa de seguridad.
+        """
+        instance = self.get_object() # Este es el usuario que se intenta borrar
 
+        # --- REGLA DE NEGOCIO: Prohibir borrado de admins ---
+        # Verificamos 'is_staff' (admin de Django) O 'es_admin' (tu campo)
+        if instance.is_staff or getattr(instance, 'es_admin', False):
+            logging.warning(f"El admin '{request.user}' intentó eliminar al admin '{instance}'. ¡Acción bloqueada!")
+            # 403 Forbidden es el código correcto para una acción no permitida
+            return Response(
+                {"detail": "No se puede eliminar a un usuario administrador. "
+                           "Para eliminarlo, primero quítele los permisos de administrador (is_staff y es_admin)."},
+                status=status.HTTP_403_FORBIDDEN 
+            )
+        
+        # Si la verificación pasa (no es admin), proceder con el borrado normal
+        logging.info(f"El admin '{request.user}' está borrando al usuario '{instance}'.")
+        return super().destroy(request, *args, **kwargs)
+
+class CategoriaListAPIView(generics.ListCreateAPIView): 
+    """
+    Vista de API para listar Y CREAR todas las Categorías.
+    """
+    queryset = Categoria.objects.all().order_by('nombre_categoria')
+    serializer_class = CategoriaSerializer
+    permission_classes = [IsAdminUser]
+
+class MarcaListAPIView(generics.ListCreateAPIView): 
+    """
+    Vista de API para listar Y CREAR todas las Marcas.
+    """
+    queryset = Marca.objects.all().order_by('nombre_marca')
+    serializer_class = MarcaSerializer
+    permission_classes = [IsAdminUser]
+    
 @api_view(['GET'])
 @permission_classes([IsAdminUser]) # ¡MUY IMPORTANTE!
 def get_web_app_logs(request):
@@ -4660,6 +4757,7 @@ def notificacion_click(request, notificacion_id):
     return redirect(destino)
 
 
+
 #############################################
 #######################################
 
@@ -5573,3 +5671,107 @@ def download_popular_search_report_pdf(request):
         # Loggear el error completo en tu log de servidor
         logging.error(f"Error al generar PDF de búsquedas: {e}", exc_info=True)
         return Response({"error": f"No se pudo generar el reporte PDF: {e}"}, status=500)
+    
+
+@login_required
+def api_post_comments(request, post_id):
+    """
+    Devuelve en JSON todos los comentarios de un post.
+    Si viene ?filtro_malas_palabras=1 en la URL, censura el texto.
+    Lo usa el modal de comentarios en el feed.
+    """
+    post = get_object_or_404(Post, id_post=post_id)
+    comentarios = (
+        post.comentarios
+        .select_related('usuario__perfil')
+        .order_by('fecha_comentario')
+    )
+
+    usar_filtro = request.GET.get("filtro_malas_palabras") == "1"
+    MAX_COMMENTS_AI = 40  # límite global para no matar la API
+
+    comentarios_list = list(comentarios)
+
+    if usar_filtro:
+        for idx, c in enumerate(comentarios_list):
+            if idx < MAX_COMMENTS_AI:
+                visible = censurar_con_openai(c.contenido or "")
+            else:
+                visible = c.contenido
+            c._contenido_visible = visible
+    else:
+        for c in comentarios_list:
+            c._contenido_visible = c.contenido
+
+    data = {
+        "comentarios": [
+            {
+                "id": c.id_comentario,
+                "autor": c.usuario.nombre_usuario,
+                "contenido": c._contenido_visible,  # 👈 ya viene censurado si corresponde
+                "fecha": c.fecha_comentario.strftime("%d %b, %Y %H:%M"),
+                "autor_foto": (
+                    c.usuario.perfil.profile_picture.url
+                    if hasattr(c.usuario, "perfil") and c.usuario.perfil.profile_picture
+                    else None
+                ),
+                "es_propietario": (c.usuario_id == request.user.id),
+            }
+            for c in comentarios_list
+        ]
+    }
+    return JsonResponse(data)
+
+
+def _model_has_field(model, name: str) -> bool:
+    return any(f.name == name for f in model._meta.get_fields())
+
+@require_http_methods(["GET", "POST"])
+def resend_verification_view(request):
+    if request.method == "POST":
+        email_input = (request.POST.get("email") or "").strip().lower()
+        if not email_input:
+            messages.error(request, "Ingresa tu correo.")
+            return redirect("resend_verification")
+
+        User = get_user_model()
+        user = User.objects.filter(correo__iexact=email_input).first()  # tu campo es 'correo'
+
+        # Mensaje neutro SIEMPRE (no revelamos si existe)
+        success_msg = "Si el correo existe, te enviamos un nuevo enlace de verificación."
+
+        if not user:
+            print("[RESEND] No existe usuario con ese correo (mensaje neutro mostrado).")
+            messages.success(request, success_msg)
+            return redirect("verification_sent")  # misma UX que el registro
+
+        # Si YA está verificado, lo mandamos a login
+        if getattr(user, "is_verified", False):
+            print(f"[RESEND] Usuario {user.id} ya verificado.")
+            messages.info(request, "Tu correo ya está verificado. Inicia sesión.")
+            return redirect("account_login")
+
+        # (Re)generar token SIEMPRE para garantizar link fresco
+        try:
+            user.verification_token = uuid.uuid4()
+            user.token_created_at = timezone.now()
+            user.save(update_fields=["verification_token", "token_created_at"])
+            print(f"[RESEND] Token regenerado para user_id={user.id}")
+        except Exception as e:
+            # Si tu modelo tiene otros nombres de campos, ajusta arriba
+            print(f"[RESEND][ERROR] No se pudo regenerar token para user_id={getattr(user,'id',None)} -> {e}")
+
+        try:
+            # Reusar exactamente el MISMO helper que usas al registrarse
+            # (el que renderiza templates y arma verification_url)
+            send_verification_email(user, request)
+            print(f"[RESEND] Email de verificación reenviado a {email_input}")
+        except Exception as e:
+            # Logueamos pero devolvemos mensaje neutro
+            print(f"[RESEND][ERROR] Falló send_verification_email -> {e}")
+
+        messages.success(request, success_msg)
+        return redirect("verification_sent")
+
+    # GET
+    return render(request, "account/resend_verification.html")

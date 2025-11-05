@@ -10,7 +10,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QKeySequence, QShortcut
 from api_client import ApiClient
-
+from local_auth_cache import LocalAuthCache
+import traceback
 
 # --- Define la ruta de los logs ---
 LOG_DIR = "logs"
@@ -44,11 +45,12 @@ logging.info("Aplicación de Administración iniciada.")
 API_BASE_URL = "http://127.0.0.1:8000/api"
 
 class LoginDialog(QDialog):
-    # ... (Esta clase no tiene cambios) ...
-    def __init__(self, api_client, parent=None):
-        super().__init__(parent)
+    def __init__(self, api_client, local_auth_cache, parent=None): 
+        super().__init__(parent) 
         self.setWindowTitle("Login - Gifter's Admin")
         self.api_client = api_client
+        self.local_auth_cache = local_auth_cache 
+        self.offline_mode = False 
         
         self.email_input = QLineEdit()
         self.password_input = QLineEdit()
@@ -75,40 +77,90 @@ class LoginDialog(QDialog):
         success, message = self.api_client.login(email, password)
         
         if success:
+            self.offline_mode = False # Login online exitoso
             self.accept()
+            return
+        
+        # 2. Si el login online falla, revisamos si fue por conexión
+        is_connection_error = "No se pudo conectar" in message or "Error de conexión" in message
+        
+        if is_connection_error:
+            logging.warning("Login online falló. Intentando validación de caché local...")
+            
+            # 3. Intento de Login Offline
+            if self.local_auth_cache.check_offline_password(email, password):
+                logging.info(f"Login offline exitoso para {email}.")
+                QMessageBox.information(self, "Modo Offline",
+                    "No se pudo conectar con el servidor. Se ha iniciado sesión en modo offline.\n"
+                    "La información mostrada (excepto los logs) podría no estar actualizada.")
+                self.offline_mode = True # Establece la bandera de modo offline
+                self.accept() # Acepta el login
+            else:
+                # La conexión falló Y la contraseña offline no coincide
+                logging.warning(f"Password offline no coincide o no existe para {email}.")
+                QMessageBox.critical(self, "Login Fallido", 
+                    "No se pudo conectar con el servidor. La contraseña local no coincide o no existe.\n"
+                    "Por favor, conéctate a internet para tu primer inicio de sesión.")
         else:
+            # El login online falló por otra razón (ej. 401 Contraseña Incorrecta)
+            logging.warning(f"Login online fallido (no por conexión): {message}")
             QMessageBox.critical(self, "Login Fallido", message)
 
-
 class CreateProductDialog(QDialog):
-    # ... (Esta clase no tiene cambios) ...
-    def __init__(self, parent=None):
+    """
+    Diálogo para ingresar datos de un nuevo producto.
+    Ahora usa ComboBoxes para categoría y marca.
+    """
+    # --- 👇 MODIFICADO: Acepta las listas de categorías y marcas 👇 ---
+    def __init__(self, categories_list, brands_list, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Crear Nuevo Producto")
 
+        # --- Widgets de Entrada ---
         self.name_input = QLineEdit()
         self.desc_input = QLineEdit()
-        self.price_input = QDoubleSpinBox()
-        self.price_input.setRange(0.0, 99999999.99)
-        self.price_input.setDecimals(2)
-        self.price_input.setPrefix("$ ")
-        self.category_id_input = QSpinBox()
-        self.category_id_input.setRange(1, 99999)
-        self.brand_id_input = QSpinBox()
-        self.brand_id_input.setRange(1, 99999)
+        
+        # --- 👇 MODIFICADO: Reemplaza QSpinBox por QComboBox 👇 ---
+        self.category_input = QComboBox()
+        self.brand_input = QComboBox()
 
+        # Llenar el ComboBox de Categorías
+        if not categories_list:
+            self.category_input.addItem("Error: No se cargaron categorías", None)
+            self.category_input.setEnabled(False)
+        else:
+            self.category_input.addItem("--- Selecciona una Categoría ---", None)
+            for cat in categories_list:
+                
+                self.category_input.addItem(cat['nombre_categoria'], cat['id_categoria'])
+
+        # Llenar el ComboBox de Marcas
+        if not brands_list:
+            self.brand_input.addItem("Error: No se cargaron marcas", None)
+            self.brand_input.setEnabled(False)
+        else:
+            self.brand_input.addItem("--- Selecciona una Marca ---", None)
+            for brand in brands_list:
+                
+                self.brand_input.addItem(brand['nombre_marca'], brand['id_marca'])
+        # --- -------------------------------------------------- ---
+
+        # --- Botones ---
         self.save_button = QPushButton("Guardar Producto")
         self.cancel_button = QPushButton("Cancelar")
-        self.save_button.clicked.connect(self.accept)
-        self.cancel_button.clicked.connect(self.reject)
+        self.save_button.clicked.connect(self.accept) 
+        self.cancel_button.clicked.connect(self.reject) 
 
+        # --- Layout ---
         layout = QVBoxLayout(self)
         form_layout = QFormLayout()
         form_layout.addRow("Nombre:", self.name_input)
         form_layout.addRow("Descripción:", self.desc_input)
-        form_layout.addRow("Precio:", self.price_input)
-        form_layout.addRow("ID Categoría:", self.category_id_input)
-        form_layout.addRow("ID Marca:", self.brand_id_input)
+        # --- 👇 MODIFICADO: Muestra los ComboBoxes 👇 ---
+        form_layout.addRow("Categoría:", self.category_input)
+        form_layout.addRow("Marca:", self.brand_input)
+        # --- --------------------------------------- ---
+
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         button_layout.addWidget(self.cancel_button)
@@ -117,21 +169,87 @@ class CreateProductDialog(QDialog):
         layout.addLayout(button_layout)
 
     def get_data(self):
+        """Devuelve los datos ingresados en un diccionario."""
+        # --- 👇 MODIFICADO: Obtiene el ID (data) del ComboBox 👇 ---
         return {
             'nombre_producto': self.name_input.text().strip(),
             'descripcion': self.desc_input.text().strip(),
-            'precio': self.price_input.value(),
-            'id_categoria': self.category_id_input.value(),
-            'id_marca': self.brand_id_input.value()
+            'precio': 0, # Sigue enviando 0 por defecto
+            'id_categoria': self.category_input.currentData(), # Obtiene el ID guardado
+            'id_marca': self.brand_input.currentData() # Obtiene el ID guardado
         }
 
+class CreateCategoryDialog(QDialog):
+    """Diálogo simple para crear una nueva Categoría."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Crear Nueva Categoría")
+        
+        self.name_input = QLineEdit()
+        self.save_button = QPushButton("Guardar")
+        self.cancel_button = QPushButton("Cancelar")
+        
+        self.save_button.clicked.connect(self.accept)
+        self.cancel_button.clicked.connect(self.reject)
+        
+        layout = QVBoxLayout(self)
+        form_layout = QFormLayout()
+        form_layout.addRow("Nombre Categoría:", self.name_input)
+        
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        button_layout.addWidget(self.cancel_button)
+        button_layout.addWidget(self.save_button)
+        
+        layout.addLayout(form_layout)
+        layout.addLayout(button_layout)
+        
+    def get_data(self):
+        """Devuelve los datos listos para la API."""
+        return {'nombre_categoria': self.name_input.text().strip()}
+class CreateBrandDialog(QDialog):
+    """Diálogo simple para crear una nueva Marca."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Crear Nueva Marca")
+        
+        self.name_input = QLineEdit()
+        self.save_button = QPushButton("Guardar")
+        self.cancel_button = QPushButton("Cancelar")
+        
+        self.save_button.clicked.connect(self.accept)
+        self.cancel_button.clicked.connect(self.reject)
+        
+        layout = QVBoxLayout(self)
+        form_layout = QFormLayout()
+        form_layout.addRow("Nombre Marca:", self.name_input)
+        
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        button_layout.addWidget(self.cancel_button)
+        button_layout.addWidget(self.save_button)
+        
+        layout.addLayout(form_layout)
+        layout.addLayout(button_layout)
+        
+    def get_data(self):
+        """Devuelve los datos listos para la API."""
+        return {'nombre_marca': self.name_input.text().strip()}
+
+
 class MainWindow(QMainWindow):
-    def __init__(self, api_client):
+    def __init__(self, api_client, is_offline=False,user_email=""): 
         super().__init__()
         self.setWindowTitle("Panel de Administración de Gifter's")
         self.setGeometry(100, 100, 900, 700)
         self.api_client = api_client
+        self.is_offline = is_offline  
+        self.user_email = user_email.lower()
+        self.setStatusBar(QStatusBar(self))
+        self.all_categories = []
+        self.all_brands = []
 
+        #-- Widget Central y Layout --
         menu_bar = self.menuBar()
         file_menu = menu_bar.addMenu("Archivo")
         exit_action = file_menu.addAction("Salir")
@@ -162,20 +280,215 @@ class MainWindow(QMainWindow):
         self.btn_catalogo.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(2))
         self.btn_importar.clicked.connect(self.open_csv_importer) 
         
-        # --- 👇 CORRECCIÓN AQUÍ 👇 ---
-        # 1. No creamos 'self.statusBar', usamos el que ya existe en QMainWindow
-        # 2. Lo creamos/seteamos con self.setStatusBar()
-        # 3. Lo accedemos con self.statusBar() (con paréntesis)
-        self.setStatusBar(QStatusBar(self))
-        self.statusBar().showMessage("Listo.")
+        
+        if self.is_offline:
+            self.statusBar().showMessage("Modo Offline. Los datos no se actualizarán.")
+            self.statusBar().setStyleSheet("background-color: #ffc107; color: black;")
+            logging.info("Modo Offline: Omitiendo carga inicial de datos desde la API.")
+            # (Las páginas de logs se cargarán desde el caché cuando se vean)
+        else:
+            self.statusBar().showMessage("Listo.")
+            logging.info("Cargando datos iniciales (productos y usuarios)...")
+            self.load_products()
+            self.load_users()
+            self.load_categories_and_brands() 
+    def create_catalogo_page(self):
+        """
+        Crea la página de Catálogo (Índice 2), que ahora es un
+        QStackedWidget que CONTIENE 4 sub-páginas.
+        """
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0) # Sin márgenes
+
+        # 1. Crear el StackedWidget para el catálogo
+        self.catalogo_stack = QStackedWidget()
+        layout.addWidget(self.catalogo_stack)
+
+        # 2. Crear las páginas (Widgets) para el stack
+        catalogo_menu_page = self.create_catalogo_menu_page() # Menú (3 botones)
+        product_table_page = self.create_product_table_page() # Tabla de Productos
+        
+        # --- 👇 AÑADE ESTAS DOS LÍNEAS NUEVAS 👇 ---
+        category_list_page = self.create_category_list_page() # Página de Categorías
+        brand_list_page = self.create_brand_list_page()       # Página de Marcas
+
+        # 3. Añadir las páginas al stack
+        self.catalogo_stack.addWidget(catalogo_menu_page)    # Índice 0
+        self.catalogo_stack.addWidget(product_table_page)   # Índice 1
+        
+        # --- 👇 AÑADE ESTAS DOS LÍNEAS NUEVAS 👇 ---
+        self.catalogo_stack.addWidget(category_list_page)   # Índice 2
+        self.catalogo_stack.addWidget(brand_list_page)      # Índice 3
+
+        return page
+    
+    def create_category_list_page(self):
+        """Crea la página (Índice 2 del stack de catálogo) para listar Categorías."""
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        # Botón para volver al menú de catálogo (Índice 0)
+        layout.addWidget(self.create_back_button(self.catalogo_stack, "Volver al Menú de Catálogo"))
+        
+        title = QLabel("Administrar Categorías")
+        title.setFont(QFont("Arial", 24, QFont.Weight.Bold))
+        layout.addWidget(title)
+
+        # Botón para "Crear" (el que abre el diálogo)
+        button_layout = QHBoxLayout()
+        self.btn_new_category_dialog = QPushButton("Crear Nueva Categoría")
+        self.btn_new_category_dialog.setStyleSheet("background-color: #007bff; color: white; padding: 10px; font-size: 14px;")
+        self.btn_new_category_dialog.clicked.connect(self.handle_create_category) # Reutiliza el handler
+        button_layout.addWidget(self.btn_new_category_dialog)
+        button_layout.addStretch()
+        layout.addLayout(button_layout)
+
+        # Tabla para listar categorías
+        self.table_categories = QTableWidget()
+        self.table_categories.setColumnCount(2)
+        self.table_categories.setHorizontalHeaderLabels(["ID", "Nombre"])
+        self.table_categories.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table_categories.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.table_categories.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers) # No editable
+        layout.addWidget(self.table_categories)
+        
+        return page
+
+    # --- 👇 AÑADE ESTA FUNCIÓN NUEVA 👇 ---
+    def create_brand_list_page(self):
+        """Crea la página (Índice 3 del stack de catálogo) para listar Marcas."""
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        # Botón para volver al menú de catálogo (Índice 0)
+        layout.addWidget(self.create_back_button(self.catalogo_stack, "Volver al Menú de Catálogo"))
+
+        title = QLabel("Administrar Marcas")
+        title.setFont(QFont("Arial", 24, QFont.Weight.Bold))
+        layout.addWidget(title)
+
+        # Botón para "Crear" (el que abre el diálogo)
+        button_layout = QHBoxLayout()
+        self.btn_new_brand_dialog = QPushButton("Crear Nueva Marca")
+        self.btn_new_brand_dialog.setStyleSheet("background-color: #007bff; color: white; padding: 10px; font-size: 14px;")
+        self.btn_new_brand_dialog.clicked.connect(self.handle_create_brand) # Reutiliza el handler
+        button_layout.addWidget(self.btn_new_brand_dialog)
+        button_layout.addStretch()
+        layout.addLayout(button_layout)
+
+        # Tabla para listar marcas
+        self.table_brands = QTableWidget()
+        self.table_brands.setColumnCount(2)
+        self.table_brands.setHorizontalHeaderLabels(["ID", "Nombre"])
+        self.table_brands.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table_brands.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.table_brands.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers) # No editable
+        layout.addWidget(self.table_brands)
+        
+        return page
+    def load_category_table(self):
+        """Puebla la tabla de categorías con los datos cacheados."""
+        if self.is_offline:
+            return # No hacer nada si estamos offline
+            
+        self.statusBar().showMessage("Cargando lista de categorías...")
+        
+        # Usamos la lista que ya cargamos al inicio
+        data = self.all_categories
+        
+        self.populate_table_with_keys(
+            self.table_categories, 
+            ["ID", "Nombre"], 
+            data,
+            key_map={"ID": "id_categoria", "Nombre": "nombre_categoria"}
+        )
+        self.statusBar().showMessage(f"Se cargaron {len(data)} categorías.", 3000)
+
+    # --- 👇 AÑADE ESTA FUNCIÓN NUEVA 👇 ---
+    def load_brand_table(self):
+        """Puebla la tabla de marcas con los datos cacheados."""
+        if self.is_offline:
+            return
+            
+        self.statusBar().showMessage("Cargando lista de marcas...")
+        
+        # Usamos la lista que ya cargamos al inicio
+        data = self.all_brands
+        
+        self.populate_table_with_keys(
+            self.table_brands, 
+            ["ID", "Nombre"], 
+            data,
+            key_map={"ID": "id_marca", "Nombre": "nombre_marca"}
+        )
+        self.statusBar().showMessage(f"Se cargaron {len(data)} marcas.", 3000)
+
+    def create_catalogo_menu_page(self):
+        """Crea el widget para el MENÚ PRINCIPAL de Catálogo."""
+        page = QWidget()
+        main_layout = QVBoxLayout(page) # Layout vertical para centrar
+        
+        # Estilo para los botones cuadrados
+        button_style = """
+            QPushButton {
+                background-color: #005bc5; color: white; border: 1px solid #004a99;
+                border-radius: 5px; padding: 20px; font-size: 16px; font-weight: bold;
+            }
+            QPushButton:hover { background-color: #007bff; }
+            QPushButton:pressed { background-color: #004a99; }
+        """
+        
+        # Layout horizontal para los botones
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(30) # Espacio entre botones
+
+        # Botón 1: Ver Catálogo (Sin cambios)
+        self.btn_goto_products = QPushButton("📦\n\nVer Catálogo\nde Productos")
+        self.btn_goto_products.setFixedSize(160, 160)
+        self.btn_goto_products.setStyleSheet(button_style)
+        self.btn_goto_products.clicked.connect(lambda: self.catalogo_stack.setCurrentIndex(1))
+        
+        # --- 👇 MODIFICACIÓN AQUÍ 👇 ---
+        # Botón 2: Administrar Categorías
+        self.btn_admin_cat = QPushButton("🏷️\n\nAdministrar\nCategorías")
+        self.btn_admin_cat.setFixedSize(160, 160)
+        self.btn_admin_cat.setStyleSheet(button_style)
+        # Conecta al nuevo índice 2 y llama a la función de carga
+        self.btn_admin_cat.clicked.connect(lambda: self.catalogo_stack.setCurrentIndex(2))
+        self.btn_admin_cat.clicked.connect(self.load_category_table) # <-- AÑADIDO
+        
+        # Botón 3: Administrar Marcas
+        self.btn_admin_brand = QPushButton("🏢\n\nAdministrar\nMarcas")
+        self.btn_admin_brand.setFixedSize(160, 160)
+        self.btn_admin_brand.setStyleSheet(button_style)
+        # Conecta al nuevo índice 3 y llama a la función de carga
+        self.btn_admin_brand.clicked.connect(lambda: self.catalogo_stack.setCurrentIndex(3))
+        self.btn_admin_brand.clicked.connect(self.load_brand_table) # <-- AÑADIDO
         # --- ---------------------- ---
 
-        logging.info("Cargando datos iniciales (productos y usuarios)...")
-        self.load_products()
-        self.load_users()
+        # Deshabilitar si estamos offline
+        if self.is_offline:
+            self.btn_admin_cat.setEnabled(False)
+            self.btn_admin_brand.setEnabled(False)
+
+        # Añadir al layout horizontal (centrado)
+        button_layout.addStretch()
+        button_layout.addWidget(self.btn_goto_products)
+        button_layout.addWidget(self.btn_admin_cat)
+        button_layout.addWidget(self.btn_admin_brand)
+        button_layout.addStretch()
         
+        main_layout.addStretch()
+        main_layout.addLayout(button_layout)
+        main_layout.addStretch()
+        
+        return page
+    
     def create_sidebar(self):
-        # ... (Esta función no tiene cambios) ...
+
         sidebar_widget = QWidget()
         sidebar_widget.setStyleSheet("""
             QWidget {
@@ -210,6 +523,10 @@ class MainWindow(QMainWindow):
         sidebar_layout.addWidget(self.btn_catalogo)
         sidebar_layout.addWidget(self.btn_importar)
         
+        if self.is_offline:
+            self.btn_importar.setEnabled(False)
+            self.btn_importar.setText("Importar CSV (Offline)")
+        
         sidebar_layout.addStretch()
         return sidebar_widget
 
@@ -241,45 +558,70 @@ class MainWindow(QMainWindow):
         return page
     
     def create_admin_page(self):
-        # ... (Esta función no tiene cambios) ...
+        """Crea la página de Administración (Mockup 3)."""
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(20, 20, 20, 20)
-        
+
         title = QLabel("Administración de Usuarios")
         title.setFont(QFont("Arial", 24, QFont.Weight.Bold))
         layout.addWidget(title)
-        
+
         self.table_users = QTableWidget()
         self.table_users.setColumnCount(7)
         self.table_users.setHorizontalHeaderLabels(["ID", "Nombre", "Apellido", "Correo", "Usename", "Es Admin","Is Active"])
         self.table_users.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.table_users.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked)
+
+        
+        if self.is_offline:
+            self.table_users.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        else:
+            self.table_users.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked)
+        
+
         self.table_users.setSortingEnabled(False)
         self.table_users.itemChanged.connect(self.handle_user_change) 
-        
+
         layout.addWidget(self.table_users)
+        
+        button_layout = QHBoxLayout()
+        button_layout.addStretch() # Empuja el botón a la derecha
+        
+        self.btn_delete_user = QPushButton("Borrar Usuario Seleccionado")
+        self.btn_delete_user.setStyleSheet("background-color: #dc3545; color: white; padding: 10px; font-size: 14px;")
+        self.btn_delete_user.clicked.connect(self.handle_delete_user)
+        
+        if self.is_offline:
+            self.btn_delete_user.setEnabled(False) # Deshabilitado en modo offline
+            
+        button_layout.addWidget(self.btn_delete_user)
+        layout.addLayout(button_layout)
+
         return page
 
-    def create_catalogo_page(self):
-        # ... (Esta función no tiene cambios) ...
+    def create_product_table_page(self):
+        """Crea la página de Catálogo (Mockup 4) - AHORA ES UNA SUB-PÁGINA."""
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(20, 20, 20, 20)
+        
+        layout.addWidget(self.create_back_button(self.catalogo_stack, "Volver al Menú de Catálogo"))
 
         title = QLabel("Catálogo de Productos")
         title.setFont(QFont("Arial", 24, QFont.Weight.Bold))
         layout.addWidget(title)
 
         self.table_products = QTableWidget()
-        self.table_products.setColumnCount(5)
-        self.table_products.setHorizontalHeaderLabels(["ID", "Nombre", "Precio", "Categoría", "Marca"])
+        self.table_products.setColumnCount(4)
+        self.table_products.setHorizontalHeaderLabels(["ID", "Nombre", "Categoría", "Marca"])
+        
         self.table_products.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table_products.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked)
         self.table_products.setSortingEnabled(False)
         self.table_products.itemChanged.connect(self.handle_product_change)
         self.table_products.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table_products.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        
         layout.addWidget(self.table_products)
 
         button_row_layout = QHBoxLayout()
@@ -293,12 +635,18 @@ class MainWindow(QMainWindow):
         self.btn_delete_product.clicked.connect(self.handle_delete_product)
         button_row_layout.addWidget(self.btn_delete_product)
         layout.addLayout(button_row_layout)
+        if self.is_offline:
+            self.btn_create_product.setEnabled(False)
+            self.btn_delete_product.setEnabled(False)
 
         return page
 
     def load_products(self):
         """Carga los productos desde la API y los muestra en la tabla."""
-        self.statusBar().showMessage("Cargando productos...") # <-- CORREGIDO ()
+        if self.is_offline: # No intentes cargar si estás offline
+            self.statusBar().showMessage("Modo Offline: Carga de productos omitida.", 3000)
+            return
+        self.statusBar().showMessage("Cargando productos...") 
         self.table_products.blockSignals(True)
 
         products, error = self.api_client.get_products()
@@ -306,14 +654,14 @@ class MainWindow(QMainWindow):
         if error:
             logging.error(f"Error al cargar productos: {error}")
             QMessageBox.critical(self, "Error al cargar productos", error)
-            self.statusBar().showMessage("Error al cargar productos.") # <-- CORREGIDO ()
+            self.statusBar().showMessage("Error al cargar productos.") 
             self.table_products.blockSignals(False)
             return
 
         if products is None:
             logging.warning("No se pudieron obtener los productos (API devolvió None).")
             QMessageBox.warning(self, "Productos", "No se pudieron obtener los productos.")
-            self.statusBar().showMessage("No se pudieron obtener los productos.") # <-- CORREGIDO ()
+            self.statusBar().showMessage("No se pudieron obtener los productos.") 
             self.table_products.blockSignals(False)
             return
 
@@ -323,23 +671,26 @@ class MainWindow(QMainWindow):
         for row_index, product in enumerate(products):
             product_id = str(product.get('id_producto', ''))
             nombre = product.get('nombre_producto', '')
-            precio = str(product.get('precio', ''))
+            
             categoria_nombre = product.get('categoria_nombre', '') 
-            marca_nombre = product.get('marca_nombre', '') 
+            marca_nombre = product.get('marca_nombre', '')
 
             item_id = QTableWidgetItem(product_id)
             item_name = QTableWidgetItem(nombre)
-            item_price = QTableWidgetItem(precio)
+            
             item_category = QTableWidgetItem(categoria_nombre)
             item_brand = QTableWidgetItem(marca_nombre)
 
             item_id.setFlags(item_id.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            # Hacemos que Categoría y Marca no sean editables en la tabla
+            # (La edición debe ser por ID en el backend o con un ComboBox)
+            item_category.setFlags(item_category.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            item_brand.setFlags(item_brand.flags() & ~Qt.ItemFlag.ItemIsEditable)
 
             self.table_products.setItem(row_index, 0, item_id)
             self.table_products.setItem(row_index, 1, item_name)
-            self.table_products.setItem(row_index, 2, item_price)
-            self.table_products.setItem(row_index, 3, item_category)
-            self.table_products.setItem(row_index, 4, item_brand)
+            self.table_products.setItem(row_index, 2, item_category) # Columna 2
+            self.table_products.setItem(row_index, 3, item_brand)
 
         logging.info(f"Se cargaron {len(products)} productos.")
         self.statusBar().showMessage(f"Se cargaron {len(products)} productos.") # <-- CORREGIDO ()
@@ -442,6 +793,9 @@ class MainWindow(QMainWindow):
                 
     def load_users(self):
         """Carga los usuarios desde la API y los muestra en la tabla."""
+        if self.is_offline: # No intentes cargar si estás offline
+            self.statusBar().showMessage("Modo Offline: Carga de usuarios omitida.", 3000)
+            return
         self.statusBar().showMessage("Cargando usuarios...") # <-- CORREGIDO ()
         self.table_users.blockSignals(True)
 
@@ -495,6 +849,36 @@ class MainWindow(QMainWindow):
         logging.info(f"Se cargaron {len(users)} usuarios.")
         self.statusBar().showMessage(f"Se cargaron {len(users)} usuarios.") # <-- CORREGIDO ()
         self.table_users.blockSignals(False)
+        
+    def load_categories_and_brands(self):
+        """Carga las listas de categorías y marcas al iniciar la app."""
+        if self.is_offline:
+            logging.warning("Modo Offline: Omitiendo carga de categorías y marcas.")
+            return
+
+        self.statusBar().showMessage("Cargando categorías y marcas...")
+        
+        # Cargar Categorías
+        categories, error_cat = self.api_client.get_categories()
+        if error_cat:
+            logging.error(f"Error al cargar categorías: {error_cat}")
+            QMessageBox.critical(self, "Error de Carga", f"No se pudieron cargar las categorías:\n{error_cat}")
+            self.all_categories = []
+        else:
+            self.all_categories = categories
+            logging.info(f"Se cargaron {len(self.all_categories)} categorías.")
+            
+        # Cargar Marcas
+        brands, error_brand = self.api_client.get_brands()
+        if error_brand:
+            logging.error(f"Error al cargar marcas: {error_brand}")
+            QMessageBox.critical(self, "Error de Carga", f"No se pudieron cargar las marcas:\n{error_brand}")
+            self.all_brands = []
+        else:
+            self.all_brands = brands
+            logging.info(f"Se cargaron {len(self.all_brands)} marcas.")
+        
+        self.statusBar().showMessage("Categorías y marcas cargadas.", 3000)
 
     def handle_download_report(self):
         """Descarga el reporte en el formato seleccionado (CSV, Excel o PDF)."""
@@ -591,7 +975,15 @@ class MainWindow(QMainWindow):
 
     def handle_create_product(self):
         """Abre el diálogo para crear un producto y envía los datos a la API."""
-        dialog = CreateProductDialog(self)
+        if self.is_offline or not self.all_categories or not self.all_brands:
+            logging.warning("Intento de crear producto sin conexión o sin listas de cat/marca.")
+            QMessageBox.warning(self, "Error", 
+                "No se pueden crear productos en modo offline o si falló la carga de categorías/marcas.\n"
+                "Reinicia la aplicación con conexión.")
+            return
+
+        # --- Modificado: Pasa las listas al diálogo ---
+        dialog = CreateProductDialog(self.all_categories, self.all_brands, self)
 
         if dialog.exec() == QDialog.DialogCode.Accepted:
             product_data = dialog.get_data()
@@ -599,8 +991,17 @@ class MainWindow(QMainWindow):
             if not product_data['nombre_producto']:
                 logging.warning("Intento de crear producto sin nombre.")
                 QMessageBox.warning(self, "Datos Incompletos", "El nombre del producto es obligatorio.")
+                return 
+            if not product_data['id_categoria']:
+                logging.warning("Intento de crear producto sin categoría.")
+                QMessageBox.warning(self, "Datos Incompletos", "Debes seleccionar una categoría.")
+                return 
+            if not product_data['id_marca']:
+                logging.warning("Intento de crear producto sin marca.")
+                QMessageBox.warning(self, "Datos Incompletos", "Debes seleccionar una marca.")
                 return
-
+            
+            
             self.statusBar().showMessage("Creando nuevo producto...") # <-- CORREGIDO ()
             QApplication.processEvents()
 
@@ -617,7 +1018,70 @@ class MainWindow(QMainWindow):
         else:
             logging.info("Creación de producto cancelada.")
             self.statusBar().showMessage("Creación de producto cancelada.", 3000) # <-- CORREGIDO ()
+            
+    def handle_create_category(self):
+        """Abre el diálogo para crear una categoría y la envía a la API."""
+        dialog = CreateCategoryDialog(self)
+        
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            category_data = dialog.get_data()
+            
+            if not category_data['nombre_categoria']:
+                logging.warning("Intento de crear categoría sin nombre.")
+                QMessageBox.warning(self, "Datos Incompletos", "El nombre de la categoría es obligatorio.")
+                return
+            
+            self.statusBar().showMessage("Creando nueva categoría...")
+            QApplication.processEvents()
+            
+            new_cat, message = self.api_client.create_category(category_data)
+            
+            if new_cat:
+                logging.info(f"Categoría creada: {new_cat}")
+                self.statusBar().showMessage(f"Categoría '{new_cat.get('nombre_categoria')}' creada.", 5000)
+                QMessageBox.information(self, "Categoría Creada", message)
+                # Recargamos las listas para que esté disponible en el futuro
+                self.load_categories_and_brands()
+                self.load_category_table()
+            else:
+                QMessageBox.critical(self, "Error al Crear Categoría", message)
+                self.statusBar().showMessage("Error al crear la categoría.", 5000)
+        else:
+            logging.info("Creación de categoría cancelada.")
+            self.statusBar().showMessage("Creación de categoría cancelada.", 3000)
 
+    def handle_create_brand(self):
+        """Abre el diálogo para crear una marca y la envía a la API."""
+        dialog = CreateBrandDialog(self)
+        
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            brand_data = dialog.get_data()
+            
+            if not brand_data['nombre_marca']:
+                logging.warning("Intento de crear marca sin nombre.")
+                QMessageBox.warning(self, "Datos Incompletos", "El nombre de la marca es obligatorio.")
+                return
+            
+            self.statusBar().showMessage("Creando nueva marca...")
+            QApplication.processEvents()
+            
+            new_brand, message = self.api_client.create_brand(brand_data)
+            
+            if new_brand:
+                logging.info(f"Marca creada: {new_brand}")
+                self.statusBar().showMessage(f"Marca '{new_brand.get('nombre_marca')}' creada.", 5000)
+                QMessageBox.information(self, "Marca Creada", message)
+                # Recargamos las listas para que esté disponible en el futuro
+                self.load_categories_and_brands()
+                self.load_brand_table()
+            else:
+                QMessageBox.critical(self, "Error al Crear Marca", message)
+                self.statusBar().showMessage("Error al crear la marca.", 5000)
+        else:
+            logging.info("Creación de marca cancelada.")
+            self.statusBar().showMessage("Creación de marca cancelada.", 3000)
+    
+    
     # -----------------------------------------------------------------
     # --- MÉTODOS DE LA PÁGINA DE REPORTES ---
     # -----------------------------------------------------------------
@@ -691,11 +1155,15 @@ class MainWindow(QMainWindow):
         layout.addStretch()
         return page
 
-    def create_back_button(self, text="Volver al Menú de Reportes"):
-        # ... (Esta función no tiene cambios) ...
+    def create_back_button(self, stack_widget, text="Volver al Menú"):
+        """
+        Helper para crear un botón de 'Volver' que controla un
+        QStackedWidget específico.
+        """
         back_button = QPushButton(text)
         back_button.setStyleSheet("background-color: #6c757d; color: white; padding: 8px; font-size: 14px;")
-        back_button.clicked.connect(lambda: self.reports_stack.setCurrentIndex(0))
+        # Conecta el botón para volver al índice 0 (el menú) del stack que le pases
+        back_button.clicked.connect(lambda: stack_widget.setCurrentIndex(0))
         return back_button
 
     def populate_table(self, table_widget, headers, data):
@@ -737,7 +1205,7 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(20, 20, 20, 20)
         
-        layout.addWidget(self.create_back_button())
+        layout.addWidget(self.create_back_button(self.reports_stack))
         title = QLabel("Reporte de Moderación")
         title.setFont(QFont("Arial", 20, QFont.Weight.Bold))
         layout.addWidget(title)
@@ -785,7 +1253,7 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(20, 20, 20, 20)
         
-        layout.addWidget(self.create_back_button())
+        layout.addWidget(self.create_back_button(self.reports_stack))
         title = QLabel("Reporte de Búsquedas Populares")
         title.setFont(QFont("Arial", 20, QFont.Weight.Bold))
         layout.addWidget(title)
@@ -836,7 +1304,7 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(20, 20, 20, 20)
         
-        layout.addWidget(self.create_back_button())
+        layout.addWidget(self.create_back_button(self.reports_stack))
         title = QLabel("Reporte de Reseñas del Sitio")
         title.setFont(QFont("Arial", 20, QFont.Weight.Bold))
         layout.addWidget(title)
@@ -906,7 +1374,7 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(20, 20, 20, 20)
         
-        layout.addWidget(self.create_back_button())
+        layout.addWidget(self.create_back_button(self.reports_stack))
         title = QLabel("Reporte de Top Usuarios Activos")
         title.setFont(QFont("Arial", 20, QFont.Weight.Bold))
         layout.addWidget(title)
@@ -1028,7 +1496,7 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(20, 20, 20, 20)
         
-        layout.addWidget(self.create_back_button())
+        layout.addWidget(self.create_back_button(self.reports_stack))
         title = QLabel("Visor de Logs del Servidor (web_app.log)")
         title.setFont(QFont("Arial", 20, QFont.Weight.Bold))
         layout.addWidget(title)
@@ -1071,6 +1539,10 @@ class MainWindow(QMainWindow):
 
     def load_web_logs(self):
         """Llama a la API para obtener los logs, los muestra y los guarda en caché."""
+        if self.is_offline: # No intentes cargar si estás offline
+            self.statusBar().showMessage("Modo Offline: No se pueden actualizar los logs del servidor.", 3000)
+            QMessageBox.warning(self, "Modo Offline", "No puedes actualizar los logs del servidor mientras estás sin conexión.")
+            return
         self.statusBar().showMessage("Cargando logs del servidor...") # <-- CORREGIDO ()
         QApplication.processEvents()
         
@@ -1137,7 +1609,7 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(20, 20, 20, 20)
         
-        layout.addWidget(self.create_back_button())
+        layout.addWidget(self.create_back_button(self.reports_stack, "Volver al Menú de Reportes"))
         title = QLabel("Visor de Logs Locales (admin_app.log)")
         title.setFont(QFont("Arial", 20, QFont.Weight.Bold))
         layout.addWidget(title)
@@ -1224,6 +1696,82 @@ class MainWindow(QMainWindow):
             logging.info("Descarga de logs locales cancelada.")
             self.statusBar().showMessage("Descarga cancelada.", 3000) # <-- CORREGIDO ()
 
+    def handle_delete_user(self):
+        """
+        Maneja el clic en el botón 'Borrar Usuario Seleccionado'.
+        Incluye advertencia (Req 2) y sugerencia de desactivar (Req 3).
+        """
+        selected_row = self.table_users.currentRow() # Obtiene la fila seleccionada
+        if selected_row < 0:
+            QMessageBox.warning(self, "Borrar Usuario", "Por favor, selecciona una fila para borrar.")
+            return
+    
+        # Obtener datos del usuario de la tabla
+        user_id_item = self.table_users.item(selected_row, 0)
+        email_item = self.table_users.item(selected_row, 3)
+        username_item = self.table_users.item(selected_row, 4)
+        es_admin_item = self.table_users.item(selected_row, 5)
+    
+        if not user_id_item or not email_item:
+            logging.error("handle_delete_user: No se pudo obtener el ID o Email del usuario seleccionado.")
+            QMessageBox.critical(self, "Error", "No se pudo obtener la información del usuario seleccionado.")
+            return
+    
+        user_id = user_id_item.text()
+        email = email_item.text().lower()
+        username = username_item.text() if username_item else f"ID {user_id}"
+        is_admin_bool = (es_admin_item.text().lower() == 'true')
+
+        # 1. Verificación de Seguridad: No borrar admins (Req 1)
+        if is_admin_bool:
+            logging.warning(f"El admin {self.user_email} intentó borrar al admin: {email}. Bloqueado por la UI.")
+            QMessageBox.warning(self, "Acción no permitida",
+                                "No se puede eliminar a un usuario administrador.\n\n"
+                                "Para eliminarlo, primero edite sus permisos (ponga 'False' en 'Es Admin'), "
+                                "guarde los cambios y vuelva a intentarlo.")
+            return
+        
+        # 2. Verificación de Seguridad: No borrarse a sí mismo
+        if email == self.user_email:
+            logging.warning(f"El admin {self.user_email} intentó borrarse a sí mismo.")
+            QMessageBox.warning(self, "Acción no permitida", "No puedes eliminar tu propia cuenta de administrador desde esta aplicación.")
+            return
+
+        # 3. Advertencia y Sugerencia de Desactivación (Req 2 y 3)
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle('Confirmar Borrado Permanente')
+        msg_box.setIcon(QMessageBox.Icon.Warning)
+        msg_box.setText(f"¿Estás SEGURO de que quieres eliminar PERMANENTEMENTE al usuario '{username}'?")
+        msg_box.setInformativeText(
+            "Esta acción es IRREVERSIBLE y borrará todos sus posts, comentarios, wishlists y datos de perfil.\n\n"
+            "ALTERNATIVA: Si solo quieres suspender la cuenta, puedes poner 'False' en la columna 'Is Active' y guardar."
+        )
+        # 3. Botones de Confirmación (Req 4)
+        yes_button = msg_box.addButton("Sí, Eliminar Todo", QMessageBox.ButtonRole.DestructiveRole)
+        no_button = msg_box.addButton("Cancelar", QMessageBox.ButtonRole.RejectRole)
+        msg_box.setDefaultButton(no_button)
+        
+        msg_box.exec()
+
+        # 4. Ejecutar Borrado si se confirma
+        if msg_box.clickedButton() == yes_button:
+            logging.info(f"Iniciando borrado permanente de usuario ID={user_id}, Email='{email}'")
+            self.statusBar().showMessage(f"Borrando Usuario {user_id}...")
+            QApplication.processEvents()
+    
+            success, message = self.api_client.delete_user(user_id)
+    
+            if success:
+                logging.info(f"Usuario {user_id} borrado exitosamente.")
+                self.statusBar().showMessage(f"Usuario {user_id} borrado exitosamente.", 3000)
+                self.load_users() # Recargar la tabla
+            else:
+                QMessageBox.critical(self, "Error al Borrar", message)
+                self.statusBar().showMessage(f"Error al borrar Usuario {user_id}.", 5000)
+        else:
+            logging.info("Borrado de usuario cancelado por el administrador.")
+            self.statusBar().showMessage("Borrado cancelado.")
+            
     def handle_download_reviews_pdf(self):
         """
         Descarga el reporte de reseñas del sitio en PDF.
@@ -1328,14 +1876,74 @@ class MainWindow(QMainWindow):
             logging.info("Descarga de reporte de búsquedas cancelada.")
             self.statusBar().showMessage("Descarga cancelada.", 3000)
 
+
+def handle_uncaught_exception(exc_type, exc_value, exc_traceback):
+    """
+    Manejador global para cualquier error no capturado (crash).
+    Loggea el error completo y muestra un mensaje al usuario.
+    """
+    # 1. Formatea el traceback completo para el log
+    error_message = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+    
+    # 2. Loggealo como un error CRÍTICO
+    logging.critical(f"CRASH NO MANEJADO (Unhandled Exception):\n{error_message}")
+    
+    # 3. Prepara un mensaje amigable para el usuario
+    user_message = f"""
+    ¡Ups! La aplicación encontró un error fatal y debe cerrarse.
+    
+    Se ha guardado un informe detallado en 'logs/admin_app.log'.
+    Por favor, reporta este error.
+
+    Mensaje del error:
+    {exc_value}
+    """
+    
+    # 4. Muestra el mensaje de error en una ventana emergente
+    # Usamos el 'setDetailedText' para que el admin pueda ver
+    # el error técnico completo si hace clic en "Show Details..."
+    try:
+        msg_box = QMessageBox()
+        msg_box.setIcon(QMessageBox.Icon.Critical)
+        msg_box.setWindowTitle("Error Fatal de la Aplicación")
+        msg_box.setText(user_message)
+        msg_box.setDetailedText(error_message) # ¡Aquí está la magia!
+        msg_box.exec()
+    except Exception as e:
+        # Fallback si ni siquiera podemos mostrar un QMessageBox
+        logging.error(f"No se pudo mostrar el QMessageBox de error fatal: {e}")
+
+    # 5. Cierra los handlers de logging de forma segura
+    logging.shutdown()
+
+
+
+# --- 👇 ASIGNA EL MANEJADOR GLOBAL 👇 ---
+sys.excepthook = handle_uncaught_exception
+# --- -------------------------------- ---
+
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    api = ApiClient(base_url=API_BASE_URL)
-    login_dialog = LoginDialog(api)
+    
+    # 1. Crear el caché local
+    local_cache = LocalAuthCache()
+    
+    # 2. Pasar el caché al ApiClient
+    api = ApiClient(base_url=API_BASE_URL, local_auth_cache=local_cache)
+    
+    # 3. Pasar AMBOS al LoginDialog
+    login_dialog = LoginDialog(api, local_cache)
     
     if login_dialog.exec() == QDialog.DialogCode.Accepted:
         logging.info("Login exitoso, mostrando ventana principal.")
-        main_window = MainWindow(api)
+        
+        
+        # 4. Comprobar si el login fue en modo offline
+        is_offline = getattr(login_dialog, 'offline_mode', False)
+        user_email = login_dialog.email_input.text() # Captura el email usado
+        
+        # 5. Pasar el estado offline a la MainWindow
+        main_window = MainWindow(api, is_offline=is_offline, user_email=user_email)
         main_window.show()
         sys.exit(app.exec())
     else:

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}Confirmar correo{% endblock %}
+{% block content %}
+<section class="section" style="padding:60px 0;">
+    <div class="container" style="max-width:720px;">
+        <div class="card shadow-sm" style="border:none;border-radius:16px;">
+            <div class="card-body" style="padding:32px;text-align:center;">
+                <h2>Confirmar correo</h2>
+                {% if confirmation %}
+                <p>Vas a confirmar el correo de <strong>{{ confirmation.email_address.email }}</strong>.</p>
+                <form method="post">{% csrf_token %}
+                    <button class="btn btn-primary" type="submit">Confirmar</button>
+                </form>
+                {% else %}
+                <p class="text-muted">Este enlace no es válido o ya fue usado.</p>
+                {% endif %}
+                <a href="{% url 'account_login' %}" class="btn btn-outline-primary mt-3">Ir a iniciar sesión</a>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

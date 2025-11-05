@@ -1,0 +1,11 @@
+{% load i18n account %}{% user_display user as user_display %}{% autoescape off %}
+Hola {{ user_display }}:
+
+Gracias por registrarte en {{ current_site.name }}.
+Para activar tu cuenta abre este enlace:
+
+{{ activate_url }}
+
+Si no creaste esta cuenta, ignora este correo.
+{{ current_site.domain }}
+{% endautoescape %}

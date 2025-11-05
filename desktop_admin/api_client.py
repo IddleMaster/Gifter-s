@@ -1,7 +1,9 @@
 import requests
 import json
 import os 
-import logging # <-- Importado (ya lo tenías)
+import logging
+
+from local_auth_cache import LocalAuthCache
 
 # Creamos un logger específico para este módulo, lo que es una buena práctica.
 logger = logging.getLogger(__name__)
@@ -10,10 +12,11 @@ class ApiClient:
     """
     Gestor de comunicación con La API REST del proyecto xiquillos!
     """
-    def __init__(self, base_url="http://127.0.0.1:8000/api"):
+    def __init__(self, base_url="http://127.0.0.1:8000/api", local_auth_cache=None): # <-- 1. AÑADE ESTO
         self.base_url = base_url
         self.token = None
         self.headers = {'Content-Type': 'application/json'}
+        self.local_auth_cache = local_auth_cache 
         logger.info(f"ApiClient inicializado con base_url: {base_url}")
 
     def login(self, username, password):
@@ -33,6 +36,11 @@ class ApiClient:
                     return False, "La respuesta de la API no contiene un token de acceso."
                 
                 self.headers['Authorization'] = f'Bearer {self.token}'
+                if self.local_auth_cache:
+                    try:
+                        self.local_auth_cache.save_user_hash(username, password)
+                    except Exception as e:
+                        logging.error(f"No se pudo guardar el hash de la contraseña en caché: {e}")
                 logger.info(f"Login exitoso para usuario: {username}")
                 return True, "Login exitoso."
             else:
@@ -584,7 +592,33 @@ class ApiClient:
             logger.critical(f"Error inesperado en download_site_reviews_report_pdf: {e}", exc_info=True)
             return None, f"Error inesperado: {str(e)}"
         
+    def get_categories(self):
+        """
+        Obtiene la lista completa de categorías desde la API.
+        """
+        if not self.token:
+            logger.warning("get_categories llamado sin token.")
+            return None, "No autenticado."
         
+        # Llama al helper _get_report_data que ya tienes
+        # (Usa 'List' en lugar de 'Report' para el nombre del log)
+        return self._get_report_data(
+            "get_categories_list",
+            f"{self.base_url}/categorias/"
+        )
+
+    def get_brands(self):
+        """
+        Obtiene la lista completa de marcas desde la API.
+        """
+        if not self.token:
+            logger.warning("get_brands llamado sin token.")
+            return None, "No autenticado."
+        
+        return self._get_report_data(
+            "get_brands_list",
+            f"{self.base_url}/marcas/"
+        )    
     def download_popular_search_report_pdf(self):
         """
         Descarga el reporte PDF de búsquedas populares desde la API.
@@ -630,3 +664,110 @@ class ApiClient:
         except requests.exceptions.RequestException as e:
             logger.error(f"download_popular_search_report_pdf: Error de conexión: {e}", exc_info=True)
             return None, f"Error de conexión: {e}"
+        
+    
+    
+    def delete_user(self, user_id):
+        """
+        Envía una petición DELETE para borrar un usuario específico a la API.
+        """
+        if not self.token:
+            logger.warning("delete_user llamado sin token.")
+            return False, "No autenticado."
+    
+        delete_url = f"{self.base_url}/users/{user_id}/" 
+    
+        try:
+            logger.info(f"Intentando DELETE en {delete_url} (Usuario ID: {user_id})")
+            response = requests.delete(delete_url, headers=self.headers)
+    
+            # DELETE exitoso devuelve 204 No Content
+            if response.status_code == 204:
+                logger.info(f"Usuario {user_id} borrado exitosamente.")
+                return True, "Usuario borrado correctamente."
+            elif response.status_code == 404:
+                logger.warning(f"Intento de borrar usuario {user_id} falló (404 Not Found).")
+                return False, f"Error al borrar: Usuario con ID {user_id} no encontrado."
+            else:
+                error_detail = response.text
+                try:
+                    error_data = response.json()
+                    if isinstance(error_data.get('detail'), str):
+                        error_detail = error_data['detail']
+                except json.JSONDecodeError:
+                    pass
+                logger.error(f"Error al borrar usuario {user_id}. Status: {response.status_code}, Error: {error_detail}")
+                return False, f"Error al borrar usuario: {response.status_code} - {error_detail}"
+        except requests.exceptions.RequestException as e:
+            logger.error(f"delete_user: Error de conexión: {e}", exc_info=True)
+            return False, f"Error de conexión al borrar: {e}"
+        
+    def create_category(self, category_data):
+        """
+        Envía una petición POST para crear una nueva categoría.
+        category_data debe ser un diccionario: {'nombre_categoria': '...'}
+        """
+        if not self.token:
+            logger.warning("create_category llamado sin token.")
+            return None, "No autenticado."
+    
+        create_url = f"{self.base_url}/categorias/"
+        
+        try:
+            logger.info(f"Intentando POST en {create_url} con datos: {category_data}")
+            response = requests.post(create_url, json=category_data, headers=self.headers)
+    
+            if response.status_code == 201: # 201 Created
+                new_category = response.json()
+                logger.info(f"Categoría creada exitosamente. ID: {new_category.get('id_categoria')}")
+                return new_category, "Categoría creada exitosamente."
+            else:
+                # Manejar error
+                error_detail = response.text
+                try:
+                    error_data = response.json()
+                    error_detail = "; ".join([f"{k}: {v[0]}" for k, v in error_data.items()])
+                except (json.JSONDecodeError, AttributeError):
+                    pass
+                logger.error(f"Error al crear categoría. Status: {response.status_code}, Error: {error_detail}")
+                return None, f"Error al crear categoría: {response.status_code} - {error_detail}"
+    
+        except requests.exceptions.RequestException as e:
+            logger.error(f"create_category: Error de conexión: {e}", exc_info=True)
+            return None, f"Error de conexión al crear categoría: {e}"
+        
+    def create_brand(self, brand_data):
+        """
+        Envía una petición POST para crear una nueva marca.
+        brand_data debe ser un diccionario: {'nombre_marca': '...'}
+        """
+        if not self.token:
+            logger.warning("create_brand llamado sin token.")
+            return None, "No autenticado."
+    
+        create_url = f"{self.base_url}/marcas/"
+        
+        try:
+            logger.info(f"Intentando POST en {create_url} con datos: {brand_data}")
+            response = requests.post(create_url, json=brand_data, headers=self.headers)
+    
+            if response.status_code == 201:
+                new_brand = response.json()
+                logger.info(f"Marca creada exitosamente. ID: {new_brand.get('id_marca')}")
+                return new_brand, "Marca creada exitosamente."
+            else:
+                # Manejar error
+                error_detail = response.text
+                try:
+                    error_data = response.json()
+                    error_detail = "; ".join([f"{k}: {v[0]}" for k, v in error_data.items()])
+                except (json.JSONDecodeError, AttributeError):
+                    pass
+                logger.error(f"Error al crear marca. Status: {response.status_code}, Error: {error_detail}")
+                return None, f"Error al crear marca: {response.status_code} - {error_detail}"
+    
+        except requests.exceptions.RequestException as e:
+            logger.error(f"create_brand: Error de conexión: {e}", exc_info=True)
+            return None, f"Error de conexión al crear marca: {e}"
+        
+    

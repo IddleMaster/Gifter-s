@@ -1,0 +1,59 @@
+{% load i18n account %}{% user_display user as user_display %}
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Verifica tu correo</title>
+</head>
+
+<body style="margin:0;padding:0;background:#f6f7fb;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f7fb;">
+        <tr>
+            <td align="center" style="padding:24px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" width="100%"
+                    style="max-width:600px;background:#fff;border:1px solid #eaeaf2;border-radius:12px;overflow:hidden;">
+                    <tr>
+                        <td style="padding:24px 24px 8px 24px;text-align:center;">
+                            <h1 style="margin:0;font:600 22px system-ui,-apple-system,Segoe UI,Roboto,Arial;">Verifica
+                                tu correo</h1>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td
+                            style="padding:8px 24px 0 24px;color:#374151;font:15px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Arial;">
+                            <p style="margin:0 0 12px 0;">¡Hola <strong>{{ user_display }}</strong>!</p>
+                            <p style="margin:0 0 12px 0;">Gracias por registrarte en <strong>{{ current_site.name
+                                    }}</strong>. Para activar tu cuenta, haz clic en el botón:</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:12px 24px 16px 24px;text-align:center;">
+                            <a href="{{ activate_url }}"
+                                style="display:inline-block;background:#6c63ff;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font:600 14px system-ui,-apple-system,Segoe UI,Roboto,Arial;">Verificar
+                                mi cuenta</a>
+                            <div style="height:10px;"></div>
+                            <p style="margin:0;color:#6b7280;font:12px system-ui,-apple-system,Segoe UI,Roboto,Arial;">
+                                Si no funciona, copia este enlace:</p>
+                            <p style="margin:0;word-break:break-all;"><a href="{{ activate_url }}"
+                                    style="color:#6c63ff;">{{ activate_url }}</a></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="height:1px;background:#eaeaf2;"></td>
+                    </tr>
+                    <tr>
+                        <td
+                            style="padding:16px 24px 24px 24px;color:#9ca3af;font:12px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Arial;">
+                            <p style="margin:0;">Si no creaste esta cuenta, ignora este correo.</p>
+                            <p style="margin:8px 0 0 0;">© {{ now|date:"Y" }} {{ current_site.name }}</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+
+</html>

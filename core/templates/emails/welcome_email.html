@@ -1,0 +1,45 @@
+{% load account %}{% user_display user as user_display %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Bienvenido(a)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="margin:0;padding:0;background:#f6f7fb;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f7fb;">
+    <tr><td align="center" style="padding:24px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px;background:#ffffff;border:1px solid #eaeaf2;border-radius:12px;overflow:hidden;">
+        <tr><td style="padding:24px 24px 8px 24px;text-align:center;">
+          <h1 style="margin:0;font:600 22px system-ui,-apple-system,Segoe UI,Roboto,Arial;color:#111827;">
+            ¡Tu correo ha sido verificado!
+          </h1>
+        </td></tr>
+
+        <tr><td style="padding:8px 24px 16px 24px;color:#374151;font:15px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Arial;">
+          <p style="margin:0 0 12px 0;">
+            Hola <strong>{{ user_display }}</strong>,
+          </p>
+          {% firstof site_name current_site.name as my_site %}
+          <p style="margin:0 0 12px 0;">
+            Bienvenido(a) a <strong>{{ my_site }}</strong>. Ya puedes iniciar sesión y comenzar a usar la plataforma.
+          </p>
+        </td></tr>
+
+        <tr><td style="padding:0 24px 24px 24px;text-align:center;">
+          {% url 'account_login' as login_href %}
+          <a href="{{ login_url|default:login_href }}"
+             style="display:inline-block;background:#6c63ff;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font:600 14px system-ui,-apple-system,Segoe UI,Roboto,Arial;">
+             Iniciar sesión
+          </a>
+        </td></tr>
+
+        <tr><td style="height:1px;background:#eaeaf2;"></td></tr>
+        <tr><td style="padding:16px 24px 24px 24px;color:#9ca3af;font:12px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Arial;">
+          <p style="margin:0;">© {{ now|date:"Y" }} {{ my_site }}</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

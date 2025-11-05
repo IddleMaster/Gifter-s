@@ -1,0 +1,9 @@
+Hola {{ user.first_name|default:user.username|default:user.email }},
+
+¡Tu correo ha sido verificado!
+Bienvenido(a) a {{ site_name|default:current_site.name }}.
+
+Ya puedes iniciar sesión y comenzar a usar la plataforma.
+{{ login_url|default:'' }}
+
+© {{ now|date:"Y" }} {{ site_name|default:current_site.name }}

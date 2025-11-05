@@ -122,29 +122,31 @@
   }
 
   /* ====== Botón Publicar (estados) ====== */
-.btn-create-post {
-  background-color: #3b82f6; /* azul habilitado */
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 6px 14px;
-  font-weight: 600;
-  transition: all 0.25s ease;
-}
+  .btn-create-post {
+    background-color: #3b82f6;
+    /* azul habilitado */
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-weight: 600;
+    transition: all 0.25s ease;
+  }
 
-.btn-create-post:hover:not(:disabled) {
-  background-color: #2563eb; /* azul más oscuro al hover */
-  transform: translateY(-1px);
-}
+  .btn-create-post:hover:not(:disabled) {
+    background-color: #2563eb;
+    /* azul más oscuro al hover */
+    transform: translateY(-1px);
+  }
 
-.btn-create-post:disabled {
-  background-color: #cbd5e1; /* gris clarito */
-  color: #64748b;
-  cursor: not-allowed;
-  transform: none;
-  opacity: 0.9;
-}
-
+  .btn-create-post:disabled {
+    background-color: #cbd5e1;
+    /* gris clarito */
+    color: #64748b;
+    cursor: not-allowed;
+    transform: none;
+    opacity: 0.9;
+  }
 </style>
 
 {% endblock %}
@@ -158,7 +160,7 @@
       <div class="post-card create-post-card">
         <form method="POST" action="{% url 'post_crear' %}" enctype="multipart/form-data">
           {% csrf_token %}
-          <div class="post-header">
+          <div class="post-header d-flex align-items-start">
             {% if user.perfil.profile_picture %}
             <img src="{{ user.perfil.profile_picture.url }}" alt="{{ user.username }}" class="profile-pic">
             {% else %}
@@ -166,6 +168,28 @@
             {% endif %}
             <textarea id="post-textarea" name="contenido" class="create-post-input" rows="2"
               placeholder="¿Qué quieres compartir?"></textarea>
+            <!-- Menú de opciones del feed (tres puntitos) -->
+            <div class="ms-2">
+              <div class="dropdown">
+                <button class="btn btn-link p-0" type="button" id="feedSettingsMenu" data-bs-toggle="dropdown"
+                  aria-expanded="false" aria-label="Opciones del feed">
+                  <i class="bi bi-three-dots-vertical fs-5"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="feedSettingsMenu">
+                  <li>
+                    <button type="button" class="dropdown-item" id="toggleFiltroMalasPalabras">
+                      {% if usar_filtro %}
+                      <i class="bi bi-check2-square me-1"></i> Desactivar filtro de malas palabras
+                      {% else %}
+                      <i class="bi bi-shield-lock me-1"></i> Activar filtro de malas palabras
+                      {% endif %}
+                    </button>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+
           </div>
 
           <div id="image-preview-container" class="image-preview-container" style="display:none;">
@@ -252,8 +276,8 @@
           {% if user.id != post.id_usuario.id %}
           <div class="post-options ms-auto">
             <div class="dropdown">
-              <button class="btn btn-link p-0" type="button" id="postMenuReport-{{ post.id_post }}" data-bs-toggle="dropdown"
-                aria-expanded="false" aria-label="Más opciones">
+              <button class="btn btn-link p-0" type="button" id="postMenuReport-{{ post.id_post }}"
+                data-bs-toggle="dropdown" aria-expanded="false" aria-label="Más opciones">
                 <i class="bi bi-three-dots-vertical fs-5"></i>
               </button>
               <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="postMenuReport-{{ post.id_post }}">
@@ -261,7 +285,8 @@
                   <form method="post" action="{% url 'report_post' post.id_post %}" class="d-inline">
                     {% csrf_token %}
                     <input type="hidden" name="motivo" value="Contenido inapropiado">
-                    <button type="submit" class="dropdown-item text-danger js-confirm-report" data-confirm="¿Reportar esta publicación como inapropiada?">
+                    <button type="submit" class="dropdown-item text-danger js-confirm-report"
+                      data-confirm="¿Reportar esta publicación como inapropiada?">
                       <i class="bi bi-flag"></i> Reportar publicación
                     </button>
                   </form>
@@ -273,13 +298,23 @@
         </div>
 
         <div class="post-content">
-          {% if post.contenido %}<p>{{ post.contenido }}</p>{% endif %}
+          {% if post.contenido %}
+          <p>
+            {% if usar_filtro and post.contenido_censurado %}
+            {{ post.contenido_censurado }}
+            {% else %}
+            {{ post.contenido }}
+            {% endif %}
+          </p>
+          {% endif %}
+
           {% if post.gif_url %}
           <img src="{{ post.gif_url }}" alt="GIF" class="post-image" loading="lazy">
           {% elif post.imagen %}
           <img src="{{ post.imagen.url }}" alt="Imagen del post" class="post-image" loading="lazy">
           {% endif %}
         </div>
+
 
 
         <div class="post-actions">
@@ -317,7 +352,14 @@
                     class="comment-author">{{c.usuario.nombre_usuario }}</a>
                   <span class="comment-date ms-2">{{ c.fecha_comentario|date:"d M, Y H:i" }}</span>
                 </div>
-                <p class="comment-text mb-0">{{ c.contenido }}</p>
+                <p class="comment-text mb-0">
+                  {% if usar_filtro and c.contenido_censurado %}
+                  {{ c.contenido_censurado }}
+                  {% else %}
+                  {{ c.contenido }}
+                  {% endif %}
+                </p>
+
               </div>
 
               {% if user.id == c.usuario.id %}
@@ -330,7 +372,9 @@
                   <li>
                     <form method="post" action="{% url 'comentario_eliminar' c.id_comentario %}">
                       {% csrf_token %}
-                      <input type="hidden" name="next" value="/feed/#post-{{ post.id_post }}">
+                      <input type="hidden" name="next"
+                        value="/feed/{% if usar_filtro %}?filtro_malas_palabras=1{% endif %}#post-{{ post.id_post }}">
+
                       <button type="submit" class="dropdown-item text-danger js-confirm-delete"
                         data-confirm="¿Eliminar este comentario?">
                         <i class="bi bi-trash"></i> Borrar comentario
@@ -358,7 +402,9 @@
           <form method="post" class="comment-form" action="{% url 'comentario_crear' %}">
             {% csrf_token %}
             <input type="hidden" name="post_id" value="{{ post.id_post }}">
-            <input type="hidden" name="next" value="/feed/#post-{{ post.id_post }}">
+            <input type="hidden" name="next"
+              value="/feed/{% if usar_filtro %}?filtro_malas_palabras=1{% endif %}#post-{{ post.id_post }}">
+
             <input type="text" name="contenido" class="comment-input" placeholder="Escribe un comentario..." required>
             <button type="submit" class="btn btn-icon"><i class="bi bi-send-fill"></i></button>
           </form>
@@ -434,6 +480,27 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+  const USAR_FILTRO = {{ usar_filtro|yesno:"true,false" }};
+
+  // === Toggle filtro de malas palabras (tres puntitos del card) ===
+  document.addEventListener('click', function (e) {
+    const btn = e.target.closest('#toggleFiltroMalasPalabras');
+    if (!btn) return;
+
+    e.preventDefault();
+
+    const url = new URL(window.location.href);
+    const isOn = url.searchParams.get('filtro_malas_palabras') === '1';
+
+    if (isOn) {
+      url.searchParams.delete('filtro_malas_palabras');
+    } else {
+      url.searchParams.set('filtro_malas_palabras', '1');
+    }
+
+    window.location.href = url.toString();
+  });
+
   /* Preview imagen crear post */
   const imageInput = document.getElementById('id_imagen');
   const previewContainer = document.getElementById('image-preview-container');
@@ -520,9 +587,19 @@
       const postId = trg.getAttribute('data-post-id');
       modalPostIdInput.value = postId;
       modalBody.innerHTML = `<div class="text-center p-4">
-      <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Cargando...</span></div>
-    </div>`;
-      fetch(`/api/post/${postId}/comments/`).then(r => r.json()).then(data => {
+  <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Cargando...</span></div>
+</div>`;
+
+      // 👇 NUEVO: le pasamos al endpoint si el filtro está activo
+      const urlActual = new URL(window.location.href);
+      const filtro = urlActual.searchParams.get('filtro_malas_palabras');
+
+      let commentsUrl = `/api/post/${postId}/comments/`;
+      if (filtro === '1') {
+        commentsUrl += '?filtro_malas_palabras=1';
+      }
+
+      fetch(commentsUrl).then(r => r.json()).then(data => {
         modalBody.innerHTML = '';
         if (!data.comentarios.length) {
           modalBody.innerHTML = '<p class="text-center text-muted no-comments-message">Este post aún no tiene comentarios.</p>';
@@ -532,16 +609,35 @@
       });
     });
 
+
+
     modalForm.addEventListener('submit', (e) => {
       e.preventDefault();
       const fd = new FormData(modalForm);
-      fetch("{% url 'comentario_crear' %}", {
-        method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: fd
+
+      // Usamos directamente la bandera del backend
+      let comentarioUrl = "{% url 'comentario_crear' %}";
+      if (USAR_FILTRO) {
+        comentarioUrl += '?filtro_malas_palabras=1';
+      }
+
+      fetch(comentarioUrl, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: fd
       }).then(r => r.json()).then(data => {
         if (data.ok) {
+          const contenidoMostrar = (USAR_FILTRO && data.comment.contenido_censurado)
+            ? data.comment.contenido_censurado
+            : data.comment.contenido;
+
           const c = {
-            id: data.comment.id, autor: data.comment.nombre_usuario, contenido: data.comment.contenido,
-            fecha: data.comment.creado_en, autor_foto: data.comment.autor_foto, es_propietario: true
+            id: data.comment.id,
+            autor: data.comment.nombre_usuario,
+            contenido: contenidoMostrar,
+            fecha: data.comment.creado_en,
+            autor_foto: data.comment.autor_foto,
+            es_propietario: true
           };
           modalBody.querySelector('.no-comments-message')?.remove();
           modalBody.appendChild(createCommentElement(c));
@@ -549,6 +645,9 @@
         }
       });
     });
+
+
+
 
     modalBody.addEventListener('submit', async (e) => {
       if (!e.target.classList.contains('modal-delete-comment-form')) return;
@@ -740,8 +839,9 @@
     }
   });
 
-    // === Comentarios del feed SIN recargar ===
-  (function () {
+  // === Comentarios del feed SIN recargar ===
+  // === Comentarios del feed SIN recargar ===
+    (function () {
     const DEFAULT_AVATAR = "{% static 'img/Gifters/favicongift.png' %}";
 
     document.addEventListener('submit', function (e) {
@@ -763,7 +863,6 @@
       })
         .then(r => r.json())
         .then(data => {
-          // Por si algo sale raro
           if (!data || !data.ok || !data.comment) {
             console.warn('Respuesta inesperada de comentario_crear:', data);
             return;
@@ -786,42 +885,51 @@
           const fecha = c.creado_en;
           const postId = form.querySelector('input[name="post_id"]')?.value || '';
 
+          // Usamos la bandera global del backend
+          const filtroOn = USAR_FILTRO;
+          const filtroQuery = filtroOn ? '?filtro_malas_palabras=1' : '';
+
+          const textoComentario = (filtroOn && c.contenido_censurado)
+            ? c.contenido_censurado
+            : c.contenido;
+
           const newCommentHtml = `
-            <div class="comment-item d-flex align-items-start" id="comment-${c.id}">
-              <a href="/u/${username}/">
-                <img src="${avatarUrl}" alt="${username}" class="comment-avatar">
-              </a>
+          <div class="comment-item d-flex align-items-start" id="comment-${c.id}">
+            <a href="/u/${username}/">
+              <img src="${avatarUrl}" alt="${username}" class="comment-avatar">
+            </a>
 
-              <div class="comment-body flex-grow-1">
-                <div class="comment-header d-flex align-items-center">
-                  <a href="/u/${username}/" class="comment-author">${username}</a>
-                  <span class="comment-date ms-2">${fecha}</span>
-                </div>
-                <p class="comment-text mb-0">${c.contenido}</p>
+            <div class="comment-body flex-grow-1">
+              <div class="comment-header d-flex align-items-center">
+                <a href="/u/${username}/" class="comment-author">${username}</a>
+                <span class="comment-date ms-2">${fecha}</span>
               </div>
-
-              <div class="dropdown ms-2">
-                <button class="btn btn-sm btn-link p-0" type="button"
-                        data-bs-toggle="dropdown" aria-expanded="false"
-                        aria-label="Más opciones">
-                  <i class="bi bi-three-dots-vertical"></i>
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                  <li>
-                    <form method="post" action="/comentarios/${c.id}/eliminar/">
-                      <input type="hidden" name="csrfmiddlewaretoken"
-                             value="${form.querySelector('[name=csrfmiddlewaretoken]').value}">
-                      <input type="hidden" name="next" value="/feed/#post-${postId}">
-                      <button type="submit" class="dropdown-item text-danger js-confirm-delete"
-                              data-confirm="¿Eliminar este comentario?">
-                        <i class="bi bi-trash"></i> Borrar comentario
-                      </button>
-                    </form>
-                  </li>
-                </ul>
-              </div>
+              <p class="comment-text mb-0">${textoComentario}</p>
             </div>
-          `;
+
+            <div class="dropdown ms-2">
+              <button class="btn btn-sm btn-link p-0" type="button"
+                      data-bs-toggle="dropdown" aria-expanded="false"
+                      aria-label="Más opciones">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                  <form method="post" action="/comentarios/${c.id}/eliminar/">
+                    <input type="hidden" name="csrfmiddlewaretoken"
+                           value="${form.querySelector('[name=csrfmiddlewaretoken]').value}">
+                    <input type="hidden" name="next"
+                           value="/feed/${filtroQuery}#post-${postId}">
+                    <button type="submit" class="dropdown-item text-danger js-confirm-delete"
+                            data-confirm="¿Eliminar este comentario?">
+                      <i class="bi bi-trash"></i> Borrar comentario
+                    </button>
+                  </form>
+                </li>
+              </ul>
+            </div>
+          </div>
+        `;
 
           // Lo agregamos al final de la lista
           list.insertAdjacentHTML('beforeend', newCommentHtml);
@@ -834,6 +942,9 @@
         });
     });
   })();
+
+
+
 
 
 </script>
