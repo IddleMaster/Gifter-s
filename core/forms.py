@@ -160,29 +160,41 @@ class PostForm(forms.ModelForm):
             'rows': 3
         }),
         label="",
-        required=False  # El contenido ya no es siempre obligatorio
+        required=False
     )
-    
+
     imagen = forms.ImageField(
         required=False,
         widget=forms.ClearableFileInput(attrs={
             'class': 'form-control'
         }),
-        validators=[validate_image_size]  
+        validators=[validate_image_size]
+    )
+
+    # ✅ nuevo: campo invisible para el GIF seleccionado
+    gif_url = forms.URLField(
+        required=False,
+        widget=forms.HiddenInput()
     )
 
     class Meta:
         model = Post
-        fields = ['contenido', 'imagen']
+        fields = ['contenido', 'imagen', 'gif_url']
 
     def clean(self):
         cleaned_data = super().clean()
         contenido = cleaned_data.get('contenido')
         imagen = cleaned_data.get('imagen')
+        gif_url = cleaned_data.get('gif_url')
 
-        if not contenido and not imagen:
-            raise ValidationError("Debes proporcionar un texto o una imagen para publicar.")
-        
+        # Evita post vacíos
+        if not contenido and not imagen and not gif_url:
+            raise ValidationError("Debes escribir algo, subir una imagen o elegir un GIF para publicar.")
+
+        # Evita imagen + gif simultáneos
+        if imagen and gif_url:
+            raise ValidationError("No puedes subir una imagen y un GIF al mismo tiempo.")
+
         return cleaned_data
 
 class PerfilForm(forms.ModelForm):

@@ -1,0 +1,46 @@
+{% if request.user != user %}
+    <div class="profile-actions">
+        <!-- Botón de Bloquear/Desbloquear -->
+        {% if is_blocked %}
+            <form method="post" action="{% url 'unblock_user' user.id %}" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-warning">
+                    <i class="fas fa-unlock"></i> Desbloquear
+                </button>
+            </form>
+        {% else %}
+            <form method="post" action="{% url 'block_user' user.id %}" 
+                  onsubmit="return confirm('¿Estás seguro de que quieres bloquear a este usuario?');"
+                  class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">
+                    <i class="fas fa-user-slash"></i> Bloquear
+                </button>
+            </form>
+        {% endif %}
+
+        {% if not is_blocked %}
+            <!-- Botón de Seguir/Dejar de Seguir -->
+            {% if is_following %}
+                <form method="post" action="{% url 'unfollow_user' user.id %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-secondary">
+                        <i class="fas fa-user-minus"></i> Dejar de Seguir
+                    </button>
+                </form>
+            {% else %}
+                <form method="post" action="{% url 'follow_user' user.id %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-user-plus"></i> Seguir
+                    </button>
+                </form>
+            {% endif %}
+
+            <!-- Botón de Enviar Mensaje -->
+            <a href="{% url 'start_conversation' user.id %}" class="btn btn-info">
+                <i class="fas fa-envelope"></i> Enviar Mensaje
+            </a>
+        {% endif %}
+    </div>
+{% endif %}

@@ -10,6 +10,8 @@ services:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+      # Monta el volumen de respaldos aquí
+      - backups:/backups
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
@@ -22,7 +24,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - .:/app  # Mapea todo tu proyecto, incluyendo la carpeta 'media'
+      - .:/app
     env_file:
       - .env
     depends_on:
@@ -33,14 +35,15 @@ services:
       meilisearch:
         condition: service_started 
     environment:
+      IS_DOCKER: "1"
       DJANGO_DB_HOST: db
       DJANGO_DB_NAME: gifters
       DJANGO_DB_USER: gifters_user
       DJANGO_DB_PASSWORD: gifters_pass
       DEBUG: "1"
       REDIS_URL: "redis://redis:6379/0"
-      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}   
-      MEILI_URL: ${MEILI_URL}                 
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
+      MEILI_URL: ${MEILI_URL}
       USE_MEILI: ${USE_MEILI} 
 
   phpmyadmin:
@@ -52,7 +55,7 @@ services:
       MYSQL_ROOT_PASSWORD: rootpass
     depends_on:
       db:
-        condition: service_healthy # También espera a que la BD esté saludable
+        condition: service_healthy
 
   redis:
     image: redis:7-alpine
@@ -70,13 +73,52 @@ services:
     environment:
       MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
     ports:
-      - "7700:7700"        # Para probar desde tu navegador/host
+      - "7700:7700"
     volumes:
       - meili_data:/meili_data
     restart: unless-stopped
 
+  # 👇 ASEGÚRATE DE QUE db-backup ESTÉ INDENTADO AQUÍ (DENTRO DE SERVICES)
+  db-backup:
+    image: mysql:8.0 # Usa la misma imagen que tu BD
+    depends_on:
+      db:
+        condition: service_healthy # Espera a que la BD esté saludable
+    environment:
+      # Pasa las credenciales de tu BD
+      MYSQL_DATABASE: gifters
+      MYSQL_USER: gifters_user
+      MYSQL_PASSWORD: gifters_pass
+      MYSQL_HOST: db # El nombre del servicio de tu BD
+    volumes:
+      - backups:/backups # Monta el volumen de respaldos
+      - .:/project:ro
+    command: >
+      sh -c "while true; do
+        echo '📦 Iniciando respaldo diario de BD...'
+        
+        # 1. Respaldo de Base de Datos (ya funciona)
+        mysqldump --no-tablespaces -h $${MYSQL_HOST} -u $${MYSQL_USER} -p$${MYSQL_PASSWORD} $${MYSQL_DATABASE} > /backups/backup-$$(date +%Y-%m-%d_%H-%M-%S).sql
+        
+        echo 'Respaldo de BD completado.'
+
+        # --- 👇 AÑADE ESTO: Respaldo de 'media' 👇 ---
+        echo '📦 Iniciando respaldo diario de Media...'
+        
+        # Comprime la carpeta /project/media/ y la guarda en /backups/
+        # (El -C /project es para que no guarde la ruta completa)
+        tar -czf /backups/media-$$(date +%Y-%m-%d_%H-%M-%S).tar.gz -C /project media
+        
+        echo 'Respaldo de Media completado.'
+        # --- ------------------------------------ ---
+
+        # Espera 24 horas
+        echo 'Durmiendo por 24 horas...'
+        sleep 86400
+      done"
 
 volumes:
   mysql_data:
   meili_data:
-
+  # Declara el nuevo volumen de respaldos
+  backups:

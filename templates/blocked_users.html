@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-4">
+    <h2 class="mb-4">Usuarios Bloqueados</h2>
+    
+    {% if messages %}
+    <div class="messages mb-4">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}" role="alert">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if blocked_users %}
+        <div class="list-group">
+            {% for block in blocked_users %}
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-1">{{ block.blocked.nombre_usuario }}</h5>
+                        <small class="text-muted">Bloqueado el {{ block.timestamp|date:"d/m/Y" }}</small>
+                    </div>
+                    <form method="post" action="{% url 'unblock_user' block.blocked.id %}" 
+                          onsubmit="return confirm('¿Estás seguro de que quieres desbloquear a este usuario?');"
+                          class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-warning btn-sm">Desbloquear</button>
+                    </form>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            No tienes usuarios bloqueados.
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

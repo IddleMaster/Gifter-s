@@ -465,13 +465,16 @@ class Seguidor(models.Model):
         
       
 
+from django.core.exceptions import ValidationError
+from django.db import models
+
 class Post(models.Model):
     # PK
     id_post = models.AutoField(primary_key=True, verbose_name='ID Post')
     
     # FK al usuario (autor)
     id_usuario = models.ForeignKey(
-        User,
+        'User',
         on_delete=models.CASCADE,
         db_column='id_usuario',
         verbose_name='Autor',
@@ -485,13 +488,14 @@ class Post(models.Model):
         null=True
     )
     
-    # Tipo de post - usando TextChoices para mejor manejo
+    # Tipo de post
     class TipoPost(models.TextChoices):
         TEXTO = 'texto', 'Texto'
         IMAGEN = 'imagen', 'Imagen'
-        VIDEO = 'video', 'Video'
+        VIDEO  = 'video',  'Video'
         ENLACE = 'enlace', 'Enlace'
-    
+        GIF    = 'gif',    'GIF'        # ← NUEVO
+
     tipo_post = models.CharField(
         max_length=10,
         choices=TipoPost.choices,
@@ -499,12 +503,20 @@ class Post(models.Model):
         verbose_name='Tipo de post'
     )
     
-    # REEMPLAZA el campo url_media por este:
+    # Media
     imagen = models.ImageField(
-        upload_to='posts/',  # Directorio donde se guardarán las imágenes
+        upload_to='posts/',
         blank=True,
         null=True,
         verbose_name='Imagen'
+    )
+
+    # ← NUEVO: URL del GIF de GIPHY
+    gif_url = models.URLField(
+        max_length=500,
+        blank=True,
+        null=True,
+        verbose_name='GIF (GIPHY)'
     )
     
     # Visibilidad
@@ -534,6 +546,8 @@ class Post(models.Model):
             models.Index(fields=['tipo_post'], name='idx_post_tipo'),
             models.Index(fields=['es_publico'], name='idx_post_publico'),
             models.Index(fields=['fecha_publicacion'], name='idx_post_fecha'),
+            # Opcional pero útil si luego filtras por GIF
+            models.Index(fields=['gif_url'], name='idx_post_gif_url'),
         ]
     
     def __str__(self):
@@ -541,17 +555,28 @@ class Post(models.Model):
     
     def clean(self):
         """Validaciones personalizadas"""
-        # Si es tipo imagen/video/enlace, debería tener url_media
-        if self.tipo_post in [self.TipoPost.IMAGEN] and not self.imagen:
-            raise ValidationError(f"Los posts de tipo {self.tipo_post} deben tener una imagen")
-        
-        # Si es tipo texto, el contenido no debe estar vacío
-        if self.tipo_post == self.TipoPost.TEXTO and not self.contenido:
-            raise ValidationError("Los posts de texto deben tener contenido")
+        # No permitir imagen y GIF al mismo tiempo
+        if self.imagen and self.gif_url:
+            raise ValidationError("No puedes adjuntar imagen y GIF a la vez.")
+
+        # Validaciones por tipo
+        if self.tipo_post == self.TipoPost.IMAGEN and not self.imagen:
+            raise ValidationError("Los posts de tipo imagen deben tener una imagen.")
+
+        if self.tipo_post == self.TipoPost.GIF and not self.gif_url:
+            raise ValidationError("Los posts de tipo GIF deben tener un GIF (gif_url).")
+
+        if self.tipo_post == self.TipoPost.TEXTO and not (self.contenido and self.contenido.strip()):
+            raise ValidationError("Los posts de texto deben tener contenido.")
+
+        # Validación básica de URL del GIF si viene
+        if self.gif_url and not self.gif_url.startswith("https://"):
+            raise ValidationError("El GIF debe tener una URL válida (https://).")
     
     def save(self, *args, **kwargs):
         self.clean()
         super().save(*args, **kwargs)
+
         
 
 class ItemEnWishlist(models.Model):

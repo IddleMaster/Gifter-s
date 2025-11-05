@@ -6,9 +6,10 @@ from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.conf.urls.static import static as dj_static
 from django.conf import settings
 from core.views import *
-from core import views
+from core import views, views_block
 from django.contrib.auth import views as auth_views
 from django.views.decorators.cache import never_cache
+from core import api_views
 from core.api_views import AmigosRecomendadosView
 from core.views_populares import populares_ai
 
@@ -30,12 +31,17 @@ from core.api_views import (
 
 from core import views as core_views
 
-
+import random
+from django.utils import timezone
+from django.contrib.auth import get_user_model
 
 urlpatterns = [
     # Admin / auth
     path('admin/', admin.site.urls),
     path('accounts/', include('allauth.urls')),
+
+    # API Events
+    path('api/events/<int:event_id>/draw/', views.api_event_draw, name='api_event_draw'),
 
     # Páginas base
     path('', views.home, name='home'),
@@ -81,6 +87,7 @@ urlpatterns = [
     path('api/post/<int:post_id>/comments/', views.get_comments_view, name='get_comments'),
     path('post/crear/', views.post_crear, name='post_crear'),
     path('post/<int:pk>/eliminar/', views.post_eliminar, name='post_eliminar'), 
+    path('post/<int:post_id>/report/', views.report_post, name='report_post'),
     path('comentarios/crear/', views.comentario_crear, name='comentario_crear'),
     path('comentarios/<int:pk>/eliminar/', views.comentario_eliminar, name='comentario_eliminar'),
     
@@ -113,6 +120,10 @@ urlpatterns = [
     path('api/reports/popular-searches/', views.PopularSearchReportAPIView.as_view(), name='api_report_popular_searches'),
     path('api/reports/site-reviews/', views.SiteReviewsReportAPIView.as_view(), name='api_report_site_reviews'),
     path('api/reports/top-active-users/', views.TopActiveUsersReportAPIView.as_view(), name='api_report_top_active_users'),
+    
+    path('api/admin/logs/', views.get_web_app_logs, name='api_get_web_logs'),
+    path('api/reports/popular-searches/download/pdf/', views.download_popular_search_report_pdf, name='api_report_search_pdf_download'),
+    
     
     # Esta ruta es para ver el detalle de un usuario (para el reporte de "a quién bloqueó")
     path('api/reports/user-activity/<int:pk>/', views.UserActivityDetailAPIView.as_view(), name='api_report_user_activity_detail'),
@@ -147,12 +158,19 @@ urlpatterns = [
     path('favoritos/toggle/<int:product_id>/', views.toggle_favorito, name='favoritos_toggle'),
     # Wishlist (acciones)
     path('wishlist/item/<int:item_id>/recibir/', views.wishlist_marcar_recibido, name='wishlist_marcar_recibido'),
-    path('api/search_friends/', views.search_friends_for_thanks, name='search_friends_for_thanks'),
+    path('api/search_friends/', views.search_friends_for_thanks, name='search_friends_for_thanks'), 
     path('api/thank_you/post/', views.create_thank_you_post, name='create_thank_you_post'),
     path('api/thank_you/notification/', views.send_thank_you_notification, name='send_thank_you_notification'),
+    path('api/agradecimiento/procesar/', views.procesar_agradecimiento_desde_regalo, name='procesar_agradecimiento'),
+    
 
     path('wishlist/item/<int:item_id>/desmarcar/',views.wishlist_desmarcar_recibido,name='wishlist_desmarcar_recibido'),
     path('amistad/amigos/', views.amistad_amigos_view, name='amistad_amigos'),
+    
+    # Bloqueo de usuarios
+    path('usuarios/bloqueados/', views_block.blocked_users_list, name='blocked_users_list'),
+    path('usuarios/bloquear/<int:user_id>/', views_block.block_user, name='block_user'),
+    path('usuarios/desbloquear/<int:user_id>/', views_block.unblock_user, name='unblock_user'),
     path("chat/con-id/<str:username>/", views.conversacion_con_usuario_id, name="chat_con_usuario_id"),
     ###para el escribiendo:::
     path("api/chat/<int:conv_id>/typing/", views.TypingView.as_view(), name="chat_typing"),
@@ -185,8 +203,17 @@ urlpatterns = [
     path('api/events/create_with_chat/', views.event_create_with_chat, name='event_create_with_chat'),
 
     # Sortear amigo secreto para un evento existente
-    path('api/events/<int:evento_id>/draw', views.event_draw, name='event_draw'),
-     
+    # Sorteo (UN solo endpoint canónico)
+    
+
+        # Sorteo (UN solo endpoint canónico)
+    path('api/events/<int:event_id>/draw/', views.api_event_draw, name='api_event_draw'),
+
+    # (Opcional) Alias legible en español que apunta a la MISMA vista
+    # (solo si realmente quieres tener /sortear/ también)
+    path('api/events/<int:event_id>/sortear/', views.api_event_draw, name='api_event_draw_es'),
+
+    # (Opcional) Alias legible en español que apunta a la MISMA vista
  
     
     path("cards/s/<slug:slug>/", views.ver_card_publica, name="ver_card_publica"),
@@ -198,9 +225,9 @@ urlpatterns = [
     
 
     ## Para notificaciones navBar
-    path("notificaciones/mark-all/", views.notificaciones_mark_all, name="notificaciones_mark_all"),
-    path("notificaciones/click/<uuid:notificacion_id>/", views.notificacion_click, name="notificacion_click"),
-    path("notificaciones/mark-one/<uuid:notificacion_id>/", views.notificacion_mark_one, name="notificacion_mark_one"),
+    path('notificaciones/mark-one/<int:notificacion_id>/', views.notificacion_mark_one, name='notificacion_mark_one'),
+    path('notificaciones/mark-all/', views.notificaciones_mark_all, name='notificaciones_mark_all'),
+    path('notificaciones/click/<int:notificacion_id>/', views.notificacion_click, name='notificacion_click'),
 
 
     path('recommendation-feedback/', recommendation_feedback, name='recommendation_feedback'),
@@ -214,7 +241,8 @@ urlpatterns = [
     path("api/cards/generar/", views.generar_card_hf, name="cards_generar"),
     path("cards/crear/<str:username>/", views.cards_crear, name="cards_crear"),
 
-
+    #calendario
+    path('api/feriados/proximo/', api_views.proximo_feriado, name='api_proximo_feriado'),
 
     # --- URLs PARA RESTABLECIMIENTO DE CONTRASEÑA (Flujo de Django) ---
     path('password_reset/',
@@ -245,8 +273,7 @@ urlpatterns = [
 
 ###apartadiño de evento (amigo secret)
     path('chat/<int:conversacion_id>/events/', views.events_list_create, name='events_list_create'),           # GET lista, POST crear
-    path('chat/events/<int:evento_id>/', views.event_detail, name='event_detail'),                             # GET detalle (admin)
-    path('chat/events/<int:evento_id>/draw/', views.event_draw, name='event_draw'),                            # POST sortear
+    path('chat/events/<int:evento_id>/', views.event_detail, name='event_detail'),                             # GET detalle (admin)             # POST sortear
     path('chat/events/<int:evento_id>/lock/', views.event_lock, name='event_lock'),                            # POST cerrar (opcional)
     path('chat/events/<int:evento_id>/mine/', views.event_my_assignment, name='event_my_assignment'),          # GET mi asignación
     

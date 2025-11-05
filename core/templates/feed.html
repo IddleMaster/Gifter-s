@@ -8,56 +8,141 @@
 <link rel="stylesheet" href="{% static 'css/feed.css' %}">
 <style>
   .post-options .btn-link,
-  .comment-item .btn-link { color:#76839a; text-decoration:none; }
+  .comment-item .btn-link {
+    color: #76839a;
+    text-decoration: none;
+  }
+
   .post-options .btn-link:hover,
-  .comment-item .btn-link:hover { color:#334155; }
-  .dropdown-item.text-danger i { margin-right:.35rem; }
+  .comment-item .btn-link:hover {
+    color: #334155;
+  }
+
+  .dropdown-item.text-danger i {
+    margin-right: .35rem;
+  }
 
 
   /* === Animación del botón "Me gusta" === */
-.like-btn {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  transition: transform 0.2s ease;
-}
+  .like-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+  }
 
-.like-btn i {
+  .like-btn i {
+    transition: all 0.25s ease;
+    font-size: 1.3rem;
+  }
+
+  .like-btn .bi-heart-fill {
+    color: #ff4d6d;
+    /* color activo */
+    transform: scale(0);
+    opacity: 0;
+  }
+
+  .like-btn .bi-heart {
+    color: #666;
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  .like-btn.liked .bi-heart-fill {
+    transform: scale(1);
+    opacity: 1;
+    animation: heart-pop 0.4s ease;
+  }
+
+  .like-btn.liked .bi-heart {
+    transform: scale(0);
+    opacity: 0;
+  }
+
+  /* Efecto de pulso */
+  @keyframes heart-pop {
+    0% {
+      transform: scale(0.3);
+      opacity: 0;
+    }
+
+    40% {
+      transform: scale(1.3);
+      opacity: 1;
+    }
+
+    70% {
+      transform: scale(0.9);
+    }
+
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  /* ==== GIPHY modal ==== */
+  #gif-grid .gif-tile {
+    position: relative;
+    cursor: pointer;
+    overflow: hidden;
+    border-radius: .6rem;
+  }
+
+  #gif-grid .gif-tile img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  #gif-grid .gif-tile:after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    box-shadow: inset 0 0 0 0 rgba(255, 255, 255, .8);
+    transition: .15s;
+  }
+
+  #gif-grid .gif-tile:hover:after {
+    box-shadow: inset 0 0 0 4px rgba(255, 255, 255, .8);
+  }
+
+  #gif-preview {
+    max-height: 360px;
+    width: auto;
+  }
+
+  .btn-create-post:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    filter: grayscale(20%);
+  }
+
+  /* ====== Botón Publicar (estados) ====== */
+.btn-create-post {
+  background-color: #3b82f6; /* azul habilitado */
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-weight: 600;
   transition: all 0.25s ease;
-  font-size: 1.3rem;
 }
 
-.like-btn .bi-heart-fill {
-  color: #ff4d6d; /* color activo */
-  transform: scale(0);
-  opacity: 0;
+.btn-create-post:hover:not(:disabled) {
+  background-color: #2563eb; /* azul más oscuro al hover */
+  transform: translateY(-1px);
 }
 
-.like-btn .bi-heart {
-  color: #666;
-  transform: scale(1);
-  opacity: 1;
-}
-
-.like-btn.liked .bi-heart-fill {
-  transform: scale(1);
-  opacity: 1;
-  animation: heart-pop 0.4s ease;
-}
-
-.like-btn.liked .bi-heart {
-  transform: scale(0);
-  opacity: 0;
-}
-
-/* Efecto de pulso */
-@keyframes heart-pop {
-  0% { transform: scale(0.3); opacity: 0; }
-  40% { transform: scale(1.3); opacity: 1; }
-  70% { transform: scale(0.9); }
-  100% { transform: scale(1); }
+.btn-create-post:disabled {
+  background-color: #cbd5e1; /* gris clarito */
+  color: #64748b;
+  cursor: not-allowed;
+  transform: none;
+  opacity: 0.9;
 }
 
 </style>
@@ -75,16 +160,22 @@
           {% csrf_token %}
           <div class="post-header">
             {% if user.perfil.profile_picture %}
-              <img src="{{ user.perfil.profile_picture.url }}" alt="{{ user.username }}" class="profile-pic">
+            <img src="{{ user.perfil.profile_picture.url }}" alt="{{ user.username }}" class="profile-pic">
             {% else %}
-              <img src="{% static 'img/Gifters/favicongift.png' %}" alt="Sin foto" class="profile-pic">
+            <img src="{% static 'img/Gifters/favicongift.png' %}" alt="Sin foto" class="profile-pic">
             {% endif %}
-            <textarea name="contenido" class="create-post-input" rows="2" placeholder="¿Qué quieres compartir?"></textarea>
+            <textarea id="post-textarea" name="contenido" class="create-post-input" rows="2"
+              placeholder="¿Qué quieres compartir?"></textarea>
           </div>
 
           <div id="image-preview-container" class="image-preview-container" style="display:none;">
             <img id="image-preview" src="#" alt="Vista previa de la imagen" />
             <button type="button" id="remove-image-btn" class="remove-image-btn">&times;</button>
+          </div>
+          <!-- PREVIEW GIF -->
+          <div id="gif-preview-container" class="image-preview-container" style="display:none; margin-top:.5rem;">
+            <img id="gif-preview" src="#" alt="Vista previa GIF" />
+            <button type="button" id="remove-gif-btn" class="remove-image-btn">&times;</button>
           </div>
 
           <hr class="post-divider">
@@ -95,9 +186,20 @@
               <span>Foto</span>
             </label>
             <input type="file" name="imagen" id="id_imagen" accept="image/*" style="display:none;">
-            <button type="submit" class="btn-create-post">Publicar</button>
+            <!-- Botón que abre el modal GIPHY -->
+            <button type="button" id="btn-open-gif" class="action-btn-new" style="border:none;background:transparent;">
+              <i class="bi bi-filetype-gif" style="font-weight:700;"></i>
+              <span>GIF</span>
+            </button>
+
+            <button type="submit" id="btn-publicar" class="btn-create-post" disabled>Publicar</button>
+
+            <input type="hidden" name="gif_url" id="gif_url">
+            <input type="hidden" name="tipo_post" id="tipo_post">
+
           </div>
         </form>
+
       </div>
 
       <!-- Feed de posts -->
@@ -105,24 +207,31 @@
       <div class="post-card" id="post-{{ post.id_post }}">
         <div class="post-header">
           {% if post.id_usuario.perfil.profile_picture %}
-            <a href="{% url 'perfil_detalle' post.id_usuario.nombre_usuario %}">
-              <img src="{{ post.id_usuario.perfil.profile_picture.url }}" alt="{{ post.id_usuario.nombre_usuario }}" class="profile-pic">
-            </a>
+          <a href="{% url 'perfil_detalle' post.id_usuario.nombre_usuario %}">
+            <img src="{{ post.id_usuario.perfil.profile_picture.url }}" alt="{{ post.id_usuario.nombre_usuario }}"
+              class="profile-pic">
+          </a>
           {% else %}
-            <a href="{% url 'perfil_detalle' post.id_usuario.nombre_usuario %}">
-              <img src="{% static 'img/Gifters/favicongift.png' %}" alt="Sin foto" class="profile-pic">
-            </a>
+          <a href="{% url 'perfil_detalle' post.id_usuario.nombre_usuario %}">
+            <img src="{% static 'img/Gifters/favicongift.png' %}" alt="Sin foto" class="profile-pic">
+          </a>
           {% endif %}
 
           <div class="post-author-info">
-            <a href="{% url 'perfil_detalle' post.id_usuario.nombre_usuario %}" class="author-name">{{ post.id_usuario.nombre_usuario }}</a>
+            {% with u=post.id_usuario %}
+            {% firstof u.nombre_usuario u.email as display_name %}
+            <a href="{% url 'perfil_detalle' u.nombre_usuario %}" class="author-name">{{ display_name }}</a>
+            {% endwith %}
             <span class="post-timestamp">{{ post.fecha_publicacion|date:"d M, Y H:i" }}</span>
           </div>
+
+
 
           {% if user.id == post.id_usuario.id %}
           <div class="post-options ms-auto">
             <div class="dropdown">
-              <button class="btn btn-link p-0" type="button" id="postMenu-{{ post.id_post }}" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Más opciones">
+              <button class="btn btn-link p-0" type="button" id="postMenu-{{ post.id_post }}" data-bs-toggle="dropdown"
+                aria-expanded="false" aria-label="Más opciones">
                 <i class="bi bi-three-dots-vertical fs-5"></i>
               </button>
               <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="postMenu-{{ post.id_post }}">
@@ -130,8 +239,30 @@
                   <form method="post" action="{% url 'post_eliminar' post.id_post %}">
                     {% csrf_token %}
                     <input type="hidden" name="next" value="/feed/">
-                    <button type="submit" class="dropdown-item text-danger js-confirm-delete" data-confirm="¿Eliminar esta publicación?">
+                    <button type="submit" class="dropdown-item text-danger js-confirm-delete"
+                      data-confirm="¿Eliminar esta publicación?">
                       <i class="bi bi-trash"></i> Borrar publicación
+                    </button>
+                  </form>
+                </li>
+              </ul>
+            </div>
+          </div>
+          {% endif %}
+          {% if user.id != post.id_usuario.id %}
+          <div class="post-options ms-auto">
+            <div class="dropdown">
+              <button class="btn btn-link p-0" type="button" id="postMenuReport-{{ post.id_post }}" data-bs-toggle="dropdown"
+                aria-expanded="false" aria-label="Más opciones">
+                <i class="bi bi-three-dots-vertical fs-5"></i>
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="postMenuReport-{{ post.id_post }}">
+                <li>
+                  <form method="post" action="{% url 'report_post' post.id_post %}" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="motivo" value="Contenido inapropiado">
+                    <button type="submit" class="dropdown-item text-danger js-confirm-report" data-confirm="¿Reportar esta publicación como inapropiada?">
+                      <i class="bi bi-flag"></i> Reportar publicación
                     </button>
                   </form>
                 </li>
@@ -142,19 +273,24 @@
         </div>
 
         <div class="post-content">
-          <p>{{ post.contenido }}</p>
-          {% if post.imagen %}
-            <img src="{{ post.imagen.url }}" alt="Imagen del post" class="post-image">
+          {% if post.contenido %}<p>{{ post.contenido }}</p>{% endif %}
+          {% if post.gif_url %}
+          <img src="{{ post.gif_url }}" alt="GIF" class="post-image" loading="lazy">
+          {% elif post.imagen %}
+          <img src="{{ post.imagen.url }}" alt="Imagen del post" class="post-image" loading="lazy">
           {% endif %}
         </div>
 
+
         <div class="post-actions">
-          <a href="#" class="action-btn like-btn {% if post.user_has_liked %}liked{% endif %}" data-post-id="{{ post.id_post }}">
+          <a href="#" class="action-btn like-btn {% if post.user_has_liked %}liked{% endif %}"
+            data-post-id="{{ post.id_post }}">
             <i class="bi bi-heart-fill"></i><i class="bi bi-heart"></i>
             <span class="like-count">{{ post.likes.count }}</span>&nbsp;Me gusta
           </a>
 
-          <a href="#" class="action-btn" data-bs-toggle="modal" data-bs-target="#commentsModal" data-post-id="{{ post.id_post }}">
+          <a href="#" class="action-btn" data-bs-toggle="modal" data-bs-target="#commentsModal"
+            data-post-id="{{ post.id_post }}">
             <i class="bi bi-chat-dots"></i>Comentarios
           </a>
         </div>
@@ -162,56 +298,61 @@
         <!-- Comentarios -->
         <div class="post-comments" id="comments-{{ post.id_post }}">
           {% with comentarios=post.comentarios.all %}
-            {% if comentarios %}
-            <div class="comments-list">
-              {% for c in comentarios|slice:":2" %}
-              <div class="comment-item d-flex align-items-start" id="comment-{{ c.id_comentario }}">
-                <a href="{% url 'perfil_detalle' c.usuario.nombre_usuario %}">
-                  {% if c.usuario.perfil.profile_picture %}
-                    <img src="{{ c.usuario.perfil.profile_picture.url }}" alt="{{ c.usuario.nombre_usuario }}" class="comment-avatar">
-                  {% else %}
-                    <img src="{% static 'img/Gifters/favicongift.png' %}" alt="Sin foto" class="comment-avatar">
-                  {% endif %}
-                </a>
-
-                <div class="comment-body flex-grow-1">
-                  <div class="comment-header d-flex align-items-center">
-                    <a href="{% url 'perfil_detalle' c.usuario.nombre_usuario %}" class="comment-author">{{ c.usuario.nombre_usuario }}</a>
-                    <span class="comment-date ms-2">{{ c.fecha_comentario|date:"d M, Y H:i" }}</span>
-                  </div>
-                  <p class="comment-text mb-0">{{ c.contenido }}</p>
-                </div>
-
-                {% if user.id == c.usuario.id %}
-                <div class="dropdown ms-2">
-                  <button class="btn btn-sm btn-link p-0" type="button" id="cmtMenu-{{ c.id_comentario }}" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Más opciones">
-                    <i class="bi bi-three-dots-vertical"></i>
-                  </button>
-                  <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="cmtMenu-{{ c.id_comentario }}">
-                    <li>
-                      <form method="post" action="{% url 'comentario_eliminar' c.id_comentario %}">
-                        {% csrf_token %}
-                        <input type="hidden" name="next" value="/feed/#post-{{ post.id_post }}">
-                        <button type="submit" class="dropdown-item text-danger js-confirm-delete" data-confirm="¿Eliminar este comentario?">
-                          <i class="bi bi-trash"></i> Borrar comentario
-                        </button>
-                      </form>
-                    </li>
-                  </ul>
-                </div>
+          {% if comentarios %}
+          <div class="comments-list">
+            {% for c in comentarios|slice:":2" %}
+            <div class="comment-item d-flex align-items-start" id="comment-{{ c.id_comentario }}">
+              <a href="{% url 'perfil_detalle' c.usuario.nombre_usuario %}">
+                {% if c.usuario.perfil.profile_picture %}
+                <img src="{{ c.usuario.perfil.profile_picture.url }}" alt="{{ c.usuario.nombre_usuario }}"
+                  class="comment-avatar">
+                {% else %}
+                <img src="{% static 'img/Gifters/favicongift.png' %}" alt="Sin foto" class="comment-avatar">
                 {% endif %}
-              </div>
-              {% endfor %}
-            </div>
-
-            {% if comentarios.count > 2 %}
-            <div class="view-all-wrapper mt-2">
-              <a href="#" class="view-all-comments" data-bs-toggle="modal" data-bs-target="#commentsModal" data-post-id="{{ post.id_post }}">
-                Ver los {{ comentarios.count }} comentarios
               </a>
+
+              <div class="comment-body flex-grow-1">
+                <div class="comment-header d-flex align-items-center">
+                  <a href="{% url 'perfil_detalle' c.usuario.nombre_usuario %}"
+                    class="comment-author">{{c.usuario.nombre_usuario }}</a>
+                  <span class="comment-date ms-2">{{ c.fecha_comentario|date:"d M, Y H:i" }}</span>
+                </div>
+                <p class="comment-text mb-0">{{ c.contenido }}</p>
+              </div>
+
+              {% if user.id == c.usuario.id %}
+              <div class="dropdown ms-2">
+                <button class="btn btn-sm btn-link p-0" type="button" id="cmtMenu-{{ c.id_comentario }}"
+                  data-bs-toggle="dropdown" aria-expanded="false" aria-label="Más opciones">
+                  <i class="bi bi-three-dots-vertical"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="cmtMenu-{{ c.id_comentario }}">
+                  <li>
+                    <form method="post" action="{% url 'comentario_eliminar' c.id_comentario %}">
+                      {% csrf_token %}
+                      <input type="hidden" name="next" value="/feed/#post-{{ post.id_post }}">
+                      <button type="submit" class="dropdown-item text-danger js-confirm-delete"
+                        data-confirm="¿Eliminar este comentario?">
+                        <i class="bi bi-trash"></i> Borrar comentario
+                      </button>
+                    </form>
+                  </li>
+                </ul>
+              </div>
+              {% endif %}
             </div>
-            {% endif %}
-            {% endif %}
+            {% endfor %}
+          </div>
+
+          {% if comentarios.count > 2 %}
+          <div class="view-all-wrapper mt-2">
+            <a href="#" class="view-all-comments" data-bs-toggle="modal" data-bs-target="#commentsModal"
+              data-post-id="{{ post.id_post }}">
+              Ver los {{ comentarios.count }} comentarios
+            </a>
+          </div>
+          {% endif %}
+          {% endif %}
           {% endwith %}
 
           <form method="post" class="comment-form" action="{% url 'comentario_crear' %}">
@@ -224,11 +365,49 @@
         </div>
       </div>
       {% empty %}
-      <div class="post-card"><p>Aún no hay publicaciones. ¡Sé el primero en compartir algo!</p></div>
+      <div class="post-card">
+        <p>Aún no hay publicaciones. ¡Sé el primero en compartir algo!</p>
+      </div>
       {% endfor %}
     </div>
   </div>
 </main>
+<!-- Modal: Selector de GIF (GIPHY) -->
+<div class="modal fade" id="gifModal" tabindex="-1" aria-labelledby="gifModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header border-0">
+        <ul class="nav nav-tabs border-0" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tab-gifs" type="button" role="tab" data-kind="gifs">GIF</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-stickers" type="button" role="tab" data-kind="stickers">Stickers</button>
+          </li>
+        </ul>
+        <button type="button" class="btn-close ms-auto" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+
+      <div class="modal-body pt-2">
+        <div class="d-flex gap-2 align-items-center mb-3">
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input id="gif-search-input" type="text" class="form-control"
+              placeholder="Buscar en GIPHY… (ej: cumpleaños, awww, clap)">
+          </div>
+          <button id="gif-clear-search" class="btn btn-outline-secondary" type="button">Limpiar</button>
+        </div>
+
+        <div id="gif-grid" class="row g-2"></div>
+
+        <div id="gif-loader" class="text-center py-3" style="display:none;">
+          <div class="spinner-border" role="status"><span class="visually-hidden">Cargando…</span></div>
+        </div>
+        <p id="gif-empty" class="text-center text-muted my-3" style="display:none;">Sin resultados.</p>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Modal comentarios -->
 <div class="modal fade" id="commentsModal" tabindex="-1" aria-labelledby="commentsModalLabel" aria-hidden="true">
@@ -255,49 +434,61 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-/* Preview imagen crear post */
-const imageInput = document.getElementById('id_imagen');
-const previewContainer = document.getElementById('image-preview-container');
-const imagePreview = document.getElementById('image-preview');
-const removeImageBtn = document.getElementById('remove-image-btn');
+  /* Preview imagen crear post */
+  const imageInput = document.getElementById('id_imagen');
+  const previewContainer = document.getElementById('image-preview-container');
+  const imagePreview = document.getElementById('image-preview');
+  const removeImageBtn = document.getElementById('remove-image-btn');
 
-imageInput?.addEventListener('change', (e) => {
-  const f = e.target.files[0]; if (!f) return;
-  const r = new FileReader();
-  r.onload = ev => { imagePreview.src = ev.target.result; previewContainer.style.display='block'; };
-  r.readAsDataURL(f);
-});
-removeImageBtn?.addEventListener('click', () => {
-  imageInput.value=''; previewContainer.style.display='none'; imagePreview.src='#';
-});
-
-/* SweetAlert confirm para eliminar (posts/comentarios en feed) */
-document.addEventListener('click', async (e) => {
-  const btn = e.target.closest('.js-confirm-delete'); if (!btn) return;
-  e.preventDefault();
-  const form = btn.closest('form');
-  const res = await Swal.fire({
-    title:'Confirmar', text:btn.dataset.confirm||'¿Seguro?', icon:'warning',
-    showCancelButton:true, confirmButtonText:'Sí, eliminar', cancelButtonText:'Cancelar', reverseButtons:true
+  imageInput?.addEventListener('change', (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => { imagePreview.src = ev.target.result; previewContainer.style.display = 'block'; };
+    r.readAsDataURL(f);
   });
-  if (res.isConfirmed) form.submit();
-});
+  removeImageBtn?.addEventListener('click', () => {
+    imageInput.value = ''; previewContainer.style.display = 'none'; imagePreview.src = '#';
+  });
 
-/* Modal comentarios (AJAX, sin toasts) */
-document.addEventListener('DOMContentLoaded', function () {
-  const commentsModal = document.getElementById('commentsModal');
-  const modalForm = document.getElementById('modal-comment-form');
-  const modalPostIdInput = document.getElementById('modal-post-id-input');
-  const modalBody = document.getElementById('modal-comments-body');
-  const defaultAvatar = "{% static 'img/Gifters/favicongift.png' %}";
+  /* SweetAlert confirm para eliminar (posts/comentarios en feed) */
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.js-confirm-delete'); if (!btn) return;
+    e.preventDefault();
+    const form = btn.closest('form');
+    const res = await Swal.fire({
+      title: 'Confirmar', text: btn.dataset.confirm || '¿Seguro?', icon: 'warning',
+      showCancelButton: true, confirmButtonText: 'Sí, eliminar', cancelButtonText: 'Cancelar', reverseButtons: true
+    });
+    if (res.isConfirmed) form.submit();
+  });
 
-  function createCommentElement(c) {
-    const el = document.createElement('div');
-    el.className='comment-item-modal mb-3';
-    el.id = `modal-comment-${c.id}`;
-    let del = '';
-    if (c.es_propietario) {
-      del = `<div class="dropdown">
+  // Confirm para reportar
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.js-confirm-report'); if (!btn) return;
+    e.preventDefault();
+    const form = btn.closest('form');
+    const res = await Swal.fire({
+      title: 'Reportar publicación', text: btn.dataset.confirm || '¿Reportar esta publicación como inapropiada?', icon: 'warning',
+      showCancelButton: true, confirmButtonText: 'Sí, reportar', cancelButtonText: 'Cancelar', reverseButtons: true
+    });
+    if (res.isConfirmed) form.submit();
+  });
+
+  /* Modal comentarios (AJAX, sin toasts) */
+  document.addEventListener('DOMContentLoaded', function () {
+    const commentsModal = document.getElementById('commentsModal');
+    const modalForm = document.getElementById('modal-comment-form');
+    const modalPostIdInput = document.getElementById('modal-post-id-input');
+    const modalBody = document.getElementById('modal-comments-body');
+    const defaultAvatar = "{% static 'img/Gifters/favicongift.png' %}";
+
+    function createCommentElement(c) {
+      const el = document.createElement('div');
+      el.className = 'comment-item-modal mb-3';
+      el.id = `modal-comment-${c.id}`;
+      let del = '';
+      if (c.es_propietario) {
+        del = `<div class="dropdown">
         <button class="btn btn-sm btn-link p-0" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Más opciones">
           <i class="bi bi-three-dots-vertical"></i>
         </button>
@@ -311,94 +502,339 @@ document.addEventListener('DOMContentLoaded', function () {
           </li>
         </ul>
       </div>`;
-    }
-    el.innerHTML = `<div class="d-flex justify-content-between align-items-start">
+      }
+      el.innerHTML = `<div class="d-flex justify-content-between align-items-start">
       <div class="d-flex">
-        <img src="${c.autor_foto||defaultAvatar}" alt="avatar" class="comment-avatar">
+        <img src="${c.autor_foto || defaultAvatar}" alt="avatar" class="comment-avatar">
         <div class="comment-body ms-2">
           <div class="comment-header"><a href="/u/${c.autor}/" class="comment-author">${c.autor}</a>
             <span class="comment-date">${c.fecha}</span></div>
           <p class="comment-text mb-0">${c.contenido}</p>
         </div>
       </div>${del}</div>`;
-    return el;
-  }
+      return el;
+    }
 
-  commentsModal.addEventListener('show.bs.modal', (ev) => {
-    const trg = ev.relatedTarget;
-    const postId = trg.getAttribute('data-post-id');
-    modalPostIdInput.value = postId;
-    modalBody.innerHTML = `<div class="text-center p-4">
+    commentsModal.addEventListener('show.bs.modal', (ev) => {
+      const trg = ev.relatedTarget;
+      const postId = trg.getAttribute('data-post-id');
+      modalPostIdInput.value = postId;
+      modalBody.innerHTML = `<div class="text-center p-4">
       <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Cargando...</span></div>
     </div>`;
-    fetch(`/api/post/${postId}/comments/`).then(r=>r.json()).then(data=>{
-      modalBody.innerHTML='';
-      if (!data.comentarios.length) {
-        modalBody.innerHTML='<p class="text-center text-muted no-comments-message">Este post aún no tiene comentarios.</p>';
-        return;
-      }
-      data.comentarios.forEach(c=>modalBody.appendChild(createCommentElement(c)));
+      fetch(`/api/post/${postId}/comments/`).then(r => r.json()).then(data => {
+        modalBody.innerHTML = '';
+        if (!data.comentarios.length) {
+          modalBody.innerHTML = '<p class="text-center text-muted no-comments-message">Este post aún no tiene comentarios.</p>';
+          return;
+        }
+        data.comentarios.forEach(c => modalBody.appendChild(createCommentElement(c)));
+      });
     });
-  });
 
-  modalForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const fd = new FormData(modalForm);
-    fetch("{% url 'comentario_crear' %}", {
-      method:'POST', headers:{'X-Requested-With':'XMLHttpRequest'}, body:fd
-    }).then(r=>r.json()).then(data=>{
-      if (data.ok) {
-        const c = { id:data.comment.id, autor:data.comment.nombre_usuario, contenido:data.comment.contenido,
-          fecha:data.comment.creado_en, autor_foto:data.comment.autor_foto, es_propietario:true };
-        modalBody.querySelector('.no-comments-message')?.remove();
-        modalBody.appendChild(createCommentElement(c));
-        modalForm.reset();
-      }
-    });
-  });
-
-  modalBody.addEventListener('submit', async (e) => {
-    if (!e.target.classList.contains('modal-delete-comment-form')) return;
-    e.preventDefault();
-    const ok = await Swal.fire({
-      title:'Confirmar', text:'¿Eliminar este comentario?', icon:'warning',
-      showCancelButton:true, confirmButtonText:'Sí, eliminar', cancelButtonText:'Cancelar', reverseButtons:true
-    });
-    if (!ok.isConfirmed) return;
-    const form = e.target;
-    fetch(form.action, { method:'POST', headers:{'X-Requested-With':'XMLHttpRequest'}, body:new FormData(form) })
-      .then(r=>r.json()).then(data=>{
+    modalForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const fd = new FormData(modalForm);
+      fetch("{% url 'comentario_crear' %}", {
+        method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: fd
+      }).then(r => r.json()).then(data => {
         if (data.ok) {
-          document.getElementById(`modal-comment-${data.deleted_id}`)?.remove();
-          document.getElementById(`comment-${data.deleted_id}`)?.remove();
+          const c = {
+            id: data.comment.id, autor: data.comment.nombre_usuario, contenido: data.comment.contenido,
+            fecha: data.comment.creado_en, autor_foto: data.comment.autor_foto, es_propietario: true
+          };
+          modalBody.querySelector('.no-comments-message')?.remove();
+          modalBody.appendChild(createCommentElement(c));
+          modalForm.reset();
         }
       });
+    });
+
+    modalBody.addEventListener('submit', async (e) => {
+      if (!e.target.classList.contains('modal-delete-comment-form')) return;
+      e.preventDefault();
+      const ok = await Swal.fire({
+        title: 'Confirmar', text: '¿Eliminar este comentario?', icon: 'warning',
+        showCancelButton: true, confirmButtonText: 'Sí, eliminar', cancelButtonText: 'Cancelar', reverseButtons: true
+      });
+      if (!ok.isConfirmed) return;
+      const form = e.target;
+      fetch(form.action, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: new FormData(form) })
+        .then(r => r.json()).then(data => {
+          if (data.ok) {
+            document.getElementById(`modal-comment-${data.deleted_id}`)?.remove();
+            document.getElementById(`comment-${data.deleted_id}`)?.remove();
+          }
+        });
+    });
   });
-});
 
-/* Animación de "Me gusta" (front-end visual, no cambia backend aún) */
-document.addEventListener('click', function (e) {
-  const btn = e.target.closest('.like-btn');
-  if (!btn) return;
+  /* Animación de "Me gusta" (front-end visual, no cambia backend aún) */
+  document.addEventListener('click', function (e) {
+    const btn = e.target.closest('.like-btn');
+    if (!btn) return;
 
-  e.preventDefault();
+    e.preventDefault();
 
-  // Cambia el estado visual
-  btn.classList.toggle('liked');
+    // Cambia el estado visual
+    btn.classList.toggle('liked');
 
-  // Si quieres hacer el "toggle" real del backend (like/unlike):
-  const postId = btn.dataset.postId;
-  fetch(`/api/post/${postId}/like/`, {
-    method: 'POST',
-    headers: { 'X-Requested-With': 'XMLHttpRequest' },
-  })
-  .then(r => r.json())
-  .then(data => {
-    // Actualiza el contador de likes
-    const span = btn.querySelector('.like-count');
-    if (span && data.likes !== undefined) span.textContent = data.likes;
+    // Si quieres hacer el "toggle" real del backend (like/unlike):
+    const postId = btn.dataset.postId;
+    fetch(`/api/post/${postId}/like/`, {
+      method: 'POST',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    })
+      .then(r => r.json())
+      .then(data => {
+        // Actualiza el contador de likes
+        const span = btn.querySelector('.like-count');
+        if (span && data.likes !== undefined) span.textContent = data.likes;
+      });
   });
-});
+  /* ==== GIPHY Selector (tipo Discord) ==== */
+  (function () {
+    const apiKey = "{{ GIPHY_API_KEY|default:''|escapejs }}";
+    const LIMIT = 24;
+
+    const DOM = {
+      openBtn: document.getElementById('btn-open-gif'),
+      modal: document.getElementById('gifModal'),
+      grid: document.getElementById('gif-grid'),
+      loader: document.getElementById('gif-loader'),
+      empty: document.getElementById('gif-empty'),
+      input: document.getElementById('gif-search-input'),
+      clear: document.getElementById('gif-clear-search'),
+      tabGifs: document.getElementById('tab-gifs'),
+      tabStickers: document.getElementById('tab-stickers'),
+
+      hiddenGif: document.getElementById('gif_url'),
+      tipoPost: document.getElementById('tipo_post'),
+
+      imgInput: document.getElementById('id_imagen'),
+      imgPrevWrap: document.getElementById('image-preview-container'),
+      imgPrevImg: document.getElementById('image-preview'),
+
+      gifPrevWrap: document.getElementById('gif-preview-container'),
+      gifPrevImg: document.getElementById('gif-preview'),
+      gifPrevRemove: document.getElementById('remove-gif-btn'),
+    };
+    if (!DOM.modal || !DOM.openBtn) return;
+
+    const state = { kind: 'gifs', query: '', offset: 0, loading: false, end: false };
+    const bsModal = () => bootstrap.Modal.getOrCreateInstance(DOM.modal);
+    const debounce = (fn, ms = 350) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+
+    function endpoint() {
+      const base = state.kind === 'stickers' ? 'stickers' : 'gifs';
+      const path = state.query ? 'search' : 'trending';
+      return `https://api.giphy.com/v1/${base}/${path}?api_key=${apiKey}&q=${encodeURIComponent(state.query)}&limit=${LIMIT}&offset=${state.offset}&rating=pg-13&lang=es`;
+    }
+    function tileHtml(item) {
+      const img = (item.images?.fixed_width_downsampled || item.images?.fixed_width || item.images?.original);
+      const thumbUrl = img?.url || item.images?.original?.url;
+      const original = item.images?.original?.url || thumbUrl;
+      return `
+      <div class="col-6 col-sm-4 col-md-3 col-lg-2">
+        <div class="gif-tile" data-url="${original}">
+          <img src="${thumbUrl}" alt="${(item.title || 'GIF')}" loading="lazy">
+        </div>
+      </div>`;
+    }
+    function clearGrid() { DOM.grid.innerHTML = ''; DOM.empty.style.display = 'none'; state.offset = 0; state.end = false; }
+    async function loadMore() {
+      if (state.loading || state.end) return;
+      state.loading = true; DOM.loader.style.display = 'block';
+      try {
+        const r = await fetch(endpoint()); const data = await r.json();
+        const items = data?.data || [];
+        if (state.offset === 0 && items.length === 0) DOM.empty.style.display = 'block';
+        if (items.length < LIMIT) state.end = true;
+        DOM.grid.insertAdjacentHTML('beforeend', items.map(tileHtml).join(''));
+        state.offset += items.length;
+      } finally { state.loading = false; DOM.loader.style.display = 'none'; }
+    }
+
+    // Abrir modal
+    DOM.openBtn.addEventListener('click', () => {
+      if (!apiKey) { alert('Falta configurar GIPHY_API_KEY.'); return; }
+      bsModal().show();
+    });
+
+    // Cargar trending al abrir
+    DOM.modal.addEventListener('shown.bs.modal', () => {
+      state.query = ''; DOM.input.value = ''; clearGrid(); loadMore();
+    });
+
+    // Tabs
+    function switchKind(kind) {
+      if (state.kind === kind) return;
+      state.kind = kind;
+      DOM.tabGifs.classList.toggle('active', kind === 'gifs');
+      DOM.tabStickers.classList.toggle('active', kind === 'stickers');
+      clearGrid(); loadMore();
+    }
+    DOM.tabGifs.addEventListener('click', () => switchKind('gifs'));
+    DOM.tabStickers.addEventListener('click', () => switchKind('stickers'));
+
+    // Buscar
+    DOM.input.addEventListener('input', debounce(() => {
+      state.query = DOM.input.value.trim(); clearGrid(); loadMore();
+    }, 400));
+    DOM.clear.addEventListener('click', () => { DOM.input.value = ''; state.query = ''; clearGrid(); loadMore(); });
+
+    // Scroll infinito (contenedor del modal)
+    DOM.modal.querySelector('.modal-dialog').addEventListener('scroll', () => {
+      const dlg = DOM.modal.querySelector('.modal-dialog');
+      if (dlg.scrollTop + dlg.clientHeight >= dlg.scrollHeight - 200) { loadMore(); }
+    }, { passive: true });
+
+    // Seleccionar GIF
+    DOM.grid.addEventListener('click', (e) => {
+      const tile = e.target.closest('.gif-tile'); if (!tile) return;
+      const url = tile.getAttribute('data-url');
+
+      // setear en form
+      DOM.hiddenGif.value = url;
+      if (DOM.tipoPost) DOM.tipoPost.value = 'gif';
+
+      // ocultar preview de imagen si había
+      if (DOM.imgInput) DOM.imgInput.value = '';
+      if (DOM.imgPrevWrap) { DOM.imgPrevWrap.style.display = 'none'; if (DOM.imgPrevImg) DOM.imgPrevImg.src = '#'; }
+
+      // mostrar preview gif
+      if (DOM.gifPrevWrap && DOM.gifPrevImg) {
+        DOM.gifPrevImg.src = url; DOM.gifPrevWrap.style.display = 'block';
+      }
+
+      // cerrar modal
+      bsModal().hide();
+    });
+
+    // Quitar GIF seleccionado
+    DOM.gifPrevRemove?.addEventListener('click', () => {
+      if (DOM.hiddenGif) DOM.hiddenGif.value = '';
+      if (DOM.gifPrevWrap) DOM.gifPrevWrap.style.display = 'none';
+      if (DOM.gifPrevImg) DOM.gifPrevImg.src = '#';
+    });
+  })();
+
+  // === Habilitar/deshabilitar "Publicar" según haya texto ===
+  const TA = document.getElementById('post-textarea');
+  const BTN_PUB = document.getElementById('btn-publicar');
+
+  function refreshPublishState() {
+    const hasText = TA && TA.value.trim().length > 0;
+    if (BTN_PUB) BTN_PUB.disabled = !hasText;
+  }
+  TA?.addEventListener('input', refreshPublishState);
+  refreshPublishState();
+
+  // Bloqueo extra por si alguien forzara el submit sin texto
+  document.querySelector('.create-post-card form')?.addEventListener('submit', (e) => {
+    const hasText = TA && TA.value.trim().length > 0;
+    if (!hasText) {
+      e.preventDefault();
+      // opcional: feedback
+      Swal.fire({ icon: 'info', title: 'Escribe algo', text: 'Para publicar, escribe un texto.' });
+    }
+  });
+
+    // === Comentarios del feed SIN recargar ===
+  (function () {
+    const DEFAULT_AVATAR = "{% static 'img/Gifters/favicongift.png' %}";
+
+    document.addEventListener('submit', function (e) {
+      const form = e.target;
+
+      // Solo formularios de comentario del feed
+      if (!form.classList.contains('comment-form')) return;
+      // No tocar el del modal (ya tiene su propio AJAX)
+      if (form.id === 'modal-comment-form') return;
+
+      e.preventDefault();
+
+      const fd = new FormData(form);
+
+      fetch("{% url 'comentario_crear' %}", {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: fd
+      })
+        .then(r => r.json())
+        .then(data => {
+          // Por si algo sale raro
+          if (!data || !data.ok || !data.comment) {
+            console.warn('Respuesta inesperada de comentario_crear:', data);
+            return;
+          }
+
+          const c = data.comment;
+          const commentsBox = form.closest('.post-comments');
+          if (!commentsBox) return;
+
+          // Buscamos / creamos el contenedor de comentarios
+          let list = commentsBox.querySelector('.comments-list');
+          if (!list) {
+            list = document.createElement('div');
+            list.className = 'comments-list';
+            commentsBox.insertBefore(list, form);
+          }
+
+          const username = c.nombre_usuario;
+          const avatarUrl = c.autor_foto || DEFAULT_AVATAR;
+          const fecha = c.creado_en;
+          const postId = form.querySelector('input[name="post_id"]')?.value || '';
+
+          const newCommentHtml = `
+            <div class="comment-item d-flex align-items-start" id="comment-${c.id}">
+              <a href="/u/${username}/">
+                <img src="${avatarUrl}" alt="${username}" class="comment-avatar">
+              </a>
+
+              <div class="comment-body flex-grow-1">
+                <div class="comment-header d-flex align-items-center">
+                  <a href="/u/${username}/" class="comment-author">${username}</a>
+                  <span class="comment-date ms-2">${fecha}</span>
+                </div>
+                <p class="comment-text mb-0">${c.contenido}</p>
+              </div>
+
+              <div class="dropdown ms-2">
+                <button class="btn btn-sm btn-link p-0" type="button"
+                        data-bs-toggle="dropdown" aria-expanded="false"
+                        aria-label="Más opciones">
+                  <i class="bi bi-three-dots-vertical"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  <li>
+                    <form method="post" action="/comentarios/${c.id}/eliminar/">
+                      <input type="hidden" name="csrfmiddlewaretoken"
+                             value="${form.querySelector('[name=csrfmiddlewaretoken]').value}">
+                      <input type="hidden" name="next" value="/feed/#post-${postId}">
+                      <button type="submit" class="dropdown-item text-danger js-confirm-delete"
+                              data-confirm="¿Eliminar este comentario?">
+                        <i class="bi bi-trash"></i> Borrar comentario
+                      </button>
+                    </form>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          `;
+
+          // Lo agregamos al final de la lista
+          list.insertAdjacentHTML('beforeend', newCommentHtml);
+
+          // Limpiar input
+          form.reset();
+        })
+        .catch(err => {
+          console.error('Error al crear comentario vía AJAX:', err);
+        });
+    });
+  })();
+
 
 </script>
 

@@ -2,7 +2,19 @@ from django.conf import settings
 
 from datetime import date, timedelta
 from django.db import transaction
-from .models import Notificacion, Evento, Seguidor, User
+from .models import Notificacion, Evento, Seguidor, User, BloqueoDeUsuario
+
+def _get_blocked_users(user):
+    """Obtiene los IDs de usuarios bloqueados por user y los que bloquearon a user"""
+    if not user or not user.is_authenticated:
+        return set()
+
+    # Los que bloqueé yo + los que me bloquearon
+    bloqueados = set(BloqueoDeUsuario.objects.filter(blocker=user)
+                    .values_list('blocked_id', flat=True))
+    me_bloquearon = set(BloqueoDeUsuario.objects.filter(blocked=user)
+                       .values_list('blocker_id', flat=True))
+    return bloqueados | me_bloquearon
 
 def _amigos_de(user):
     # Tus “amigos” = follow mutuo (ya lo tienes en SeguidorQuerySet)
@@ -26,7 +38,9 @@ def _sync_eventos_a_notifs(user, dias=30):
     hoy = date.today()
     hasta = hoy + timedelta(days=dias)
 
-    amigos_ids = list(_amigos_de(user).values_list("id", flat=True))
+    # Excluir usuarios bloqueados de las notificaciones
+    bloqueados = _get_blocked_users(user)
+    amigos_ids = list(_amigos_de(user).exclude(id__in=bloqueados).values_list("id", flat=True))
     if not amigos_ids:
         return
 

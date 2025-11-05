@@ -17,7 +17,7 @@
 <section class="section">
   <div class="container max-w">
     <h1 class="h4 mb-1">
-      <i class="bi bi-envelope-paper-heart"></i> Crear postal
+      <i class="bi bi-envelope-paper-heart"></i> Crear Imagen
     </h1>
     <p class="text-muted">Para <strong>@{{ username_dest }}</strong></p>
 
@@ -70,79 +70,75 @@
     const m = document.cookie.match(new RegExp('(^|; )' + name + '=([^;]+)'));
     return m ? decodeURIComponent(m[2]) : null;
   }
-</script>
 
-<script>
-async function crearPostal(e) {
-  e.preventDefault();
-  const form = e.target;
-  const btn = document.getElementById('btn-generar');
-  const hint = document.getElementById('hint');
+  async function crearPostal(e) {
+    e.preventDefault();
+    const form = e.target;
+    const btn  = document.getElementById('btn-generar');
+    const hint = document.getElementById('hint');
 
-  btn.disabled = true;
-  btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Generando...';
-  hint.textContent = 'Puede tardar unos segundos la primera vez.';
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Generando...';
+    hint.textContent = 'Puede tardar unos segundos la primera vez.';
 
-  try {
-    const fd = new FormData(form);
-    const res = await fetch("{% url 'cards_generar' %}", {
-      method: "POST",
-      headers: { "X-CSRFToken": getCookie('csrftoken') },
-      body: fd
-    });
+    // 🕒 Nuevo: cancelamos si tarda más de 40 segundos
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 1000 * 40);
 
-    if (!res.ok) {
-      const txt = await res.text();
-      throw new Error(txt || 'Error inesperado');
+    try {
+      const fd = new FormData(form);
+      const res = await fetch("{% url 'cards_generar' %}", {
+        method: "POST",
+        headers: { "X-CSRFToken": getCookie('csrftoken') },
+        body: fd,
+        signal: controller.signal,
+        credentials: "same-origin",
+      });
+      clearTimeout(t);
+
+      let data, txt;
+      try { data = await res.json(); } catch { txt = await res.text(); }
+
+      if (!res.ok || !data?.url) {
+        const msg = (data && (data.error || data.detail)) || txt || `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+
+      // --- Mostrar resultado ---
+      document.getElementById('card-img').src = data.url;
+      document.getElementById('card-dl').href = data.url;
+      document.getElementById('card-dl').download = "gifters_postal.png";
+      document.getElementById('card-wa').href =
+        "https://wa.me/?text=" + encodeURIComponent("Te hice esta postal: " + (data.share || data.url));
+      document.getElementById('card-result').style.display = '';
+
+      const btnCopy = document.getElementById('btn-copy');
+      if (btnCopy) {
+        btnCopy.onclick = async () => {
+          try {
+            await navigator.clipboard.writeText(data.share);
+            btnCopy.innerHTML = '<i class="bi bi-check2-circle"></i> Enlace copiado';
+            setTimeout(() => btnCopy.innerHTML = '<i class="bi bi-link-45deg"></i> Copiar enlace', 1500);
+          } catch {
+            alert('No se pudo copiar el enlace');
+          }
+        };
+      }
+
+      hint.textContent = '';
+    } catch (err) {
+      const msg = err?.name === 'AbortError'
+        ? 'Se canceló por timeout (intenta de nuevo)'
+        : (err?.message || 'No se pudo generar la postal');
+      alert(msg);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-magic"></i> Generar postal';
     }
-
-    const data = await res.json();
-
-    // --- Mostrar resultado (si existen los elementos) ---
-    const img = document.getElementById('card-img');
-    if (img) img.src = data.url;
-
-    const dl = document.getElementById('card-dl');
-    if (dl) {
-      dl.href = data.url;
-      dl.download = "gifters_postal.png";
-    }
-
-    // WhatsApp (solo si existe el botón)
-    const wa = document.getElementById('card-wa');
-    if (wa) {
-      wa.href = "https://wa.me/?text=" + encodeURIComponent("Te hice esta postal: " + data.share);
-    }
-
-    // Mostrar el bloque del resultado
-    const result = document.getElementById('card-result');
-    if (result) result.style.display = '';
-
-    // Botón copiar enlace
-    const btnCopy = document.getElementById('btn-copy');
-    if (btnCopy) {
-      btnCopy.onclick = async () => {
-        try {
-          await navigator.clipboard.writeText(data.share);
-          btnCopy.innerHTML = '<i class="bi bi-check2-circle"></i> Enlace copiado';
-          setTimeout(() => btnCopy.innerHTML = '<i class="bi bi-link-45deg"></i> Copiar enlace', 1500);
-        } catch {
-          alert('No se pudo copiar el enlace');
-        }
-      };
-    }
-
-    hint.textContent = '';
-  } catch (err) {
-    alert(err.message || 'No se pudo generar la postal');
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '<i class="bi bi-magic"></i> Generar postal';
+    return false;
   }
-
-  return false;
-}
 </script>
 
 
 {% endblock %}
+

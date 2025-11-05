@@ -1,6 +1,10 @@
 import requests
 import json
-import os # <-- AÑADIR ESTA LÍNEA
+import os 
+import logging # <-- Importado (ya lo tenías)
+
+# Creamos un logger específico para este módulo, lo que es una buena práctica.
+logger = logging.getLogger(__name__)
 
 class ApiClient:
     """
@@ -10,14 +14,13 @@ class ApiClient:
         self.base_url = base_url
         self.token = None
         self.headers = {'Content-Type': 'application/json'}
+        logger.info(f"ApiClient inicializado con base_url: {base_url}")
 
     def login(self, username, password):
         """
         Autenticación al administrador contra la API y guarda el token JWT.
         """
         try:
-            # Asumimos que tienes un endpoint de token como el de JWT o SimpleJWT
-            # CAMBIO CLAVE: Usa 'json=' en lugar de 'data='
             response = requests.post(f"{self.base_url}/token/", json={
                 "correo": username,
                 "password": password
@@ -26,28 +29,30 @@ class ApiClient:
             if response.status_code == 200:
                 self.token = response.json().get('access')
                 if not self.token:
+                    logger.error("Login exitoso (200) pero no se encontró 'access' token en la respuesta.")
                     return False, "La respuesta de la API no contiene un token de acceso."
                 
-                # A partir de ahora, todas las peticiones incluirán el token
                 self.headers['Authorization'] = f'Bearer {self.token}'
+                logger.info(f"Login exitoso para usuario: {username}")
                 return True, "Login exitoso."
             else:
+                logger.warning(f"Intento de login fallido para {username}. Status: {response.status_code}, Respuesta: {response.text}")
                 return False, f"Error de autenticación: {response.status_code} - {response.text}"
         except requests.exceptions.RequestException as e:
+            logger.critical(f"Fallo de conexión en login: {e}") # Error crítico de conexión
             return False, f"No se pudo conectar con el servidor: {e}"
 
-    # ... (el resto del archivo no necesita cambios)
     def get_products(self):
         """
-        Obtiene TODOS los productos desde la API, manejando paginación
-        o una lista plana si no hay paginación.
+        Obtiene TODOS los productos desde la API...
         """
         if not self.token:
+            logger.warning("get_products llamado sin token de autenticación.")
             return None, "No autenticado."
         
         all_products = []
         page = 1
-        first_request = True # Flag to check response type only once
+        first_request = True
         
         while True: 
             try:
@@ -58,7 +63,6 @@ class ApiClient:
                 if response.status_code == 200:
                     data = response.json()
                     
-                    # --- Check if response is paginated (dictionary) or flat (list) ---
                     if isinstance(data, dict): # Paginated Case
                         products_on_page = data.get('results', []) 
                         all_products.extend(products_on_page)
@@ -66,130 +70,132 @@ class ApiClient:
                             break 
                         else:
                             page += 1 
-                    elif isinstance(data, list) and first_request: # Flat List Case (only on first request)
-                        all_products = data # The whole list was returned at once
-                        break # No more pages to fetch
-                    elif first_request: # Unexpected format on first request
-                         return None, f"Formato de respuesta inesperado de la API: {type(data)}"
-                    else: # If it was paginated before, it shouldn't suddenly become a list
-                        break # Assume end of pages if format changes unexpectedly after page 1
+                    elif isinstance(data, list) and first_request: # Flat List Case
+                        all_products = data
+                        break 
+                    elif first_request: 
+                        logger.error(f"get_products: Formato de respuesta inesperado. Tipo: {type(data)}")
+                        return None, f"Formato de respuesta inesperado de la API: {type(data)}"
+                    else: 
+                        break 
 
                 elif response.status_code == 404:
-                     # If 404 on the very first page, the endpoint is wrong.
-                     if page == 1:
-                         return None, f"Error al obtener productos: {response.status_code} - Not Found. ¿La URL {self.base_url}/productos/ es correcta?"
-                     # If 404 on subsequent pages, it means we've reached the end.
-                     else:
-                         break
+                    if page == 1:
+                        logger.error(f"get_products falló (404) en la página 1. URL: {url}")
+                        return None, f"Error al obtener productos: {response.status_code} - Not Found. ¿La URL {self.base_url}/productos/ es correcta?"
+                    else:
+                        break # Fin de las páginas
                 else:
                     error_detail = response.text
                     try: 
                         error_detail = response.json().get('detail', response.text)
                     except json.JSONDecodeError:
                         pass 
+                    logger.error(f"Error al obtener productos (página {page}): {response.status_code} - {error_detail}")
                     return None, f"Error al obtener productos (página {page}): {response.status_code} - {error_detail}"
             except requests.exceptions.RequestException as e:
+                logger.error(f"get_products: Error de conexión: {e}")
                 return None, f"Error de conexión: {e}"
             except json.JSONDecodeError as e:
+                logger.error(f"get_products: Error al decodificar JSON. Respuesta: {response.text}", exc_info=True)
                 return None, f"Error al decodificar JSON de la API: {e} - Respuesta recibida: {response.text}"
             
-            first_request = False # No longer the first request after the first loop iteration
+            first_request = False 
 
+        logger.info(f"get_products: Se cargaron {len(all_products)} productos exitosamente.")
         return all_products, None
 
     def upload_products_csv(self, file_path):
         """
-        Sube un archivo CSV al endpoint de importación de la API.
+        Sube un archivo CSV al endpoint...
         """
         if not self.token:
+            logger.warning("upload_products_csv llamado sin token.")
             return False, "No autenticado."
         
-        # Necesitaremos un endpoint específico para esto en Django
-        # Por ahora, solo preparamos la lógica del cliente
         upload_url = f"{self.base_url}/admin/upload-csv/" 
         
         try:
             with open(file_path, 'rb') as f:
-                # Usamos 'multipart/form-data' para enviar archivos
                 files = {'csv_file': (os.path.basename(file_path), f, 'text/csv')}
-                # No enviamos el header de JSON, 'requests' lo gestiona
                 auth_header = {'Authorization': self.headers['Authorization']}
                 
+                logger.info(f"Iniciando subida de CSV: {file_path}")
                 response = requests.post(upload_url, files=files, headers=auth_header)
 
             if response.status_code == 200 or response.status_code == 201:
+                logger.info(f"CSV {file_path} subido exitosamente.")
                 return True, "Archivo CSV subido. La importación ha comenzado."
             else:
+                logger.error(f"Error al subir CSV {file_path}. Status: {response.status_code}, Respuesta: {response.text}")
                 return False, f"Error al subir el archivo: {response.status_code} - {response.text}"
         except FileNotFoundError:
+            logger.error(f"upload_products_csv: Archivo no encontrado en {file_path}")
             return False, "Archivo no encontrado en la ruta especificada."
         except requests.exceptions.RequestException as e:
+            logger.error(f"upload_products_csv: Error de conexión: {e}", exc_info=True)
             return False, f"Error de conexión: {e}"
+
     def update_product(self, product_id, field_name, new_value):
         """
-        Envía una actualización parcial (PATCH) para un producto específico a la API.
+        Envía una actualización parcial (PATCH) para un producto...
         """
         if not self.token:
+            logger.warning("update_product llamado sin token.")
             return False, "No autenticado."
 
-        update_url = f"{self.base_url}/productos/{product_id}/" # URL para actualizar un producto específico
-
-        # Mapear el nombre de la columna de la tabla al nombre del campo en la API/Modelo
-        # Asegúrate de que estos nombres coincidan con los campos en tu ProductoSerializer
+        update_url = f"{self.base_url}/productos/{product_id}/" 
+        
         field_mapping = {
             "Nombre": "nombre_producto",
             "Precio": "precio",
-            "Categoría": "id_categoria", # O 'categoria_nombre' si la API lo permite
-            "Marca": "id_marca",         # O 'marca_nombre' si la API lo permite
-            # Añade otros campos si es necesario
+            "Categoría": "id_categoria",
+            "Marca": "id_marca",
         }
 
         api_field_name = field_mapping.get(field_name)
         if not api_field_name:
+            logger.warning(f"update_product: Intento de editar campo no mapeado '{field_name}'.")
             return False, f"Campo '{field_name}' no es editable o no está mapeado."
 
-        # Preparar los datos a enviar (solo el campo que cambió)
-        data_to_send = {
-            api_field_name: new_value
-        }
+        data_to_send = { api_field_name: new_value }
 
-        # Validar y convertir tipos si es necesario (ej. Precio a número)
         if api_field_name == 'precio':
             try:
-                data_to_send[api_field_name] = float(new_value.replace(',', '.')) # Intenta convertir a float
+                data_to_send[api_field_name] = float(new_value.replace(',', '.'))
             except ValueError:
+                logger.warning(f"update_product: Valor de precio inválido '{new_value}' para ID {product_id}.")
                 return False, f"Valor de precio inválido: '{new_value}'. Debe ser un número."
-        # Podrías necesitar validaciones similares para ID de categoría/marca si editas esos
-
+        
         try:
-            # Usamos PATCH para actualizaciones parciales
+            logger.info(f"Intentando PATCH en {update_url} con datos: {data_to_send}")
             response = requests.patch(update_url, json=data_to_send, headers=self.headers)
 
             if response.status_code == 200:
+                logger.info(f"Producto {product_id} actualizado exitosamente.")
                 return True, "Producto actualizado correctamente."
             else:
-                # Intentar obtener un mensaje de error más detallado del JSON
                 error_detail = response.text
                 try:
                     error_data = response.json()
-                    # DRF a menudo devuelve errores por campo
                     if isinstance(error_data, dict):
-                         error_detail = "; ".join([f"{k}: {v[0]}" for k, v in error_data.items()])
+                        error_detail = "; ".join([f"{k}: {v[0]}" for k, v in error_data.items()])
                     elif isinstance(error_data.get('detail'), str):
-                         error_detail = error_data['detail']
+                        error_detail = error_data['detail']
                 except json.JSONDecodeError:
-                    pass # Usar el texto plano si no es JSON
-
+                    pass 
+                logger.error(f"Error al actualizar producto {product_id}. Status: {response.status_code}, Error: {error_detail}")
                 return False, f"Error al actualizar producto: {response.status_code} - {error_detail}"
         except requests.exceptions.RequestException as e:
+            logger.error(f"update_product: Error de conexión: {e}", exc_info=True)
             return False, f"Error de conexión al actualizar: {e}"
         
     def get_users(self):
         """
-        Obtiene TODOS los usuarios desde la API /api/users/, manejando paginación
-        o una lista plana si no hay paginación.
+        Obtiene TODOS los usuarios desde la API...
         """
         if not self.token:
+            logger.warning("get_users llamado sin token.")
             return None, "No autenticado."
         
         all_users = []
@@ -198,7 +204,6 @@ class ApiClient:
         
         while True: 
             try:
-                # Usa la nueva URL para usuarios
                 url = f"{self.base_url}/users/?page={page}" 
                 self.headers['Accept'] = 'application/json' 
                 response = requests.get(url, headers=self.headers)
@@ -217,198 +222,204 @@ class ApiClient:
                         all_users = data 
                         break 
                     elif first_request: 
-                         return None, f"Formato de respuesta inesperado de la API de usuarios: {type(data)}"
+                        logger.error(f"get_users: Formato de respuesta inesperado. Tipo: {type(data)}")
+                        return None, f"Formato de respuesta inesperado de la API de usuarios: {type(data)}"
                     else: 
                         break 
 
                 elif response.status_code == 404:
-                     if page == 1:
-                         return None, f"Error al obtener usuarios: {response.status_code} - Not Found. ¿La URL {self.base_url}/users/ es correcta?"
-                     else:
-                         break # Fin de las páginas
+                    if page == 1:
+                        logger.error(f"get_users falló (404) en la página 1. URL: {url}")
+                        return None, f"Error al obtener usuarios: {response.status_code} - Not Found. ¿La URL {self.base_url}/users/ es correcta?"
+                    else:
+                        break # Fin de las páginas
                 else:
                     error_detail = response.text
                     try: 
                         error_detail = response.json().get('detail', response.text)
                     except json.JSONDecodeError:
                         pass 
+                    logger.error(f"Error al obtener usuarios (página {page}): {response.status_code} - {error_detail}")
                     return None, f"Error al obtener usuarios (página {page}): {response.status_code} - {error_detail}"
             except requests.exceptions.RequestException as e:
+                logger.error(f"get_users: Error de conexión: {e}", exc_info=True)
                 return None, f"Error de conexión: {e}"
             except json.JSONDecodeError as e:
+                logger.error(f"get_users: Error al decodificar JSON. Respuesta: {response.text}", exc_info=True)
                 return None, f"Error al decodificar JSON de la API de usuarios: {e} - Respuesta recibida: {response.text}"
             
             first_request = False
 
+        logger.info(f"get_users: Se cargaron {len(all_users)} usuarios exitosamente.")
         return all_users, None
 
     def update_user(self, user_id, field_name, new_value):
         """
-        Envía una actualización parcial (PATCH) para un usuario específico a la API.
+        Envía una actualización parcial (PATCH) para un usuario...
         """
         if not self.token:
+            logger.warning("update_user llamado sin token.")
             return False, "No autenticado."
             
-        # Usa la URL de detalle para usuarios
         update_url = f"{self.base_url}/users/{user_id}/" 
         
-        # Mapear columnas de tabla a campos de API (del AdminUserSerializer)
         field_mapping = {
             "Nombre": "nombre",
             "Apellido": "apellido",
-            "Username": "nombre_usuario", # Asumiendo que quieres editar 'nombre_usuario'
-            "Es Admin": "es_admin",       # Tu campo personalizado
-            "Is Staff": "is_staff",       # Campo de Django admin
-            "Is Active": "is_active",     # Para activar/desactivar
+            "Username": "nombre_usuario",
+            "Es Admin": "es_admin",
+            "Is Staff": "is_staff",
+            "Is Active": "is_active",
         }
         
         api_field_name = field_mapping.get(field_name)
         if not api_field_name:
-            # Si el campo no está en el mapeo, no es editable (como ID o Correo)
+            logger.warning(f"update_user: Intento de editar campo no mapeado '{field_name}'.")
             return False, f"Campo '{field_name}' no es editable."
 
-        # Preparar datos (solo el campo cambiado)
-        data_to_send = {
-            api_field_name: new_value
-        }
+        data_to_send = { api_field_name: new_value }
 
-        # Validar y convertir booleanos (is_active, is_staff, es_admin)
         if api_field_name in ['is_active', 'is_staff', 'es_admin']:
-            # Aceptar "True", "true", "1", "Verdadero", "Sí" como verdadero
             if isinstance(new_value, str) and new_value.lower() in ['true', '1', 'verdadero', 'sí', 'si']:
-                 data_to_send[api_field_name] = True
-            # Aceptar "False", "false", "0", "Falso", "No" como falso
+                data_to_send[api_field_name] = True
             elif isinstance(new_value, str) and new_value.lower() in ['false', '0', 'falso', 'no']:
-                 data_to_send[api_field_name] = False
-            # Si ya es booleano, está bien
+                data_to_send[api_field_name] = False
             elif isinstance(new_value, bool):
-                 data_to_send[api_field_name] = new_value
+                data_to_send[api_field_name] = new_value
             else:
-                 return False, f"Valor inválido para '{field_name}'. Use True/False, 1/0, etc."
+                logger.warning(f"update_user: Valor booleano inválido '{new_value}' para ID {user_id}.")
+                return False, f"Valor inválido para '{field_name}'. Use True/False, 1/0, etc."
 
         try:
+            logger.info(f"Intentando PATCH en {update_url} con datos: {data_to_send}")
             response = requests.patch(update_url, json=data_to_send, headers=self.headers)
 
             if response.status_code == 200:
+                logger.info(f"Usuario {user_id} actualizado exitosamente.")
                 return True, "Usuario actualizado correctamente."
             else:
                 error_detail = response.text
                 try:
                     error_data = response.json()
                     if isinstance(error_data, dict):
-                         error_detail = "; ".join([f"{k}: {v[0]}" for k, v in error_data.items()])
+                        error_detail = "; ".join([f"{k}: {v[0]}" for k, v in error_data.items()])
                     elif isinstance(error_data.get('detail'), str):
-                         error_detail = error_data['detail']
+                        error_detail = error_data['detail']
                 except json.JSONDecodeError:
                     pass 
+                logger.error(f"Error al actualizar usuario {user_id}. Status: {response.status_code}, Error: {error_detail}")
                 return False, f"Error al actualizar usuario: {response.status_code} - {error_detail}"
         except requests.exceptions.RequestException as e:
+            logger.error(f"update_user: Error de conexión: {e}", exc_info=True)
             return False, f"Error de conexión al actualizar usuario: {e}"
+
     def delete_product(self, product_id):
         """
-        Envía una petición DELETE para borrar un producto específico a la API.
+        Envía una petición DELETE para borrar un producto...
         """
         if not self.token:
+            logger.warning("delete_product llamado sin token.")
             return False, "No autenticado."
     
-        delete_url = f"{self.base_url}/productos/{product_id}/" # Misma URL que para actualizar/ver detalle
+        delete_url = f"{self.base_url}/productos/{product_id}/" 
     
         try:
+            logger.info(f"Intentando DELETE en {delete_url}")
             response = requests.delete(delete_url, headers=self.headers)
     
-            # DELETE exitoso usualmente devuelve 204 No Content
             if response.status_code == 204:
+                logger.info(f"Producto {product_id} borrado exitosamente.")
                 return True, "Producto borrado correctamente."
             elif response.status_code == 404:
-                 return False, f"Error al borrar: Producto con ID {product_id} no encontrado."
+                logger.warning(f"Intento de borrar producto {product_id} falló (404 Not Found).")
+                return False, f"Error al borrar: Producto con ID {product_id} no encontrado."
             else:
-                # Intentar obtener un mensaje de error más detallado
                 error_detail = response.text
                 try:
                     error_data = response.json()
                     if isinstance(error_data.get('detail'), str):
-                         error_detail = error_data['detail']
+                        error_detail = error_data['detail']
                 except json.JSONDecodeError:
                     pass
+                logger.error(f"Error al borrar producto {product_id}. Status: {response.status_code}, Error: {error_detail}")
                 return False, f"Error al borrar producto: {response.status_code} - {error_detail}"
         except requests.exceptions.RequestException as e:
-            return False, f"Error de conexión al borrar: {e}"    
-        
-    def download_product_report(self, report_format='csv'): # cite: Sex.txt
+            logger.error(f"delete_product: Error de conexión: {e}", exc_info=True)
+            return False, f"Error de conexión al borrar: {e}"
+            
+    def download_product_report(self, report_format='csv'):
         """
-        Descarga el reporte CSV, Excel o PDF de productos activos desde la API,
-        llamando a la URL específica para cada formato.
+        Descarga el reporte CSV, Excel o PDF de productos activos...
         """
-        if not self.token: # cite: Sex.txt
-            return None, "No autenticado." # cite: Sex.txt
+        if not self.token:
+            logger.warning("download_product_report llamado sin token.")
+            return None, "No autenticado."
     
-        # --- Elegir la URL correcta ---
         if report_format == 'pdf':
-            report_url = f"{self.base_url}/reports/products/download/pdf/" # URL PDF # cite: Sex.txt (modificado)
+            report_url = f"{self.base_url}/reports/products/download/pdf/"
         elif report_format == 'excel':
-             # NUEVA URL para Excel
-             report_url = f"{self.base_url}/reports/products/download/excel/"
+            report_url = f"{self.base_url}/reports/products/download/excel/"
         else: # Default a CSV
-            report_url = f"{self.base_url}/reports/products/download/" # URL CSV # cite: Sex.txt
-        # -----------------------------
-    
+            report_url = f"{self.base_url}/reports/products/download/"
+        
         try:
-            temp_headers = self.headers.copy() # cite: Sex.txt
-            if 'Content-Type' in temp_headers: del temp_headers['Content-Type'] # cite: Sex.txt
-            if 'Accept' in temp_headers: del temp_headers['Accept'] # cite: Sex.txt
+            temp_headers = self.headers.copy()
+            if 'Content-Type' in temp_headers: del temp_headers['Content-Type']
+            if 'Accept' in temp_headers: del temp_headers['Accept']
     
-            response = requests.get(report_url, headers=temp_headers, stream=True) # cite: Sex.txt
-            response.raise_for_status() # cite: Sex.txt
+            logger.info(f"Iniciando descarga de reporte: {report_format} desde {report_url}")
+            response = requests.get(report_url, headers=temp_headers, stream=True)
+            response.raise_for_status()
     
-            # Verificar Content-Type esperado (CSV, Excel o PDF)
-            content_type = response.headers.get('content-type', '').lower() # cite: Sex.txt
-            if report_format == 'csv': # cite: Sex.txt
-                 expected_content_type = 'csv'
+            content_type = response.headers.get('content-type', '').lower()
+            if report_format == 'csv':
+                expected_content_type = 'csv'
             elif report_format == 'excel':
-                 expected_content_type = 'spreadsheetml' # Parte del content-type de Excel
-            elif report_format == 'pdf': # cite: Sex.txt
-                 expected_content_type = 'pdf'
+                expected_content_type = 'spreadsheetml' # Parte del content-type de Excel
+            elif report_format == 'pdf':
+                expected_content_type = 'pdf'
             else:
-                 expected_content_type = 'desconocido'
+                expected_content_type = 'desconocido'
     
-            if expected_content_type not in content_type: # cite: Sex.txt
-                 # ... (manejo de error igual que antes) ...
-                 try: # cite: Sex.txt
-                     error_data = response.json() # cite: Sex.txt
-                     error_detail = error_data.get("error", f"Respuesta inesperada (esperaba {report_format.upper()}).") # cite: Sex.txt
-                 except json.JSONDecodeError: # cite: Sex.txt
-                     error_detail = f"Respuesta inesperada del servidor (no es {expected_content_type})." # cite: Sex.txt
-                 return None, error_detail # cite: Sex.txt
+            if expected_content_type not in content_type:
+                error_detail = f"Respuesta inesperada del servidor (no es {expected_content_type})."
+                try:
+                    error_data = response.json()
+                    error_detail = error_data.get("error", f"Respuesta inesperada (esperaba {report_format.upper()}).")
+                except json.JSONDecodeError:
+                    pass
+                logger.error(f"Error en descarga de reporte: {error_detail}. Content-Type recibido: {content_type}")
+                return None, error_detail
     
-            return response.content, None # cite: Sex.txt
+            logger.info(f"Reporte {report_format} descargado exitosamente ({len(response.content)} bytes).")
+            return response.content, None
     
-        # --- Manejo de errores (igual que antes) ---
-        except requests.exceptions.HTTPError as http_err: # cite: Sex.txt
-             # ... (código existente) ...
-             error_detail = http_err.response.text # cite: Sex.txt
-             try: # cite: Sex.txt
-                 error_data = http_err.response.json() # cite: Sex.txt
-                 error_detail = error_data.get("error", error_data.get("detail", http_err.response.text)) # cite: Sex.txt
-             except json.JSONDecodeError: # cite: Sex.txt
-                 pass # cite: Sex.txt
-             return None, f"Error del servidor ({http_err.response.status_code}): {error_detail}" # cite: Sex.txt
-        except requests.exceptions.RequestException as e: # cite: Sex.txt
-            return None, f"Error de conexión: {e}" # cite: Sex.txt
-        except Exception as e: # cite: Sex.txt
-             return None, f"Error inesperado: {str(e)}" # cite: Sex.txt
-             
+        except requests.exceptions.HTTPError as http_err:
+            error_detail = http_err.response.text
+            try:
+                error_data = http_err.response.json()
+                error_detail = error_data.get("error", error_data.get("detail", http_err.response.text))
+            except json.JSONDecodeError:
+                pass
+            logger.error(f"Error HTTP al descargar reporte. Status: {http_err.response.status_code}, Error: {error_detail}", exc_info=True)
+            return None, f"Error del servidor ({http_err.response.status_code}): {error_detail}"
+        except requests.exceptions.RequestException as e:
+            logger.error(f"download_product_report: Error de conexión: {e}", exc_info=True)
+            return None, f"Error de conexión: {e}"
+        except Exception as e:
+            logger.critical(f"Error inesperado en download_product_report: {e}", exc_info=True)
+            return None, f"Error inesperado: {str(e)}"
+            
     def create_product(self, product_data):
         """
         Envía una petición POST para crear un nuevo producto.
-        product_data debe ser un diccionario con los campos:
-        'nombre_producto', 'descripcion', 'precio', 'id_categoria', 'id_marca'
         """
         if not self.token:
+            logger.warning("create_product llamado sin token.")
             return None, "No autenticado."
     
-        create_url = f"{self.base_url}/productos/" # URL de la lista/creación
+        create_url = f"{self.base_url}/productos/"
     
-        # Validar y convertir tipos (similar a update_product)
         try:
             if 'precio' in product_data and product_data['precio'] is not None:
                 product_data['precio'] = float(str(product_data['precio']).replace(',', '.'))
@@ -417,43 +428,49 @@ class ApiClient:
             if 'id_marca' in product_data:
                 product_data['id_marca'] = int(product_data['id_marca'])
         except (ValueError, TypeError) as e:
+            logger.warning(f"create_product: Datos inválidos. Error: {e}, Datos: {product_data}")
             return None, f"Datos inválidos para crear producto: {e}"
     
         try:
+            logger.info(f"Intentando POST en {create_url} con datos: {product_data}")
             response = requests.post(create_url, json=product_data, headers=self.headers)
     
-            # POST exitoso usualmente devuelve 201 Created
             if response.status_code == 201:
-                new_product_info = response.json() # La API devuelve los datos del producto creado
+                new_product_info = response.json()
+                logger.info(f"Producto creado exitosamente. ID: {new_product_info.get('id_producto')}")
                 return new_product_info, "Producto creado exitosamente."
             else:
-                # Intentar obtener mensaje de error detallado
                 error_detail = response.text
                 try:
                     error_data = response.json()
                     if isinstance(error_data, dict):
-                         # Errores por campo de DRF
-                         error_detail = "; ".join([f"{k}: {v[0]}" for k, v in error_data.items()])
+                        error_detail = "; ".join([f"{k}: {v[0]}" for k, v in error_data.items()])
                     elif isinstance(error_data.get('detail'), str):
-                         error_detail = error_data['detail']
+                        error_detail = error_data['detail']
                 except json.JSONDecodeError:
                     pass
+                logger.error(f"Error al crear producto. Status: {response.status_code}, Error: {error_detail}")
                 return None, f"Error al crear producto: {response.status_code} - {error_detail}"
     
         except requests.exceptions.RequestException as e:
+            logger.error(f"create_product: Error de conexión: {e}", exc_info=True)
             return None, f"Error de conexión al crear producto: {e}"
+
     ########################
     #REPORTES DE ACTIVIDAD#
-    # ########################
-    def get_moderation_report(self):
-        """Obtiene el reporte de moderación (top reporters / most reported)."""
+    ########################
+    
+    def _get_report_data(self, endpoint_name, report_url):
+        """Helper genérico para obtener datos de reportes."""
         if not self.token:
+            logger.warning(f"{endpoint_name} llamado sin token.")
             return None, "No autenticado."
-        report_url = f"{self.base_url}/reports/moderation/"
         
         try:
+            logger.info(f"Solicitando reporte: {endpoint_name} desde {report_url}")
             response = requests.get(report_url, headers=self.headers)
             response.raise_for_status() # Lanza error en 4xx/5xx
+            logger.info(f"Reporte {endpoint_name} obtenido exitosamente.")
             return response.json(), None
         except requests.exceptions.HTTPError as http_err:
             error_detail = http_err.response.text
@@ -462,74 +479,154 @@ class ApiClient:
                 error_detail = error_data.get("error", error_data.get("detail", error_detail))
             except json.JSONDecodeError:
                 pass
+            logger.error(f"Error HTTP en {endpoint_name}. Status: {http_err.response.status_code}, Error: {error_detail}", exc_info=True)
             return None, f"Error del servidor ({http_err.response.status_code}): {error_detail}"
         except requests.exceptions.RequestException as e:
+            logger.error(f"{endpoint_name}: Error de conexión: {e}", exc_info=True)
             return None, f"Error de conexión: {e}"
+        except json.JSONDecodeError as e:
+            logger.error(f"{endpoint_name}: Error al decodificar JSON. Respuesta: {response.text}", exc_info=True)
+            return None, f"Error al decodificar JSON de la API: {e} - Respuesta recibida: {response.text}"
+
+    def get_moderation_report(self):
+        """Obtiene el reporte de moderación."""
+        return self._get_report_data(
+            "get_moderation_report", 
+            f"{self.base_url}/reports/moderation/"
+        )
 
     def get_popular_search_report(self):
         """Obtiene el reporte de búsquedas populares."""
-        if not self.token:
-            return None, "No autenticado."
-        report_url = f"{self.base_url}/reports/popular-searches/"
-        try:
-            response = requests.get(report_url, headers=self.headers)
-            response.raise_for_status() 
-            return response.json(), None
-        except requests.exceptions.HTTPError as http_err:
-            error_detail = http_err.response.text
-            try: error_detail = http_err.response.json().get("detail", error_detail)
-            except json.JSONDecodeError: pass
-            return None, f"Error del servidor ({http_err.response.status_code}): {error_detail}"
-        except requests.exceptions.RequestException as e:
-            return None, f"Error de conexión: {e}"
+        return self._get_report_data(
+            "get_popular_search_report",
+            f"{self.base_url}/reports/popular-searches/"
+        )
 
     def get_site_reviews_report(self):
         """Obtiene el reporte de reseñas del sitio."""
-        if not self.token:
-            return None, "No autenticado."
-        report_url = f"{self.base_url}/reports/site-reviews/"
-        try:
-            response = requests.get(report_url, headers=self.headers)
-            response.raise_for_status() 
-            return response.json(), None
-        except requests.exceptions.HTTPError as http_err:
-            error_detail = http_err.response.text
-            try: error_detail = http_err.response.json().get("detail", error_detail)
-            except json.JSONDecodeError: pass
-            return None, f"Error del servidor ({http_err.response.status_code}): {error_detail}"
-        except requests.exceptions.RequestException as e:
-            return None, f"Error de conexión: {e}"
+        return self._get_report_data(
+            "get_site_reviews_report",
+            f"{self.base_url}/reports/site-reviews/"
+        )
 
     def get_top_active_users_report(self):
         """Obtiene el reporte de top 10 usuarios activos."""
-        if not self.token:
-            return None, "No autenticado."
-        report_url = f"{self.base_url}/reports/top-active-users/"
-        try:
-            response = requests.get(report_url, headers=self.headers)
-            response.raise_for_status() 
-            return response.json(), None
-        except requests.exceptions.HTTPError as http_err:
-            error_detail = http_err.response.text
-            try: error_detail = http_err.response.json().get("detail", error_detail)
-            except json.JSONDecodeError: pass
-            return None, f"Error del servidor ({http_err.response.status_code}): {error_detail}"
-        except requests.exceptions.RequestException as e:
-            return None, f"Error de conexión: {e}"
+        return self._get_report_data(
+            "get_top_active_users_report",
+            f"{self.base_url}/reports/top-active-users/"
+        )
 
     def get_user_activity_detail(self, user_id):
         """Obtiene el reporte de actividad detallado para un usuario."""
+        return self._get_report_data(
+            "get_user_activity_detail",
+            f"{self.base_url}/reports/user-activity/{user_id}/"
+        )
+        
+    def get_web_logs(self):
+        """Obtiene los logs del servidor web desde la API."""
+        # Reutilizamos el helper _get_report_data que ya maneja 
+        # la autenticación y los errores de conexión.
+        return self._get_report_data(
+            "get_web_logs",
+            f"{self.base_url}/admin/logs/"
+        )
+        
+
+    def download_site_reviews_report_pdf(self):
+        """
+        Descarga el reporte PDF de reseñas del sitio desde la API.
+        """
         if not self.token:
+            logger.warning("download_site_reviews_report_pdf llamado sin token.")
             return None, "No autenticado."
-        report_url = f"{self.base_url}/reports/user-activity/{user_id}/"
+    
+        report_url = f"{self.base_url}/reports/site-reviews/download/pdf/"
+    
         try:
-            response = requests.get(report_url, headers=self.headers)
-            response.raise_for_status() 
-            return response.json(), None
+            # Preparamos headers sin 'Content-Type' o 'Accept' de JSON
+            temp_headers = self.headers.copy()
+            if 'Content-Type' in temp_headers: del temp_headers['Content-Type']
+            if 'Accept' in temp_headers: del temp_headers['Accept']
+    
+            logger.info(f"Iniciando descarga de reporte PDF de reseñas desde {report_url}")
+            response = requests.get(report_url, headers=temp_headers, stream=True)
+            response.raise_for_status()
+    
+            # Verificar que la respuesta sea un PDF
+            content_type = response.headers.get('content-type', '').lower()
+            if 'pdf' not in content_type:
+                error_detail = "Respuesta inesperada del servidor (no es PDF)."
+                try:
+                    error_data = response.json()
+                    error_detail = error_data.get("error", "Respuesta inesperada (esperaba PDF).")
+                except json.JSONDecodeError:
+                    pass
+                logger.error(f"Error en descarga de reporte PDF: {error_detail}. Content-Type recibido: {content_type}")
+                return None, error_detail
+    
+            logger.info(f"Reporte PDF de reseñas descargado exitosamente ({len(response.content)} bytes).")
+            return response.content, None # Devuelve los bytes del PDF
+    
         except requests.exceptions.HTTPError as http_err:
             error_detail = http_err.response.text
-            try: error_detail = http_err.response.json().get("detail", error_detail)
-            except json.JSONDecodeError: pass
+            try:
+                error_data = http_err.response.json()
+                error_detail = error_data.get("error", error_data.get("detail", http_err.response.text))
+            except json.JSONDecodeError:
+                pass
+            logger.error(f"Error HTTP al descargar reporte de reseñas. Status: {http_err.response.status_code}, Error: {error_detail}", exc_info=True)
             return None, f"Error del servidor ({http_err.response.status_code}): {error_detail}"
         except requests.exceptions.RequestException as e:
+            logger.error(f"download_site_reviews_report_pdf: Error de conexión: {e}", exc_info=True)
+            return None, f"Error de conexión: {e}"
+        except Exception as e:
+            logger.critical(f"Error inesperado en download_site_reviews_report_pdf: {e}", exc_info=True)
+            return None, f"Error inesperado: {str(e)}"
+        
+        
+    def download_popular_search_report_pdf(self):
+        """
+        Descarga el reporte PDF de búsquedas populares desde la API.
+        """
+        if not self.token:
+            logger.warning("download_popular_search_report_pdf llamado sin token.")
+            return None, "No autenticado."
+    
+        report_url = f"{self.base_url}/reports/popular-searches/download/pdf/"
+    
+        try:
+            temp_headers = self.headers.copy()
+            if 'Content-Type' in temp_headers: del temp_headers['Content-Type']
+            if 'Accept' in temp_headers: del temp_headers['Accept']
+    
+            logger.info(f"Iniciando descarga de reporte PDF de búsquedas desde {report_url}")
+            response = requests.get(report_url, headers=temp_headers, stream=True)
+            response.raise_for_status()
+    
+            content_type = response.headers.get('content-type', '').lower()
+            if 'pdf' not in content_type:
+                error_detail = "Respuesta inesperada del servidor (no es PDF)."
+                try:
+                    error_data = response.json()
+                    error_detail = error_data.get("error", "Respuesta inesperada (esperaba PDF).")
+                except json.JSONDecodeError:
+                    pass
+                logger.error(f"Error en descarga de reporte PDF búsquedas: {error_detail}. Content-Type recibido: {content_type}")
+                return None, error_detail
+    
+            logger.info(f"Reporte PDF de búsquedas descargado exitosamente ({len(response.content)} bytes).")
+            return response.content, None
+    
+        except requests.exceptions.HTTPError as http_err:
+            error_detail = http_err.response.text
+            try:
+                error_data = http_err.response.json()
+                error_detail = error_data.get("error", error_data.get("detail", http_err.response.text))
+            except json.JSONDecodeError:
+                pass
+            logger.error(f"Error HTTP al descargar reporte de búsquedas. Status: {http_err.response.status_code}, Error: {error_detail}", exc_info=True)
+            return None, f"Error del servidor ({http_err.response.status_code}): {error_detail}"
+        except requests.exceptions.RequestException as e:
+            logger.error(f"download_popular_search_report_pdf: Error de conexión: {e}", exc_info=True)
             return None, f"Error de conexión: {e}"

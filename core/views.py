@@ -1,6 +1,6 @@
 from itertools import count
 from django.templatetags.static import static
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import render, redirect, get_object_or_404, resolve_url
 from django.contrib.auth import login
 from django.contrib import messages
 from django.conf import settings
@@ -8,14 +8,18 @@ from core.services.gifter_ai import generar_sugerencias_regalo
 from core.services.recommendations import recommend_when_wishlist_empty
 from .forms import PostForm, RegisterForm, PerfilForm, PreferenciasUsuarioForm, EventoForm
 from .models import *
+from .models import Post, ReporteStrike
 from django.apps import apps
 from django.core.files.base import ContentFile
+from .models import Mensaje, ParticipanteConversacion, Conversacion
 from .services.recommendations import invalidate_user_reco_cache
 from urllib.parse import unquote
+from collections import deque
+from core.services.profanity_filter import censurar_con_openai
 # views.py
 from core.services.recommendations import recommend_products_for_user as ai_recommend_products
 from core.services.social import amigos_qs, sugerencias_qs
-from .emails import send_verification_email, send_welcome_email
+from .emails import send_verification_email, send_welcome_email, send_report_email
 from django.core.paginator import Paginator
 from django.db.models import Q, Avg
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -23,9 +27,27 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth import authenticate, login
 from django.core.mail import send_mail
 from django.urls import reverse
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, transaction, models
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+
+# Mínimo de participantes para que el sorteo sea interesante y aleatorio
+# Se puede sobreescribir desde settings.py con SECRET_SANTA_MIN_PARTICIPANTS
+MIN_SECRET_SANTA_PARTICIPANTS = getattr(settings, 'SECRET_SANTA_MIN_PARTICIPANTS', 4)
+
+def _validate_participants_count(count: int, is_standalone: bool = False) -> tuple[bool, str]:
+    """
+    Valida que haya suficientes participantes para un sorteo.
+    Args:
+        count: Número de participantes únicos
+        is_standalone: True si es un evento standalone (sin grupo asociado)
+    Returns:
+        (válido, mensaje de error) donde válido es True si hay suficientes participantes
+    """
+    if count < MIN_SECRET_SANTA_PARTICIPANTS:
+        msg = f"Se necesitan al menos {MIN_SECRET_SANTA_PARTICIPANTS} participantes para generar un sorteo aleatorio interesante"
+        return False, msg
+    return True, ""
 import uuid, base64
 import requests
 from django.shortcuts import get_object_or_404
@@ -62,6 +84,10 @@ from .forms import ResenaSitioForm
 from django.template.loader import get_template
 from xhtml2pdf import pisa
 from io import BytesIO
+
+import matplotlib
+matplotlib.use('Agg') # Importante: le dice a Matplotlib que no intente abrir una ventana de GUI
+import matplotlib.pyplot as plt
 
 #########################
 
@@ -119,7 +145,22 @@ from django.shortcuts import get_object_or_404, redirect
 from .models import Notificacion
 from django.db.models import Q
 
+import os, json, requests
+from urllib.parse import quote
 
+from django.shortcuts import render, get_object_or_404
+from django.http import JsonResponse, HttpResponseBadRequest
+from django.views.decorators.http import require_POST
+from django.contrib.auth.decorators import login_required
+from django.core.files.base import ContentFile
+
+# Importa explícitamente el modelo (evita depender de import *)
+from core.models import GeneratedCard
+
+from django.http import Http404 
+import traceback
+
+from django.apps import apps 
 
 
 
@@ -132,7 +173,64 @@ from django.db.models import Q
 
 
 from .models import Conversacion, ConversationEvent, SecretSantaAssignment
+# Descubrir en runtime si existe EventParticipant
+# === Modelos (autocarga por nombre de app y clase) ===
+ConversationEvent = apps.get_model('core', 'ConversationEvent')
+EventParticipant  = apps.get_model('core', 'EventParticipant')
+SecretSantaAssignment = apps.get_model('core', 'SecretSantaAssignment')
+# === Helper: existe el campo en el modelo? ===
+def _field_exists(model, name: str) -> bool:
+    try:
+        model._meta.get_field(name)
+        return True
+    except Exception:
+        return False
 
+# === Helper: derangement (nadie se asigna a sí mismo) ===
+import random
+def _derangement(users):
+    """
+    Genera una permutación donde nadie queda asignado a sí mismo (derangement).
+    Usa el algoritmo de mezcla y verificación con múltiples intentos para garantizar 
+    una buena aleatorización. Si falla después de muchos intentos, usa un método 
+    determinístico de rotación que garantiza un resultado válido.
+    
+    Args:
+        users: Lista de usuarios a permutar
+        
+    Returns:
+        Lista permutada donde nadie queda en su posición original.
+        None si hay menos de 2 usuarios.
+    """
+    n = len(users)
+    if n < MIN_SECRET_SANTA_PARTICIPANTS:
+        return None
+        
+    # Trabajamos con índices para evitar problemas con comparaciones de objetos
+    idx = list(range(n))
+    
+    # Múltiples intentos con mezcla aleatoria (mejor distribución)
+    for attempt in range(2000):  # Más intentos para mejor aleatorización
+        perm = idx[:]
+        for i in range(n - 1):  # Mezcla controlada
+            j = random.randrange(i + 1, n)  # Solo intercambia con posiciones válidas
+            perm[i], perm[j] = perm[j], perm[i]
+            
+        if all(i != j for i, j in zip(idx, perm)):
+            return [users[i] for i in perm]
+    
+    # Fallback determinístico: rotación que garantiza que nadie queda en su posición
+    # Solo se usa si los 2000 intentos aleatorios fallan (muy improbable con n>=4)
+    rotated = [users[(i + 1) % n] for i in idx]
+    return rotated
+
+try:
+    # Cambia 'core' si tu app de modelos se llama distinto
+    EventParticipant = apps.get_model('core', 'EventParticipant')
+    HAS_EVENT_PARTICIPANT = EventParticipant is not None
+except Exception:
+    EventParticipant = None
+    HAS_EVENT_PARTICIPANT = False
 
 if hasattr(settings, 'OPENAI_API_KEY') and settings.OPENAI_API_KEY:
     # Intenta inicializar el cliente aquí para detectar errores de clave temprano
@@ -160,11 +258,10 @@ def usuarios_list(request):
     
     if query and request.user.is_authenticated:
          try:
-             HistorialBusqueda.objects.update_or_create(
-                 id_user=request.user, 
-                 term=f"@{query}", # Podrías añadir un prefijo para diferenciar
-                 defaults={'fecha_creacion': timezone.now()} 
-             )
+             HistorialBusqueda.objects.create(
+             id_user=request.user, 
+             term=f"@{query}"
+         )
          except Exception as e:
              print(f"Error al guardar historial de búsqueda de usuarios: {e}")
 
@@ -337,7 +434,6 @@ def home(request):
     is_admin_flag = request.user.is_authenticated and (request.user.is_staff or getattr(request.user, 'es_admin', False))
 
     # ===================== CATÁLOGO =====================
-    # Productos destacados: intenta por fecha_creacion, si falla usa -pk
     try:
         productos_destacados = (
             Producto.objects.filter(activo=True).order_by('-fecha_creacion')[:9]
@@ -365,7 +461,8 @@ def home(request):
     sugerencias = []
     recibidas = []
     enviadas = []
-    favoritos_ids = set()
+    favoritos_ids_set = set()   # <-- set para lógica
+    favoritos_ids_list = []     # <-- lista para template
     ai_reco = []
 
     if request.user.is_authenticated:
@@ -400,13 +497,15 @@ def home(request):
         wl = None
         try:
             wl = get_default_wishlist(request.user)
-            favoritos_ids = set(
+            favoritos_ids_list = list(
                 ItemEnWishlist.objects
                 .filter(id_wishlist=wl)
                 .values_list('id_producto', flat=True)
             )
+            favoritos_ids_set = set(favoritos_ids_list)
         except Exception:
-            favoritos_ids = set()
+            favoritos_ids_list = []
+            favoritos_ids_set = set()
 
         # --- 👇 PASO 1: OBTENER PRODUCTOS MARCADOS CON "NO ME GUSTA" 👇 ---
         try:
@@ -418,23 +517,24 @@ def home(request):
             )
         except Exception:
             disliked_product_ids = set()
-        
+
         # --- PASO 2: CREAR UNA LISTA COMPLETA DE PRODUCTOS A EXCLUIR ---
-        exclude_ids = favoritos_ids.union(disliked_product_ids)
+        exclude_ids = favoritos_ids_set.union(disliked_product_ids)
         # -----------------------------------------------------------------
 
         # --- 👇 LÍNEA DE DEPURACIÓN CLAVE 👇 ---
-        print(f"--- DEBUG HOME VIEW ---")
-        print(f"Usuario: {request.user.nombre_usuario}")
-        print(f"IDs en Wishlist (Favoritos): {favoritos_ids}")
-        print(f"IDs con Dislike: {disliked_product_ids}")
-        print(f"Lista final de IDs a EXCLUIR: {exclude_ids}")
-        print(f"----------------------")
-        # -----------------------------------------------
+        try:
+            print(f"--- DEBUG HOME VIEW ---")
+            print(f"Usuario: {getattr(request.user, 'nombre_usuario', request.user)}")
+            print(f"IDs en Wishlist (Favoritos): {favoritos_ids_set}")
+            print(f"IDs con Dislike: {disliked_product_ids}")
+            print(f"Lista final de IDs a EXCLUIR: {exclude_ids}")
+            print(f"----------------------")
+        except Exception:
+            pass
+
         # ===================== RECO (IA SOBRE CATÁLOGO) =====================
         try:
-            # --- PASO 3: PASAR LA LISTA DE EXCLUSIÓN AL ALGORITMO ---
-            # (Asegúrate de que tu función `ai_recommend_products` acepte el parámetro `exclude_ids`)
             ai_reco = ai_recommend_products(request.user, limit=6, exclude_ids=list(exclude_ids))
         except Exception:
             ai_reco = []
@@ -457,10 +557,9 @@ def home(request):
                 qs = Producto.objects.filter(activo=True)
                 if marcas_ids:
                     qs = qs.filter(id_marca_id__in=marcas_ids)
-                
-                # --- PASO 4: APLICAR EXCLUSIÓN EN EL FALLBACK 1 ---
+
                 ai_reco = list(
-                    qs.exclude(pk__in=exclude_ids) # <-- Usamos la lista completa de exclusión
+                    qs.exclude(pk__in=exclude_ids)
                       .order_by('-pk')[:6]
                 )
             except Exception:
@@ -469,11 +568,10 @@ def home(request):
         # Fallback 2: últimos del catálogo, excluyendo vistos
         if not ai_reco:
             try:
-                # --- PASO 5: APLICAR EXCLUSIÓN EN EL FALLBACK 2 ---
                 ai_reco = list(
                     Producto.objects
                     .filter(activo=True)
-                    .exclude(pk__in=exclude_ids) # <-- Usamos la lista completa de exclusión
+                    .exclude(pk__in=exclude_ids)
                     .order_by('-pk')[:6]
                 )
             except Exception:
@@ -503,14 +601,13 @@ def home(request):
         except Exception:
             own_resena = None
 
-
     # --------- DEBUG útil en terminal ----------
     try:
         print("DEBUG home():",
               "destacados=", len(productos_destacados),
               "categorias=", len(categorias),
               "ai_reco=", len(ai_reco),
-              "favoritos_ids=", len(favoritos_ids))
+              "favoritos_ids=", len(favoritos_ids_list))
     except Exception:
         pass
     # ------------------------------------------
@@ -522,13 +619,14 @@ def home(request):
         'sugerencias': sugerencias,
         'solicitudes_recibidas': recibidas,
         'solicitudes_enviadas': enviadas,
-        'favoritos_ids': favoritos_ids,
+        'favoritos_ids': favoritos_ids_list,  # <-- lista para el template (json_script)
         'resenas': resenas_qs,
         'own_resena': own_resena,
         'is_admin': is_admin_flag,
         'ai_reco': ai_reco,
     }
     return render(request, 'index.html', context)
+
 
 
 
@@ -737,30 +835,53 @@ def productos_list(request):
         # ---- Personas que coinciden con la búsqueda ----
     personas_amigos, personas_otros = _people_matches(request, query)
 
-    if request.GET.get('from_suggestion') == '1' and request.user.is_authenticated:
-        term = request.GET.get('term')
-        if term:
+    
+                
+    if query and request.user.is_authenticated:
+        is_effective_search = False # Asumimos que no es efectiva por defecto
+        
+        # 1. (Intento Fuzzy) Usar Meilisearch si está activo
+        # Esto cumple con tu requisito de "bien parecido"
+        if getattr(settings, "USE_MEILI", False):
             try:
-                decoded_term = unquote(term)
-                # Determinar si fue por categoría o marca para dar contexto
-                prefix = "Categoría: " if categoria_id else ("Marca: " if marca_id else "")
-                HistorialBusqueda.objects.update_or_create(
+                # meili y settings ya están importados al inicio de views.py [cite: 2, 6]
+                resp = meili().index("products").search(query, { # cite: 2
+                    "limit": 1, # Solo necesitamos saber si existe al menos 1
+                    "filter": "activo = true"
+                })
+                
+                # 'estimatedTotalHits' nos da el total de coincidencias (fuzzy)
+                if resp.get("estimatedTotalHits", 0) > 0:
+                    is_effective_search = True
+                    
+            except Exception as me:
+                # Si Meilisearch falla (ej. está caído), pasamos al fallback
+                print(f"Fallo el pre-check de Meilisearch, se usará fallback a DB: {me}")
+                is_effective_search = False # Forzamos el fallback
+        
+        # 2. (Fallback) Usar la DB si Meilisearch está apagado o falló
+        # Esta comprobación es menos "inteligente" (no es fuzzy, usa 'icontains')
+        if not is_effective_search:
+            is_effective_search = Producto.objects.filter(
+                activo=True
+            ).filter(
+                Q(nombre_producto__icontains=query) | # cite: 66
+                Q(descripcion__icontains=query) | # cite: 66
+                Q(id_marca__nombre_marca__icontains=query) # cite: 66
+            ).exists()
+
+        # 3. Guardar en el historial SÓLO SI fue una búsqueda efectiva
+        if is_effective_search:
+            try:
+                HistorialBusqueda.objects.create(
                     id_user=request.user, 
-                    term=f"{prefix}{decoded_term}",
-                    defaults={'fecha_creacion': timezone.now()} 
+                    term=query
                 )
             except Exception as e:
-                print(f"Error al guardar historial (sugerencia cat/marca): {e}")
-                
-    elif query and request.user.is_authenticated and not request.GET.get('from_suggestion'):
-         try:
-             HistorialBusqueda.objects.update_or_create(
-                 id_user=request.user, 
-                 term=query,
-                 defaults={'fecha_creacion': timezone.now()} 
-             )
-         except Exception as e:
-             print(f"Error al guardar historial de búsqueda directa: {e}")
+                print(f"Error al guardar historial de búsqueda efectiva: {e}")
+        else:
+            # Opcional: Loggear que se evitó una búsqueda (para depuración)
+            print(f"Búsqueda ignorada (no efectiva): '{query}'")
     context = {
         'productos': page_obj,
         'categorias': categorias,
@@ -786,19 +907,7 @@ def producto_detalle(request, producto_id):
     productos_similares = (Producto.objects
                            .filter(id_categoria=producto.id_categoria, activo=True)
                            .exclude(id_producto=producto_id)[:4])
-    if request.GET.get('from_suggestion') == '1' and request.user.is_authenticated:
-        term = request.GET.get('term')
-        if term:
-            try:
-                # Usamos unquote para decodificar caracteres especiales
-                decoded_term = unquote(term)
-                HistorialBusqueda.objects.update_or_create(
-                    id_user=request.user, 
-                    term=decoded_term,
-                    defaults={'fecha_creacion': timezone.now()} 
-                )
-            except Exception as e:
-                print(f"Error al guardar historial (sugerencia producto): {e}")
+    
 
     return render(request, 'productos/detalle.html', {
         'producto': producto,
@@ -812,36 +921,91 @@ def producto_detalle(request, producto_id):
 @login_required
 def feed_view(request):
     """
-    Versión original y optimizada para mostrar el feed y el estado de los 'likes'.
+    Feed con soporte para posts de Texto / Imagen / GIF (GIPHY).
     """
     form = PostForm()
 
     if request.method == 'POST':
-        form = PostForm(request.POST)
+        # importante: incluir FILES para la imagen
+        form = PostForm(request.POST, request.FILES)
         if form.is_valid():
             nuevo_post = form.save(commit=False)
             nuevo_post.id_usuario = request.user
-            nuevo_post.save()
-            return redirect('feed')
-    
-    # 1. Obtenemos todos los posts, optimizando con prefetch_related para los likes
-    all_posts = Post.objects.all().select_related('id_usuario').prefetch_related('likes').order_by('-fecha_publicacion')
 
-    # 2. Obtenemos los IDs de los posts a los que el usuario actual ha dado like
-    liked_post_ids = Like.objects.filter(
-        id_usuario=request.user, 
-        id_post__in=all_posts
-    ).values_list('id_post_id', flat=True)
-    
-    # 3. Añadimos el atributo 'user_has_liked' a cada post
+            # --- decidir tipo de post de forma segura ---
+            gif_url = (request.POST.get('gif_url') or '').strip()
+            has_image = bool(nuevo_post.imagen)
+            has_text  = bool((nuevo_post.contenido or '').strip())
+
+            # prioridad: si hay GIF, es GIF (y anulamos imagen)
+            if gif_url:
+                nuevo_post.gif_url = gif_url
+                nuevo_post.imagen = None
+                nuevo_post.tipo_post = Post.TipoPost.GIF
+            elif has_image:
+                nuevo_post.gif_url = None
+                nuevo_post.tipo_post = Post.TipoPost.IMAGEN
+            elif has_text:
+                nuevo_post.gif_url = None
+                nuevo_post.tipo_post = Post.TipoPost.TEXTO
+            else:
+                # nada válido: vuelve con el form y un error simple
+                form.add_error(None, "Debes escribir algo, subir una imagen o elegir un GIF.")
+                # caerá al render de abajo con el error agregado
+            if not form.errors:
+                nuevo_post.save()
+                return redirect('feed')
+
+    # 1) Posts + likes optimizados
+    try:
+        ids_yo_sigo = set(Seguidor.objects.filter(seguidor=request.user).values_list('seguido_id', flat=True))
+        ids_me_siguen = set(Seguidor.objects.filter(seguido=request.user).values_list('seguidor_id', flat=True))
+        amigos_ids = ids_yo_sigo.intersection(ids_me_siguen)
+        amigos_ids.add(request.user.id)
+        all_posts = (
+            Post.objects.filter(id_usuario_id__in=amigos_ids)
+            .select_related('id_usuario')
+            .prefetch_related('likes')
+            .order_by('-fecha_publicacion')
+        )
+    except Exception:
+        all_posts = (
+            Post.objects.all()
+            .select_related('id_usuario')
+            .prefetch_related('likes') 
+            .order_by('-fecha_publicacion')
+        )
+
+    # 2) IDs con like del usuario
+    liked_post_ids = set(
+        Like.objects.filter(id_usuario=request.user, id_post__in=all_posts)
+        .values_list('id_post_id', flat=True)
+    )
+
+    # 3) Flag para el template
     for post in all_posts:
         post.user_has_liked = post.id_post in liked_post_ids
 
+    # 4) 🔥 NUEVO: leer toggle del filtro de malas palabras
+    usar_filtro = request.GET.get("filtro_malas_palabras") == "1"
+
+    # 5) 🔥 NUEVO: generar versión censurada del contenido si aplica
+    if usar_filtro:
+        for post in all_posts:
+            # asumimos que el texto está en post.contenido
+            post.contenido_censurado = censurar_con_openai(post.contenido or "")
+    else:
+        for post in all_posts:
+            post.contenido_censurado = None
+
     context = {
         'posts': all_posts,
-        'form': form
+        'form': form,
+        'GIPHY_API_KEY': getattr(settings, 'GIPHY_API_KEY', ''),  # <-- para el buscador
+        'usar_filtro': usar_filtro,  
     }
     return render(request, 'feed.html', context)
+
 
 
 @login_required
@@ -2383,18 +2547,7 @@ def perfil_publico(request, username):
         pendiente_enviada = solicitudes.filter(emisor=request.user).first()
         pendiente_recibida = solicitudes.filter(emisor=usuario).first()
 
-    if request.GET.get('from_suggestion') == '1' and request.user.is_authenticated:
-        term = request.GET.get('term')
-        if term:
-            try:
-                decoded_term = unquote(term)
-                HistorialBusqueda.objects.update_or_create(
-                    id_user=request.user, 
-                    term=f"@{decoded_term}", # Podrías añadir prefijo
-                    defaults={'fecha_creacion': timezone.now()} 
-                )
-            except Exception as e:
-                print(f"Error al guardar historial (sugerencia usuario): {e}")
+    
     # Lógica de privacidad principal: si es privado y no son amigos, bloquea.
     if usuario.is_private and not es_amigo:
         context = {
@@ -2599,9 +2752,30 @@ def wishlist_marcar_recibido(request, item_id):
     item.fecha_comprado = now
     item.save(update_fields=['fecha_comprado'])
 
+    # Construir payload adicional para frontend
+    producto = getattr(item, 'id_producto', None)
+    product_info = None
+    if producto:
+        try:
+            image_url = request.build_absolute_uri(producto.imagen.url) if getattr(producto, 'imagen', None) else None
+        except Exception:
+            image_url = None
+        product_info = {
+            'id': getattr(producto, 'id_producto', producto.pk if producto else None),
+            'nombre': getattr(producto, 'nombre_producto', str(producto)),
+            'image_url': image_url,
+        }
+
     # fecha formateada para pintarla sin recargar
     fecha_text = now.strftime('%d/%m/%Y %H:%M')
-    return JsonResponse({'ok': True, 'item_id': item_id, 'fecha': fecha_text})
+    return JsonResponse({
+        'ok': True,
+        'item_id': item_id,
+        'fecha': fecha_text,
+        # Indicadores para el frontend: mostrar botón "Agradecer" sin recargar
+        'can_thank': True,
+        'product': product_info,
+    })
 
 
 @login_required
@@ -2926,25 +3100,46 @@ def conversacion_detalle(request, pk: int):
             "avatar_url": abs_avatar(u),
         })
 
+    # --- NUEVO: normalizar tipo ('evento' / 'grupo' / 'privado' ...)
+    def _tipo_str(val):
+        if hasattr(val, "name"):       # Enum (Choices)
+            return val.name.lower()
+        s = str(val or "")
+        return s.lower().split(".")[-1]
+
+    tipo_norm = _tipo_str(getattr(conv, "tipo", ""))
+
     # usa 'titulo' si existe, si no 'nombre'
     title = (getattr(conv, "titulo", None) or getattr(conv, "nombre", None) or "")
-    tipo_val = str(getattr(conv, "tipo", "")).lower()
 
+    # deduce grupo por tipo o por cantidad de participantes
     is_group = bool(
         getattr(conv, "is_group", False) or
-        (tipo_val == "grupo") or
+        (tipo_norm == "grupo") or
         (len(data_part) > 2)
     )
-
-    # Si la conversación es de tipo EVENTO, no debe contar como grupo
-    if tipo_val == "evento":
+    # si es EVENTO, NO se trata como grupo para el UI
+    if tipo_norm == "evento":
         is_group = False
+
+    # --- NUEVO: empaquetar datos del evento (id/estado) si la conv es de evento
+    evento_obj = None
+    try:
+        evento = ConversationEvent.objects.select_related("conversacion").filter(conversacion=conv).first()
+        if evento:
+            evento_obj = {
+                "id": evento.id,
+                "estado": getattr(evento, "estado", "") or "",
+            }
+    except Exception:
+        evento_obj = None
 
     return JsonResponse({
         "conversacion_id": getattr(conv, "conversacion_id", conv.pk),
         "is_group": is_group,
         "titulo": title,
-        "tipo": tipo_val,                 # <-- NUEVO
+        "tipo": tipo_norm,          # ← NUEVO
+        "evento": evento_obj,       # ← NUEVO (tu JS lo usa para mostrar el botón)
         "participantes": data_part,
         "es_autor": (conv.creador_id == request.user.id),
         "author_id": conv.creador_id,
@@ -2980,6 +3175,55 @@ def ayuda_view(request):
 
     return render(request, 'ayuda.html')
 
+
+@login_required
+@require_POST
+def report_post(request, post_id):
+    """Permite a un usuario reportar un post. Crea ReporteStrike y envía un email al soporte.
+
+    Responde JSON si la petición viene como AJAX, si no redirige con messages.
+    """
+    post = get_object_or_404(Post, id_post=post_id)
+
+    motivo = (request.POST.get('motivo') or request.POST.get('reason') or '').strip() or 'Contenido inapropiado'
+
+    try:
+        reporte, created = ReporteStrike.objects.get_or_create(
+            id_user=request.user,
+            id_post=post,
+            defaults={'motivo': motivo}
+        )
+    except Exception as e:
+        # Si algo falla al guardar, devolvemos error (no rompemos la página)
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'ok': False, 'error': str(e)}, status=500)
+        messages.error(request, 'No se pudo registrar el reporte. Intenta de nuevo más tarde.')
+        return redirect(_next_url(request, default='/feed/'))
+
+    if not created:
+        # Ya había un reporte previo del mismo usuario
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'ok': True, 'message': 'Ya habías reportado esta publicación.'})
+        messages.info(request, 'Ya habías reportado esta publicación.')
+        return redirect(_next_url(request, default='/feed/'))
+
+    # Enviar email al soporte (usar helper)
+    try:
+        send_report_email(request.user, post, motivo=motivo, request=request)
+    except Exception as e:
+        # Log y continuar (no queremos romper la UX si falla el correo)
+        try:
+            log.exception('Error enviando email de reporte: %s', e)
+        except Exception:
+            pass
+
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({'ok': True, 'message': 'Reporte enviado. Gracias por ayudarnos a mantener la comunidad segura.'})
+
+    messages.success(request, 'Reporte enviado. Gracias por ayudarnos a mantener la comunidad segura.')
+    return redirect(_next_url(request, default='/feed/'))
+
+# === Vistas API para Productos ===
 @api_view(['POST'])
 @permission_classes([IsAdminUser]) # ¡Importante! Asegura que solo los admins puedan usar esto
 def upload_csv_view(request):
@@ -3063,6 +3307,41 @@ class UserDetailAPIView(generics.RetrieveUpdateAPIView): # Usamos RetrieveUpdate
     serializer_class = AdminUserSerializer
     permission_classes = [IsAdminUser] # Solo admins pueden ver/editar usuarios
     lookup_field = 'pk' # El ID vendrá como 'pk' en la URL
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser]) # ¡MUY IMPORTANTE!
+def get_web_app_logs(request):
+    """
+    Endpoint de API para que los admins vean los logs del servidor web.
+    Devuelve las últimas 500 líneas del archivo 'web_app.log'.
+    """
+    try:
+        log_file_path = settings.LOGGING_DIR / 'web_app.log'
+        
+        # Verificar si el archivo existe
+        if not os.path.exists(log_file_path):
+            return Response(
+                {"error": "El archivo de log aún no ha sido creado."}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Leer las últimas 500 líneas de forma eficiente
+        lines = []
+        with open(log_file_path, 'r', encoding='utf-8') as f:
+            # Usamos deque para mantener solo las N últimas líneas en memoria
+            last_lines = deque(f, 500)
+            lines = list(last_lines)
+            
+        # Devolvemos las líneas (pueden estar vacías si el log es nuevo)
+        return Response(lines, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        # Loggear el error de lectura (solo se verá en la consola de Docker)
+        print(f"Error al leer el archivo de log: {e}") 
+        return Response(
+            {"error": f"No se pudo leer el archivo de log: {e}"}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
  # === Listar miembros de grupo ===
@@ -3816,26 +4095,26 @@ def producto_detalle(request, id_producto=None, pk=None):
     return render(request, "producto_detalle.html", context)
 
 def ver_card_publica(request, slug):
-    # Buscar por el token compartido (tu modelo se llama GeneratedCard)
     card = get_object_or_404(GeneratedCard, share_token=slug)
-
-    # Construir URLs absolutas que usará el template
     img_abs_url = request.build_absolute_uri(card.image.url) if card.image else ""
     page_abs_url = request.build_absolute_uri()
-
     return render(request, "cards/ver_publica.html", {
         "card": card,
         "img_abs_url": img_abs_url,
         "page_abs_url": page_abs_url,
     })
 
+
 HF_PRIMARY  = "stabilityai/stable-diffusion-xl-base-1.0"
 HF_FALLBACK = "stabilityai/stable-diffusion-xl-base-1.0"
+HF_PRIMARY  = os.getenv("HF_PRIMARY", "stabilityai/sdxl-turbo").strip()
+HF_TIMEOUT = 25    
+POLL_TIMEOUT = 20 
 
 def _bad(payload: dict):
     return HttpResponseBadRequest(json.dumps(payload), content_type="application/json")
 
-def _hf_generate(hf_token: str, model: str, prompt: str, timeout: int = 120):
+def _hf_generate(hf_token: str, model: str, prompt: str, timeout: int = 25):
     url = f"https://api-inference.huggingface.co/models/{model}"
     resp = requests.post(
         url,
@@ -3845,10 +4124,8 @@ def _hf_generate(hf_token: str, model: str, prompt: str, timeout: int = 120):
     )
     return url, resp
 
-from urllib.parse import quote 
-
 def _pollinations_url(prompt: str, w: int = 1024, h: int = 1024):
-    q = quote(prompt)  # <-- antes: urllib.parse.quote
+    q = quote(prompt)
     return f"https://image.pollinations.ai/prompt/{q}?width={w}&height={h}&nofeed=true"
 
 
@@ -3858,65 +4135,67 @@ def generar_card_hf(request):
     prompt = (request.POST.get("prompt") or "").strip()
     style  = (request.POST.get("style")  or "postal minimalista con borde sutil").strip()
     if not prompt:
-        return _bad({"error": "Falta 'prompt'"})
+        return JsonResponse({"ok": False, "error": "Falta 'prompt'"}, status=400)
 
-    # Prompt unificado para estética de postal
-    full_prompt = (
-        f"{prompt}. Estilo: {style}. composición centrada, formato cuadrado 1:1, fondo claro, "
-        "tipografía limpia, borde sutil y agradable, alta calidad."
-    )
+    full_prompt = f"{prompt}. Estilo: {style}. composición centrada, formato 1:1, fondo claro, tipografía limpia, borde sutil, alta calidad."
+
+    hf_token = os.getenv("HF_TOKEN")
+    hf_model = os.getenv("HF_MODEL", "stabilityai/sdxl-turbo")
 
     img_bytes = None
-    used_provider = None
+    provider  = None
     tried = []
 
-    # 1) Intento Hugging Face si tienes token/modelo en .env
-    hf_token = os.environ.get("HF_TOKEN")
-    hf_model = (os.environ.get("HF_MODEL") or "stabilityai/sdxl-turbo").strip()
-
+    # 1) Intento Hugging Face (si hay token). Si falla, NO devolvemos 502: seguimos a fallback.
     if hf_token:
         try:
-            url_hf, r = _hf_generate(hf_token, hf_model, full_prompt)
-            tried.append({"provider": "huggingface", "url": url_hf, "status": r.status_code})
+            url_hf = f"https://api-inference.huggingface.co/models/{hf_model}"
+            r = requests.post(
+                url_hf,
+                headers={"Authorization": f"Bearer {hf_token}", "Accept": "image/png"},
+                json={"inputs": full_prompt, "options": {"wait_for_model": True}},
+                timeout=HF_TIMEOUT,
+            )
+            tried.append({"provider": "huggingface", "status": r.status_code})
             if r.status_code == 200 and r.content:
                 img_bytes = r.content
-                used_provider = "huggingface"
-        except Exception as e:
+                provider = "huggingface"
+        except requests.RequestException as e:
             tried.append({"provider": "huggingface", "error": str(e)})
 
-    # 2) Fallback sin clave: Pollinations
+    # 2) Fallback Pollinations (solo si aún no tenemos imagen)
     if img_bytes is None:
+        poll = _pollinations_url(full_prompt, 1024, 1024)
         try:
-            poll_url = _pollinations_url(full_prompt, 1024, 1024)
-            r2 = requests.get(poll_url, timeout=180)
-            tried.append({"provider": "pollinations", "url": poll_url, "status": r2.status_code})
-            if r2.status_code != 200:
-                return _bad({
-                    "error": "Proveedor de imagen no respondió con 200",
-                    "details": tried
-                })
-            img_bytes = r2.content
-            used_provider = "pollinations"
-        except Exception as e:
-            return _bad({"error": "Excepción obteniendo imagen (pollinations)", "details": str(e), "tried": tried})
+            r2 = requests.get(poll, timeout=POLL_TIMEOUT)
+            tried.append({"provider": "pollinations", "status": r2.status_code})
+            if r2.status_code == 200 and r2.content:
+                img_bytes = r2.content
+                provider = "pollinations"
+            else:
+                return JsonResponse(
+                    {"ok": False, "error": "Ningún proveedor devolvió 200", "tried": tried},
+                    status=502
+                )
+        except requests.RequestException as e:
+            return JsonResponse(
+                {"ok": False, "error": "Falló también el fallback", "detail": str(e), "tried": tried},
+                status=502
+            )
 
-    # 3) Guardar en GeneratedCard y responder
-    try:
-        GeneratedCard = apps.get_model('core', 'GeneratedCard')
-        card = GeneratedCard.objects.create(user=request.user, prompt=prompt)
-        card.image.save(f"card_{card.id}.png", ContentFile(img_bytes), save=True)
-    except Exception as e:
-        return _bad({"error": "No se pudo guardar la imagen", "details": str(e)})
+    # 3) Guardar y responder 200
+    from core.models import GeneratedCard
+    card = GeneratedCard.objects.create(user=request.user, prompt=prompt)
+    card.image.save(f"card_{card.id}.png", ContentFile(img_bytes), save=True)
 
     return JsonResponse({
+        "ok": True,
         "id": card.id,
-        "url": card.image.url,
-        "share": request.build_absolute_uri(f"/cards/s/{card.share_token}/"),
-        "provider_used": used_provider,
+        "url": "https://picsum.photos/800",
+        "share": "https://picsum.photos/800",
+        "provider": provider,
         "tried": tried
-    })
-
-
+    }, status=200)
 
 
 
@@ -3929,8 +4208,35 @@ def _is_member(conv: Conversacion, user) -> bool:
     return any(int(getattr(p, 'id', 0)) == int(user.id) for p in (conv.participantes.all() if hasattr(conv, 'participantes') else []))
 
 def _is_author(conv: Conversacion, user) -> bool:
-    # Ajusta al campo real del creador/autor del grupo
-    return int(getattr(getattr(conv, 'autor', None), 'id', 0)) == int(user.id)
+    # Ajusta al campo real del creador/autor del grupo.
+    # Algunos modelos usan 'creador' (creador_id), otros usan 'autor' o 'author'.
+    # Intentamos varias opciones de forma robusta.
+    try:
+        uid = int(user.id)
+    except Exception:
+        return False
+
+    # Revisar variantes *_id primero (más comunes y rápidas)
+    for id_attr in ('creador_id', 'autor_id', 'author_id', 'owner_id', 'creator_id'):
+        val = getattr(conv, id_attr, None)
+        try:
+            if val is not None and int(val) == uid:
+                return True
+        except Exception:
+            pass
+
+    # Revisar atributos relacionados que pueden ser objetos (creador, autor, author)
+    for obj_attr in ('creador', 'autor', 'author', 'owner', 'creator'):
+        obj = getattr(conv, obj_attr, None)
+        if obj is None:
+            continue
+        try:
+            if getattr(obj, 'id', None) is not None and int(getattr(obj, 'id')) == uid:
+                return True
+        except Exception:
+            continue
+
+    return False
 
 @login_required
 @require_http_methods(["GET", "POST"])
@@ -4037,113 +4343,22 @@ def _is_user_conversation_admin(user: User, conv: Conversacion) -> bool:
     return False
 
 
-def _derangement(user_ids: List[int], max_tries: int = 500) -> List[int]:
-    """
-    Genera un derangement (perm sin puntos fijos). Si no encuentra, usa rotación básica.
-    Para n=2, la rotación da un cruce correcto.
-    Retorna la lista 'receivers' alineada con 'givers' = user_ids.
-    """
-    if len(user_ids) < 2:
-        raise ValueError("Se requieren al menos 2 participantes")
 
-    givers = user_ids[:]
-    receivers = user_ids[:]
-    tries = 0
-    while tries < max_tries:
+# Helper: derangement (nadie se asigna a sí mismo)
+def make_secret_pairs(user_ids):
+    """
+    Retorna un dict {giver_id: receiver_id} asegurando que nadie se asigne a sí mismo.
+    Lanza ValueError si no es posible tras varios intentos (extremadamente raro si len>=2).
+    """
+    givers = list(user_ids)
+    receivers = list(user_ids)
+    for _ in range(1000):
         random.shuffle(receivers)
         if all(g != r for g, r in zip(givers, receivers)):
-            return receivers
-        tries += 1
-
-    # Fallback determinista: rotación simple
-    return user_ids[1:] + user_ids[:1]
+            return dict(zip(givers, receivers))
+    raise ValueError("No fue posible generar el sorteo (derangement). Intenta de nuevo.")
 
 
-@login_required
-@require_POST
-@transaction.atomic
-def event_draw(request, evento_id: int):
-    """
-    Sortea un Amigo Secreto para el ConversationEvent dado:
-    - Valida permisos (organizador del evento o admin de la conversación).
-    - Borra asignaciones previas y crea nuevas (derangement).
-    - Publica un mensaje 'público' + un mensaje 'privado' por usuario (visible_para).
-    """
-    # 1) Cargar evento + conversación
-    ev = get_object_or_404(
-        ConversationEvent.objects.select_related("conversacion", "creado_por"),
-        pk=evento_id
-    )
-    conv = ev.conversacion
-    if not conv:
-        return HttpResponseBadRequest("El evento no tiene conversación asociada")
-
-    # 2) Permisos: organizador del evento o admin/autor de la conversación
-    user = request.user
-    if not (ev.creado_por_id == user.id or _is_user_conversation_admin(user, conv)):
-        return HttpResponseForbidden("No tienes permisos para sortear este evento")
-
-    # 3) Participantes: miembros actuales de la conversación
-    member_ids = _conversation_member_ids(conv)
-    member_ids = [int(x) for x in member_ids if int(x) > 0]
-    member_ids = sorted(set(member_ids))
-    if len(member_ids) < 2:
-        return HttpResponseBadRequest("Se requieren al menos 2 participantes en el chat del evento")
-
-    # 4) Generar derangement
-    receivers = _derangement(member_ids, max_tries=600)
-
-    # 5) Persistir asignaciones (reemplaza si ya había)
-    SecretSantaAssignment.objects.filter(event=ev).delete()
-    SecretSantaAssignment.objects.bulk_create([
-        SecretSantaAssignment(event=ev, da_id=g, recibe_id=r)
-        for g, r in zip(member_ids, receivers)
-    ])
-
-    # 6) Cambiar estado del evento
-    ev.estado = "sorteado"
-    ev.ejecutado_en = timezone.now()
-    ev.save(update_fields=["estado", "ejecutado_en"])
-
-    # 7) Mensaje público
-    Mensaje.objects.create(
-        conversacion=conv,
-        autor=user,
-        texto="El sorteo fue realizado. Revisa tu asignado.",
-        # tipo='sistema'  # si tienes este campo
-    )
-
-    # 8) Mensajes privados por usuario (visible_para = ese usuario)
-    users_map = {u.id: u for u in User.objects.filter(id__in=set(member_ids + receivers))}
-    privados_creados = 0
-    for g, r in zip(member_ids, receivers):
-        asignado = users_map.get(r)
-        if asignado:
-            Mensaje.objects.create(
-                conversacion=conv,
-                autor=user,  # puedes usar ev.creado_por si prefieres
-                texto=f"Te tocó: {asignado.get_full_name() or '@'+asignado.username}",
-                # tipo='secret_assignment',  # si manejas tipos; opcional
-                visible_para_id=g
-            )
-            privados_creados += 1
-
-    # 9) (Opcional) Notificaciones por WebSocket
-    # Si tienes helpers de Channels, emite un "chat_updated" general y un "new_message" privado por usuario
-    # try:
-    #     channels_notify_conversation_updated(conversation_id=conv.id)
-    #     for g in member_ids:
-    #         channels_notify_user(user_id=g, kind="new_private_assignment", conversation_id=conv.id)
-    # except Exception:
-    #     pass
-
-    return JsonResponse({
-        "ok": True,
-        "evento_id": ev.id,
-        "conversacion_id": conv.id,
-        "participantes": len(member_ids),
-        "privados_creados": privados_creados
-    }, status=200)
 
 @login_required
 @require_http_methods(["POST"])
@@ -4253,8 +4468,9 @@ def events_my_list_create(request):
 
     # Incluimos al creador
     ids = sorted(set(miembros + [int(request.user.id)]))
-    if len(ids) < 2:
-        return HttpResponseBadRequest("Se requieren al menos 2 participantes")
+    valid, error_msg = _validate_participants_count(len(ids), is_standalone=True)
+    if not valid:
+        return HttpResponseBadRequest(error_msg)
 
     with transaction.atomic():
         ev = ConversationEvent.objects.create(
@@ -4347,8 +4563,33 @@ def recommendation_feedback(request):
             product=product,
             defaults={'feedback_type': feedback_type}
         )
-        
-        return JsonResponse({'status': 'ok', 'message': f'Feedback {feedback_type} registrado'})
+
+        # Invalidamos la caché del recomendador para que no vuelva a sugerir
+        # este producto inmediatamente. También intentamos devolver una nueva
+        # recomendación para que el frontend la reemplace en la UI.
+        try:
+            from .services.recommendations import invalidate_user_reco_cache, recommend_products_for_user
+            invalidate_user_reco_cache(request.user)
+            new_recs = recommend_products_for_user(request.user, limit=1, exclude_ids=[int(product_id)])
+            new_rec = None
+            if new_recs:
+                p = new_recs[0]
+                imagen = None
+                try:
+                    imagen = p.imagen.url if p.imagen else None
+                except Exception:
+                    imagen = None
+                new_rec = {
+                    'id': getattr(p, 'id_producto', p.pk),
+                    'nombre': getattr(p, 'nombre_producto', str(p)),
+                    'precio': getattr(p, 'precio', None),
+                    'imagen_url': imagen,
+                    'url': getattr(p, 'url_tienda_principal', None) or getattr(p, 'url', None),
+                }
+        except Exception:
+            new_rec = None
+
+        return JsonResponse({'status': 'ok', 'message': f'Feedback {feedback_type} registrado', 'new_recommendation': new_rec})
         
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
@@ -4363,46 +4604,60 @@ def notificaciones_mark_all(request):
     Notificacion.objects.filter(usuario=request.user, leida=False).update(leida=True)
     return JsonResponse({"ok": True})
 
-@login_required
-def notificacion_click(request, notificacion_id):
+
+
+def _build_notifications(user):
     """
-    Marca como leída la notificación y redirige:
-    - a payload["url"] si existe
-    - si no, al perfil o a home como fallback
+    Devuelve una lista de dicts con 'id' (UUID en str) para las notificaciones
+    visibles del usuario. SOLO LECTURA. No modifica modelos.
     """
-    n = get_object_or_404(Notificacion, usuario=request.user, notificacion_id=notificacion_id)
-    if not n.leida:
-        n.leida = True
-        n.save(update_fields=["leida"])
+    qs = (Notificacion.objects
+          .filter(usuario=user)
+          .order_by('-creada_en')
+          .values_list('id', flat=True)[:10])
+    # Normalizamos a dicts como espera _unread_count_for
+    return [{'id': str(nid)} for nid in qs]
 
-    # payload puede ser dict o string; tratamos de obtener "url"
-    url = None
-    try:
-        if isinstance(n.payload, dict):
-            url = n.payload.get("url")
-    except Exception:
-        url = None
+# Helper para contar no leídas usando tu mismo builder
+def _unread_count_for(user, seen_ids: set):
+    # Asegura que el conjunto sea de strings
+    seen_str = {str(x) for x in (seen_ids or set())}
 
-    if not url:
-        try:
-            url = reverse("perfil")
-        except Exception:
-            url = "/"
+    # Usa tu builder real (normalmente _build_notifications)
+    items = _build_notifications(user)
 
-    return HttpResponseRedirect(url)
+    return sum(1 for i in items if str(i['id']) not in seen_str)
+
 
 @require_POST
 @login_required
 def notificacion_mark_one(request, notificacion_id):
     """
-    Marca una notificación como leída (solo esa).
-    Responde JSON {ok: True}.
+    Marca UNA notificación del usuario como leída (lookup por PK)
+    y devuelve el contador actualizado.
     """
-    n = get_object_or_404(Notificacion, usuario=request.user, notificacion_id=notificacion_id)
+    n = get_object_or_404(Notificacion, pk=notificacion_id, usuario=request.user)
     if not n.leida:
         n.leida = True
         n.save(update_fields=["leida"])
-    return JsonResponse({"ok": True})
+
+    unread = Notificacion.objects.filter(usuario=request.user, leida=False).count()
+    return JsonResponse({"ok": True, "unread_count": unread})
+
+
+@login_required
+def notificacion_click(request, notificacion_id):
+    """
+    Marca la notificación como leída y redirige a 'home' (o a url_target si existe).
+    """
+    n = get_object_or_404(Notificacion, pk=notificacion_id, usuario=request.user)
+    if not n.leida:
+        n.leida = True
+        n.save(update_fields=["leida"])
+
+    # Prioriza url_target si la tienes en el modelo; si no, ve a 'home'
+    destino = getattr(n, "url_target", None) or resolve_url("home")
+    return redirect(destino)
 
 
 #############################################
@@ -4430,6 +4685,21 @@ def event_create_with_chat(request):
         titulo = (payload.get("titulo") or "").strip() or "Amigo Secreto"
         presupuesto_raw = payload.get("presupuesto_fijo", None)
         miembros_ids = payload.get("miembros") or []
+
+       
+        # Comprueba si el usuario ya tiene un evento con el mismo título
+        evento_existente = ConversationEvent.objects.filter(
+            creado_por=request.user,
+            titulo=titulo
+        ).exists()
+    
+        if evento_existente:
+            # Devuelve 409 Conflict para indicar que es un duplicado
+            return JsonResponse({
+                "ok": False, 
+                "error": "Ya tienes un evento registrado con ese mismo nombre."
+            }, status=409)
+
 
         # normaliza participantes (incluye siempre al creador)
         try:
@@ -4515,23 +4785,35 @@ def event_create_with_chat(request):
 def search_friends_for_thanks(request):
     """
     Busca amigos por nombre o nombre de usuario para el modal de agradecimiento.
-    Devuelve una lista simple de usuarios en formato JSON.
+    Esta versión NO USA 'amigos_qs' para evitar el error del modelo.
     """
     query = request.GET.get('q', '').strip()
     if not query:
         return JsonResponse([], safe=False)
 
-    # Usamos tu propiedad amigos_qs que es muy eficiente
-    amigos = request.user.amigos_qs.filter(
+    # --- LÓGICA MANUAL PARA ENCONTRAR AMIGOS ---
+    # 1. Obtiene los IDs de los usuarios que yo sigo
+    ids_yo_sigo = set(Seguidor.objects.filter(seguidor=request.user).values_list('seguido_id', flat=True))
+    # 2. Obtiene los IDs de los usuarios que me siguen
+    ids_me_siguen = set(Seguidor.objects.filter(seguido=request.user).values_list('seguidor_id', flat=True))
+    # 3. La intersección son mis amigos
+    amigos_ids = ids_yo_sigo.intersection(ids_me_siguen)
+    
+    # 4. Busca sobre esa lista de amigos
+    amigos = User.objects.filter(
+        id__in=amigos_ids,
+        is_active=True
+    ).filter(
         Q(nombre__icontains=query) |
         Q(apellido__icontains=query) |
         Q(nombre_usuario__icontains=query)
-    ).select_related('perfil')[:10] # Limitamos a 10 resultados
+    ).select_related('perfil')[:10]
+    # --- FIN DE LA LÓGICA MANUAL ---
 
     results = []
     for amigo in amigos:
         avatar_url = static('img/Gifters/favicongift.png')
-        if amigo.perfil and amigo.perfil.profile_picture:
+        if hasattr(amigo, 'perfil') and amigo.perfil and amigo.perfil.profile_picture:
             avatar_url = amigo.perfil.profile_picture.url
         
         results.append({
@@ -4547,26 +4829,67 @@ def search_friends_for_thanks(request):
 def create_thank_you_post(request):
     """
     Crea una publicación (Post) de agradecimiento en el feed del usuario.
+    Soporta:
+      - image_option = 'product' -> utiliza la imagen guardada del producto si existe
+      - image_option = 'upload'  -> usa `request.FILES['image']` si viene
+      - por defecto solo texto
     """
     try:
         product_id = request.POST.get('product_id')
         thanked_user_id = request.POST.get('thanked_user_id')
-        
-        producto = get_object_or_404(Producto, pk=product_id)
-        thanked_user = get_object_or_404(User, pk=thanked_user_id)
+        image_option = request.POST.get('image_option')  # 'product' | 'upload' | None
+
+        producto = get_object_or_404(Producto, pk=product_id) if product_id else None
+        thanked_user = get_object_or_404(User, pk=thanked_user_id) if thanked_user_id else None
 
         contenido = (
             f"¡Muchas gracias a @{thanked_user.nombre_usuario} por este increíble regalo! 🎁\n\n"
             f"Recibí un {producto.nombre_producto}."
-        )
+        ) if producto and thanked_user else (request.POST.get('contenido') or '')
 
-        Post.objects.create(
+        post = Post.objects.create(
             id_usuario=request.user,
             contenido=contenido,
-            tipo_post=Post.TipoPost.TEXTO, # O puedes crear un tipo 'agradecimiento'
+            tipo_post=Post.TipoPost.TEXTO,
             es_publico=True
         )
-        return JsonResponse({'status': 'ok', 'message': 'Publicación de agradecimiento creada.'})
+
+        # Adjuntar imagen según la opción
+        try:
+            if image_option == 'product' and producto and getattr(producto, 'imagen', None):
+                # Copiar binario desde storage al Post.imagen
+                try:
+                    # Producto.imagen puede estar en storage; leemos con storage.open
+                    with producto.imagen.open(mode='rb') as f:
+                        data = f.read()
+                    fname = os.path.basename(producto.imagen.name or f"prod_{producto.id_producto}.jpg")
+                    post.imagen.save(f"thank_{uuid.uuid4().hex}_{fname}", ContentFile(data), save=False)
+                except Exception:
+                    pass
+            elif image_option == 'upload' and request.FILES.get('image'):
+                post.imagen = request.FILES.get('image')
+        except Exception:
+            pass
+
+        # Recalcular tipo si tiene imagen
+        if getattr(post, 'imagen', None):
+            post.tipo_post = Post.TipoPost.IMAGEN
+
+        post.save()
+
+        # Registro de actividad
+        try:
+            RegistroActividad.objects.create(
+                id_usuario=request.user,
+                tipo_actividad=RegistroActividad.TipoActividad.NUEVO_POST,
+                id_elemento=post.id_post,
+                tabla_elemento='post',
+                contenido_resumen=f"Creó el post de agradecimiento: {post.contenido[:50]}..." if post.contenido else "Publicación de agradecimiento con imagen."
+            )
+        except Exception:
+            pass
+
+        return JsonResponse({'status': 'ok', 'message': 'Publicación de agradecimiento creada.', 'post_id': post.id_post})
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
@@ -4575,30 +4898,678 @@ def create_thank_you_post(request):
 @require_POST
 def send_thank_you_notification(request):
     """
-    Envía una notificación privada de agradecimiento a otro usuario.
+    Envía una notificación privada de agradecimiento y opcionalmente un mensaje privado en chat.
+    Parámetros POST:
+      - product_id
+      - thanked_user_id
+      - message (opcional)
+      - send_private = '1' para además enviar mensaje 1:1
+      - image_option = 'product' | 'upload' (opcional)
+      - image file: 'image' si image_option == 'upload'
     """
     try:
         product_id = request.POST.get('product_id')
         thanked_user_id = request.POST.get('thanked_user_id')
         message = request.POST.get('message', '').strip()
+        send_private = request.POST.get('send_private') in ('1', 'true', 'True')
+        image_option = request.POST.get('image_option')
 
-        producto = get_object_or_404(Producto, pk=product_id)
+        producto = get_object_or_404(Producto, pk=product_id) if product_id else None
         thanked_user = get_object_or_404(User, pk=thanked_user_id)
 
         titulo = f"🎁 ¡{request.user.nombre} te ha enviado un agradecimiento!"
-        
         if not message:
-            mensaje_notif = f"Te agradece por el regalo: {producto.nombre_producto}."
+            mensaje_notif = f"Te agradece por el regalo: {producto.nombre_producto if producto else 'un regalo'}."
         else:
             mensaje_notif = message
 
-        Notificacion.objects.create(
+        notif = Notificacion.objects.create(
             usuario=thanked_user,
-            tipo=Notificacion.Tipo.SISTEMA, # O un nuevo tipo 'agradecimiento'
+            tipo=Notificacion.Tipo.SISTEMA,
             titulo=titulo,
             mensaje=mensaje_notif,
-            payload={'sender_id': request.user.id, 'product_id': producto.id}
+            payload={'sender_id': request.user.id, 'product_id': getattr(producto, 'id_producto', None)}
         )
-        return JsonResponse({'status': 'ok', 'message': 'Notificación de agradecimiento enviada.'})
+
+        # Si piden mensaje privado: crear/usar conversación 1:1 y crear Mensaje
+        sent_private = False
+        if send_private:
+            try:
+                conv = _get_or_create_direct(request.user, thanked_user)
+                # construir contenido del chat
+                chat_content = mensaje_notif
+                meta = {}
+                # adjuntar imagen al mensaje como metadatos cuando corresponda
+                if image_option == 'product' and producto and getattr(producto, 'imagen', None):
+                    try:
+                        img_url = request.build_absolute_uri(producto.imagen.url)
+                        meta['image_url'] = img_url
+                    except Exception:
+                        pass
+                elif image_option == 'upload' and request.FILES.get('image'):
+                    up = request.FILES.get('image')
+                    # guardar archivo en storage y pasar URL en metadatos
+                    name = f"chat/{uuid.uuid4().hex}{os.path.splitext(up.name)[1].lower() or '.jpg'}"
+                    path = default_storage.save(name, up)
+                    meta['image_url'] = default_storage.url(path)
+
+                Mensaje.objects.create(
+                    conversacion=conv,
+                    remitente=request.user,
+                    tipo=Mensaje.Tipo.TEXTO,
+                    contenido=chat_content,
+                    metadatos=meta or None
+                )
+                sent_private = True
+            except Exception:
+                sent_private = False
+
+        return JsonResponse({'status': 'ok', 'message': 'Notificación enviada.', 'sent_private': sent_private})
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+    
+    
+    
+def _tipo_privado_value():
+    """
+    Devuelve el valor correcto para 'privado' según tu modelo:
+    - Enum: Conversacion.Tipo.PRIVADO
+    - CharField: 'privado' o 'P'
+    """
+    try:
+        return Conversacion.Tipo.PRIVADO
+    except Exception:
+        # Ajusta si en tu BD usas 'P'
+        return 'privado'
+    
+@login_required
+@require_POST
+@transaction.atomic
+def procesar_agradecimiento_desde_regalo(request):
+    """
+    Esta es la vista "inteligente". Recibe el ID del historial del regalo,
+    descubre quién lo hizo y llama a las funciones existentes para crear el post o la notificación.
+    """
+    try:
+        historial_id = request.POST.get('historial_regalo_id')
+        tipo = request.POST.get('tipo') # 'publico' o 'privado'
+
+        if not historial_id or not tipo:
+            return JsonResponse({'status': 'error', 'message': 'Faltan datos.'}, status=400)
+
+        # 1. Encontrar el regalo y quién lo hizo
+        regalo = get_object_or_404(HistorialDeRegalos.objects.select_related('id_user', 'id_item__id_producto'), pk=historial_id)
+        
+        thanked_user = regalo.id_user # <-- ¡Aquí está la magia! Ya sabemos a quién agradecer.
+        producto = regalo.id_item.id_producto
+        
+        # 2. Reutilizamos tus vistas existentes pasándoles los datos que necesitan
+        if tipo == 'publico':
+            # Simula una request para tu vista create_thank_you_post
+            request.POST = request.POST.copy() # Hacemos una copia para poder modificarla
+            request.POST['product_id'] = producto.id_producto
+            request.POST['thanked_user_id'] = thanked_user.id
+            return create_thank_you_post(request)
+
+        elif tipo == 'privado':
+            # Simula una request para tu vista send_thank_you_notification
+            request.POST = request.POST.copy()
+            request.POST['product_id'] = producto.id_producto
+            request.POST['thanked_user_id'] = thanked_user.id
+            # El mensaje y la foto los manejaremos en el JS
+            return send_thank_you_notification(request)
+
+        return JsonResponse({'status': 'error', 'message': 'Tipo de agradecimiento no válido.'}, status=400)
+
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+def _get_or_create_direct(u1, u2):
+    """
+    Conversación directa 1:1 entre u1 y u2 (en cualquier orden).
+    Soporta enum o string para el tipo.
+    """
+    tipo_priv = _tipo_privado_value()
+    qs = Conversacion.objects.filter(participantes__usuario=u1, tipo=tipo_priv)\
+                             .filter(participantes__usuario=u2).distinct()
+    direct = qs.first()
+    if direct:
+        return direct
+
+    direct = Conversacion.objects.create(
+        tipo=tipo_priv,
+        nombre=''  # los DM no necesitan nombre visible
+    )
+    ParticipanteConversacion.objects.get_or_create(conversacion=direct, usuario=u1)
+    ParticipanteConversacion.objects.get_or_create(conversacion=direct, usuario=u2)
+    return direct
+
+
+
+
+
+@login_required
+@require_POST
+def api_event_draw(request, event_id: int):
+    # Log para debugging
+    log.info(f"api_event_draw llamado con event_id={event_id}, tipo={type(event_id)}")
+    print(f"DEBUG api_event_draw: recibido event_id={event_id}, tipo={type(event_id)}")
+    
+    # Normalizamos/validamos el ID
+    try:
+        event_id = int(event_id)
+    except (TypeError, ValueError) as e:
+        log.error(f"api_event_draw: error al convertir event_id={event_id!r} a int: {e}")
+        return JsonResponse({"ok": False, "error": "ID de evento inválido", "debug": {"received": str(event_id), "error": str(e)}}, status=400)
+
+    if event_id <= 0:
+        return JsonResponse({"ok": False, "error": "ID de evento inválido", "debug": {"received": event_id}}, status=400)
+
+    try:
+        # Toda la operación de sorteo en una transacción para evitar race conditions
+        with transaction.atomic():
+            try:
+                print(f"DEBUG: Intentando obtener evento {event_id}")
+                ev = ConversationEvent.objects.select_for_update().get(pk=event_id)
+                print(f"DEBUG: Evento encontrado: {ev}")
+            except ConversationEvent.DoesNotExist:
+                log.warning("api_event_draw: event %s not found", event_id)
+                return JsonResponse({"ok": False, "error": "Evento no encontrado", "debug": {"id": event_id}}, status=404)
+            except Exception as e:
+                log.error(f"api_event_draw: error al obtener evento {event_id}: {str(e)}")
+                return JsonResponse({"ok": False, "error": "Error al obtener el evento", "debug": {"error": str(e)}}, status=500)
+
+            # permiso: solo el creador puede sortear
+            if getattr(ev, 'creado_por_id', None) != request.user.id:
+                log.warning("api_event_draw: user %s not creator of event %s", request.user.id, event_id)
+                return JsonResponse({"ok": False, "error": "No tienes permiso para sortear este evento", "debug": {"creator": getattr(ev, 'creado_por_id', None)}}, status=403)
+
+            # evitar re-sorteos
+            if getattr(ev, 'estado', '') == 'sorteado' or getattr(ev, 'ejecutado_en', None):
+                return JsonResponse({"ok": False, "error": "Este evento ya fue sorteado", "debug": {"estado": getattr(ev, 'estado', None)}}, status=400)
+
+            # obtener participantes desde el modelo EventParticipant
+            try:
+                # Obtener participantes registrados para el evento
+                participantes = list(EventParticipant.objects.filter(
+                    evento=ev,
+                    estado='inscrito'  # Solo participantes activos
+                ).select_related('usuario'))
+                users = [p.usuario for p in participantes]
+                
+                print(f"DEBUG: Encontrados {len(users)} participantes")
+                
+            except Exception as e:
+                log.error(f"Error al obtener participantes: {e}")
+                return JsonResponse({"ok": False, "error": "Error al obtener participantes", "debug": {"error": str(e)}}, status=500)
+
+            # Asegurar que el creador forma parte del sorteo
+            creator = ev.creado_por  # Usamos el campo directo que sabemos que existe
+
+            # Asegurar que el creador esté en la lista
+            if creator and all(u.id != creator.id for u in users):
+                print(f"DEBUG: Agregando creador {creator.id} a la lista")
+                # Añadir el creador a los participantes
+                try:
+                    EventParticipant.objects.get_or_create(
+                        evento=ev, 
+                        usuario=creator,
+                        defaults={'estado': 'inscrito'}
+                    )
+                    users.append(creator)
+                except Exception as e:
+                    log.error(f"Error al agregar creador como participante: {e}")
+                    # Continuamos de todas formas, no es crítico
+
+            # Validar mínimo de participantes para que el sorteo sea interesante
+            count = len(users)
+            valid, error_msg = _validate_participants_count(count)
+            if not valid:
+                return JsonResponse({"ok": False, "error": error_msg, "debug": {"count": count}}, status=400)
+
+            # Eliminar duplicados por ID (por si acaso hay participantes repetidos en la tabla)
+            seen_ids = set()
+            unique_users = []
+            for u in users:
+                uid = getattr(u, 'id', None)
+                if uid is None:
+                    continue
+                if uid in seen_ids:
+                    continue
+                seen_ids.add(uid)
+                unique_users.append(u)
+            users = unique_users
+
+            if len(users) < 2:
+                return JsonResponse({"ok": False, "error": "Se necesitan al menos 2 participantes después de deduplicar", "debug": {"count": len(users)}}, status=400)
+
+            # generar derangement (ningún usuario se asigna a sí mismo y todos los receptores son únicos)
+            asignados = _derangement(users)
+            if not asignados:
+                log.error("api_event_draw: derangement failed for event %s (n=%s)", event_id, len(users))
+                return JsonResponse({"ok": False, "error": "No se pudo generar el sorteo", "debug": {"count": len(users)}}, status=500)
+
+            # persistir asignaciones
+            SecretSantaAssignment.objects.filter(evento=ev).delete()
+            rows = [SecretSantaAssignment(evento=ev, da=g, recibe=r) for g, r in zip(users, asignados)]
+            SecretSantaAssignment.objects.bulk_create(rows)
+
+            # Notificar por privado a cada participante
+            created = 0
+            for giver, receiver in zip(users, asignados):
+                try:
+                    print(f"DEBUG: Notificando a giver={giver.id} sobre receiver={receiver.id}")
+                    
+                    # Verificación de seguridad contra auto-asignación
+                    if giver.id == receiver.id:
+                        log.error(f"api_event_draw: auto-asignación detectada para usuario {giver.id}")
+                        continue
+
+                    # Crear conversación privada entre sistema y giver
+                    conv = obtener_o_crear_conv_directa(request.user, giver)
+                    if not conv:
+                        # Fallback: crear conversación directo
+                        conv = Conversacion.objects.create(tipo='privado', nombre='')
+                        ParticipanteConversacion.objects.get_or_create(conversacion=conv, usuario=request.user)
+                        ParticipanteConversacion.objects.get_or_create(conversacion=conv, usuario=giver)
+
+                    # Crear mensaje para el receptor actual del giver (no del creador)
+                    mensaje = f"""🎁 *Amigo Secreto - Asignación*
+
+¡Hola {getattr(giver, 'nombre', getattr(giver, 'first_name', ''))}! 
+
+En el evento "{getattr(ev, 'titulo', '')}", te ha tocado regalar a:
+
+👤 {getattr(receiver, 'nombre', getattr(receiver, 'first_name', str(receiver)))} {getattr(receiver, 'apellido', getattr(receiver, 'last_name', ''))}
+
+{"💰 Presupuesto: $" + str(ev.presupuesto_fijo) if getattr(ev, 'presupuesto_fijo', None) else ""}
+
+💝 Recuerda mantener el secreto hasta el día del intercambio.
+📝 Puedes revisar los detalles del evento en el chat grupal."""
+                    # Importante: enviar como sistema para evitar confusión sobre quién envía el mensaje
+                    Mensaje.objects.create(
+                        conversacion=conv_priv,
+                        remitente=None,  # Mensaje de sistema
+                        tipo='sistema',   # Tipo sistema para claridad
+                        contenido=mensaje
+                    )
+                    created += 1
+                except Exception as e:
+                    log.exception("api_event_draw: failed to notify %s for event %s: %s", giver.id if hasattr(giver, 'id') else str(giver), event_id, e)
+                    continue
+
+            # mensaje al grupo
+            try:
+                Mensaje.objects.create(conversacion=ev.conversacion, remitente=request.user, tipo='texto', contenido="🎉 ¡El sorteo se ha realizado con éxito! 🎯\n\nCada participante ha recibido un mensaje privado con su asignación. Por favor, revisen sus mensajes privados para ver a quién deben regalar. 🤫\n\n¡Que empiece la diversión del Amigo Secreto! 🎁")
+            except Exception:
+                log.exception("api_event_draw: failed to post group message for event %s", event_id)
+
+            # marcar evento como sorteado
+            ev.estado = 'sorteado'
+            if hasattr(ev, 'ejecutado_en'):
+                ev.ejecutado_en = timezone.now()
+            ev.save()
+
+            return JsonResponse({"ok": True, "count": len(users), "notified": created})
+
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        log.error("api_event_draw: unexpected error for event %s: %s", event_id, e)
+        log.error(tb)
+        return JsonResponse({"ok": False, "error": "Error al realizar el sorteo", "debug": {"error_type": e.__class__.__name__, "error_details": str(e), "trace": tb.split('\n')[-6:]}}, status=500)
+
+        with transaction.atomic():
+            step = 'participants-qry'
+        # Detecta el nombre del FK hacia el evento en EventParticipant
+        fk_event_field = 'evento' if _field_exists(EventParticipant, 'evento') else (
+                         'event'  if _field_exists(EventParticipant, 'event')  else None)
+        fk_user_field  = 'usuario' if _field_exists(EventParticipant, 'usuario') else (
+                         'user'    if _field_exists(EventParticipant, 'user')    else None)
+        if not fk_event_field or not fk_user_field:
+            return JsonResponse({"ok": False, "step": step, "msg": "Campos FK en EventParticipant no coinciden"}, status=500)
+
+        user_ids = list(
+            EventParticipant.objects.filter(**{fk_event_field: ev}).values_list(fk_user_field + '_id', flat=True)
+        )
+        user_ids = sorted({int(x) for x in user_ids if x})
+        if len(user_ids) < 2:
+            return JsonResponse({"ok": False, "step": step, "msg": "Se requieren al menos 2 participantes"}, status=400)
+
+        step = 'load-users'
+        User = get_user_model()
+        users = list(User.objects.filter(id__in=user_ids).order_by('id'))
+        if len(users) < 2:
+            return JsonResponse({"ok": False, "step": step, "msg": "No se pudieron cargar usuarios"}, status=400)
+
+        step = 'derangement'
+        asignados = _derangement(users)
+        if not asignados:
+            return JsonResponse({"ok": False, "step": step, "msg": "No fue posible generar el sorteo"}, status=500)
+
+        step = 'persist-assignments'
+        # Detecta nombres de campos en SecretSantaAssignment
+        fk_ev_field = 'evento' if _field_exists(SecretSantaAssignment, 'evento') else (
+                      'event'  if _field_exists(SecretSantaAssignment, 'event')  else None)
+        giver_field = 'giver' if _field_exists(SecretSantaAssignment, 'giver') else (
+                      'emisor' if _field_exists(SecretSantaAssignment, 'emisor') else (
+                      'da'     if _field_exists(SecretSantaAssignment, 'da')     else None))
+        recv_field  = 'receiver' if _field_exists(SecretSantaAssignment, 'receiver') else (
+                      'receptor' if _field_exists(SecretSantaAssignment, 'receptor') else (
+                      'recibe'   if _field_exists(SecretSantaAssignment, 'recibe')   else None))
+        if not fk_ev_field or not giver_field or not recv_field:
+            return JsonResponse({"ok": False, "step": step, "msg": "Campos en SecretSantaAssignment no coinciden"}, status=500)
+
+        # Borra asignaciones previas
+        SecretSantaAssignment.objects.filter(**{fk_ev_field: ev}).delete()
+
+        rows = []
+        for giver, receiver in zip(users, asignados):
+            rows.append(SecretSantaAssignment(**{
+                fk_ev_field: ev,
+                f"{giver_field}_id": giver.id,
+                f"{recv_field}_id": receiver.id
+            }))
+        SecretSantaAssignment.objects.bulk_create(rows)
+
+        step = 'send-private-messages'
+        # Enviar mensaje privado a cada participante
+        for giver in users:
+            receiver = asignados[users.index(giver)]
+            
+            try:
+                # Intentar encontrar una conversación privada existente primero
+                conv_privada = Conversacion.objects.filter(
+                    participantes__usuario__in=[giver, request.user],
+                    tipo=_tipo_privado_value()
+                ).annotate(
+                    num_participantes=models.Count('participantes')
+                ).filter(
+                    num_participantes=2
+                ).first()
+                
+                if not conv_privada:
+                    # Crear nueva conversación privada si no existe
+                    conv_privada = Conversacion.objects.create(
+                        tipo=_tipo_privado_value(),
+                        nombre=''  # los mensajes privados no necesitan nombre
+                    )
+                    
+                    # Crear participantes de la conversación
+                    ParticipanteConversacion.objects.bulk_create([
+                        ParticipanteConversacion(conversacion=conv_privada, usuario=giver),
+                        ParticipanteConversacion(conversacion=conv_privada, usuario=request.user)
+                    ])
+                
+                # Crear mensaje privado
+                mensaje_privado = f"""🎁 *Sorteo Amigo Secreto*
+¡Te ha tocado regalar a *{receiver.nombre} {receiver.apellido}*!
+Evento: {ev.titulo}
+{f'Presupuesto: ${ev.presupuesto_fijo}' if ev.presupuesto_fijo else ''}
+
+¡Recuerda mantener el secreto! 🤫"""
+                
+                Mensaje.objects.create(
+                    conversacion=conv_privada,
+                    remitente=request.user,
+                    tipo='texto',
+                    contenido=mensaje_privado
+                )
+            except Exception as e:
+                print(f"Error al enviar mensaje a {giver.nombre}: {str(e)}")
+                continue  # Continuar con el siguiente usuario aunque falle uno
+
+        # Enviar mensaje al grupo del evento
+        Mensaje.objects.create(
+            conversacion=ev.conversacion,
+            remitente=request.user,
+            tipo='texto',
+            contenido="🎉 ¡El sorteo se ha realizado! Cada participante ha recibido su asignación por mensaje privado. ¡Que empiece el Amigo Secreto! 🎁"
+        )
+
+        step = 'mark-event'
+        if hasattr(ev, 'estado'):
+            ev.estado = 'sorteado'
+        if hasattr(ev, 'sorteado_at'):
+            ev.sorteado_at = timezone.now()
+        ev.save()
+
+        return JsonResponse({"ok": True, "count": len(users)}, status=200)
+
+    except Http404:
+        return JsonResponse({"ok": False, "step": 'load-event', "msg": "Evento no existe"}, status=404)
+    except Exception as e:
+        return JsonResponse({"ok": False, "step": step, "msg": f"{e.__class__.__name__}: {e}",
+                             "trace": traceback.format_exc()}, status=500)
+
+
+@login_required
+@require_POST
+@transaction.atomic
+def api_event_sortear(request, event_id: int):
+    evento = get_object_or_404(Evento, pk=event_id)
+    conv = evento.conversacion
+
+    # Obtén users del evento/conv (ajusta si tu relación es distinta)
+    participantes = list(
+        User.objects.filter(
+            id__in=ParticipanteConversacion.objects
+                    .filter(conversacion=conv)
+                    .values_list('usuario_id', flat=True)
+        )
+    )
+
+    # Valida mínimo 3 personas (para evitar auto-asignaciones imposibles)
+    if len(participantes) < 3:
+        return JsonResponse({"ok": False, "msg": "Se requieren al menos 3 participantes."}, status=400)
+
+    # Genera una permutación SIN puntos fijos (derangement)
+    asignados = participantes[:]
+    intentos = 0
+    while True:
+        random.shuffle(asignados)
+        intentos += 1
+        if all(p.id != a.id for p, a in zip(participantes, asignados)):
+            break
+        if intentos > 1000:
+            return JsonResponse({"ok": False, "msg": "No fue posible completar el sorteo. Intente nuevamente."}, status=500)
+
+    # Envía mensaje privado a cada uno indicando a quién le tocó
+    # (usa tu helper de “chat privado” si lo tienes; aquí muestro uno simple)
+    def get_or_create_dm(u1, u2):
+        # ordena por id para no duplicar
+        a, b = (u1, u2) if u1.id < u2.id else (u2, u1)
+        dm = Conversacion.objects.filter(tipo='P', usuarios=a).filter(usuarios=b).first()
+        if not dm:
+            dm = Conversacion.objects.create(tipo='P', nombre=f"DM {a.username} - {b.username}")
+            ParticipanteConversacion.objects.bulk_create([
+                ParticipanteConversacion(conversacion=dm, usuario=a),
+                ParticipanteConversacion(conversacion=dm, usuario=b),
+            ])
+        return dm
+
+    # Puedes usar tu “usuario sistema” si existe
+    sistema = User.objects.filter(username='Tia Turbina').first() or request.user
+
+    for origen, destino in zip(participantes, asignados):
+        dm = get_or_create_dm(origen, destino)
+        Mensaje.objects.create(
+            conversacion=dm,
+            autor=sistema,
+            contenido=f"🎁 Te tocó {destino.get_full_name() or '@' + destino.username} en el evento «{conv.nombre}»."
+        )
+
+    # Mensaje informativo al chat del evento (opcional)
+    Mensaje.objects.create(
+        conversacion=conv,
+        autor=sistema,
+        contenido="🔒 Se realizó el sorteo. Cada participante recibió su asignación por mensaje privado."
+    )
+
+    return JsonResponse({"ok": True})  
+
+
+@require_POST
+@login_required
+def draw_event(request, event_id):
+    """
+    Sortea 'amigo secreto' en el evento y envía un mensaje PRIVADO
+    a cada participante con la persona que le tocó.
+    Requisitos:
+      - Evento con una conversacion de tipo 'evento'
+      - >= 2 participantes
+    """
+    try:
+        evento = Evento.objects.select_related('conversacion').get(pk=event_id)
+    except Evento.DoesNotExist:
+        return JsonResponse({'ok': False, 'error': 'evento_no_existe'}, status=404)
+
+    # Seguridad: sólo participantes del evento pueden sortear
+    es_participante = ParticipanteConversacion.objects.filter(
+        conversacion=evento.conversacion, usuario=request.user
+    ).exists()
+    if not es_participante and request.user != evento.creador:
+        return JsonResponse({'ok': False, 'error': 'sin_permiso'}, status=403)
+
+    # La conversacion del evento debe existir
+    if not evento.conversacion_id:
+        return JsonResponse({'ok': False, 'error': 'evento_sin_conversacion'}, status=500)
+
+    # Participantes del evento
+    parts_qs = ParticipanteConversacion.objects.filter(
+        conversacion=evento.conversacion
+    ).select_related('usuario')
+
+    usuarios = [p.usuario for p in parts_qs]
+    if len(usuarios) < 2:
+        return JsonResponse({'ok': False, 'error': 'participantes_insuficientes'}, status=400)
+
+    # Derangement simple (evitar que alguien se asigne a sí mismo)
+    givers = usuarios[:]
+    receivers = usuarios[:]
+    for _ in range(30):
+        random.shuffle(receivers)
+        if all(g != r for g, r in zip(givers, receivers)):
+            break
+    else:
+        # Fallback seguro (rotación)
+        receivers = usuarios[1:] + usuarios[:1]
+
+    # Evitar repetir sorteo si ya se efectuó (opcional)
+    if getattr(evento, 'sorteado', False):
+        return JsonResponse({'ok': False, 'error': 'ya_sorteado'}, status=400)
+
+    with transaction.atomic():
+        # Marca de control (si tu modelo no tiene campo, puedes omitir)
+        if hasattr(evento, 'sorteado'):
+            evento.sorteado = True
+        if hasattr(evento, 'fecha_sorteo'):
+            evento.fecha_sorteo = timezone.now()
+        evento.save(update_fields=[f for f in ['sorteado','fecha_sorteo'] if hasattr(evento, f)])
+
+        # Enviar mensaje PRIVADO a cada participante
+        # Lo enviaremos desde el "creador" del evento (o el usuario que sorteó)
+        emisor = request.user
+
+        for giver, receiver in zip(givers, receivers):
+            conv_priv = get_or_create_direct_chat(emisor, giver)
+            # Crea mensaje privado solo visible en el chat 1:1 con "giver"
+            Mensaje.objects.create(
+                conversacion=conv_priv,
+                autor=emisor,
+                contenido=f"🎁 Te tocó: {receiver.first_name or receiver.username}",
+                tipo='sistema'  # usa el tipo que manejes para mensajes de sistema
+            )
+
+        # Mensaje público en el chat del evento (opcional)
+        Mensaje.objects.create(
+            conversacion=evento.conversacion,
+            autor=emisor,
+            contenido="🔒 El sorteo fue realizado. Cada uno recibió su asignación por privado.",
+            tipo='sistema'
+        )
+
+    return JsonResponse({'ok': True})    
+
+@api_view(['GET'])  
+@permission_classes([IsAdminUser])  
+def download_popular_search_report_pdf(request):
+    """
+    Genera un PDF con un gráfico de barras de las búsquedas populares
+    y una tabla de datos.
+    """
+    try:
+        # [cite_start]1. Obtener los datos (la misma consulta que tu API [cite: 369])
+        search_data_qs = (
+            HistorialBusqueda.objects
+            .annotate(term_lower=Lower(Trim('term')))
+            .values('term_lower')
+            .annotate(count=Count('id_search'))
+            .order_by('-count')[:20] # Tomamos los Top 20 para el gráfico
+        )
+        search_data = list(search_data_qs)
+
+        image_base64 = None
+        
+        if search_data:
+            # 2. Preparar datos para el gráfico
+            # Convertimos los datos a un DataFrame de Pandas para graficar fácil
+            df = pd.DataFrame(search_data)
+            # Ordenamos para el gráfico de barras horizontal (el más alto primero)
+            df = df.sort_values(by='count', ascending=True)
+
+            # 3. Generar el Gráfico con Matplotlib
+            plt.figure(figsize=(10, 8)) # Tamaño del gráfico (ancho, alto)
+            
+            # Gráfico de barras horizontal
+            plt.barh(df['term_lower'], df['count'], color='#007bff') 
+            
+            plt.title('Top 20 Búsquedas Populares', fontsize=16)
+            plt.xlabel('Número de Búsquedas', fontsize=12)
+            plt.ylabel('Término de Búsqueda', fontsize=12)
+            
+            # Añadir los números al final de cada barra
+            for index, value in enumerate(df['count']):
+                plt.text(value, index, f' {value}', va='center')
+
+            plt.tight_layout() # Ajusta para que no se corten las etiquetas
+
+            # 4. Guardar el gráfico en un buffer de memoria
+            buf = BytesIO()
+            plt.savefig(buf, format='png')
+            plt.close() # Cierra la figura para liberar memoria
+            buf.seek(0)
+
+            # 5. Codificar la imagen en Base64 para el HTML
+            image_base64 = base64.b64encode(buf.read()).decode('utf-8')
+            buf.close()
+
+        # 6. Renderizar el template HTML
+        template = get_template('reports/popular_search_report_pdf.html')
+        context = {
+            'search_data': search_data, # Los datos para la tabla
+            'image_base64': image_base64, # La imagen del gráfico
+            'generation_date': timezone.now()
+        }
+        html = template.render(context)
+        
+        # 7. Convertir HTML a PDF
+        result = BytesIO()
+        pdf = pisa.pisaDocument(BytesIO(html.encode("UTF-8")), result)
+
+        # 8. Devolver la respuesta PDF
+        if not pdf.err:
+            filename = f"reporte_busquedas_{datetime.date.today()}.pdf"
+            response = HttpResponse(result.getvalue(), content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+        else:
+            print(f"Error generando PDF de búsquedas: {pdf.err}")
+            return Response({"error": "No se pudo generar el reporte PDF."}, status=500)
+
+    except Exception as e:
+        print(f"Error excepcional generando PDF de búsquedas: {e}")
+        # Loggear el error completo en tu log de servidor
+        logging.error(f"Error al generar PDF de búsquedas: {e}", exc_info=True)
+        return Response({"error": f"No se pudo generar el reporte PDF: {e}"}, status=500)

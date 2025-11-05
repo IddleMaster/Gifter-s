@@ -8,6 +8,389 @@
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/perfil.css' %}">
 <style>
+  /* Grid layout responsivo para wishlist y recibidos */
+  .gift-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 260px));
+    justify-content: flex-start;
+    gap: clamp(10px, 2vw, 20px);
+    padding: 0;
+    margin: 0;
+    list-style: none;
+    align-items: stretch;
+    /* NUEVO: que todos los items se estiren */
+  }
+
+
+
+
+  /* Tarjetas de regalo responsivas */
+  /* Tarjetas de regalo responsivas */
+  .gift-card {
+    position: relative;
+    background: #fff;
+    border-radius: clamp(8px, 2vw, 12px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 300px;
+    height: 100%;
+    /* NUEVO: que llene toda la celda */
+    z-index: 0;
+  }
+
+  .gift-card:hover {
+    z-index: 20;
+    /* pone la card encima de las demás */
+  }
+
+
+
+  .gift-card,
+  .recibido-item {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    /* overflow: hidden;  <-- QUITADO */
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
+  }
+
+
+  .gift-card:hover,
+  .recibido-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Imágenes responsivas */
+  /* Imágenes con alto fijo para que no crezcan a todo el alto del contenedor */
+  .gift-card img,
+  .recibido-item img {
+    display: block;
+    width: 100%;
+    height: 220px;
+    /* puedes subirlo a 240–250 si quieres un poco más alta */
+    object-fit: cover;
+    border-radius: 12px 12px 0 0;
+  }
+
+
+  /* Info del regalo responsiva */
+  .gift-card .gift-info,
+  .recibido-item .gift-info {
+    padding: clamp(12px, 3vw, 20px);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(6px, 1.5vw, 12px);
+  }
+
+  /* El enlace principal ocupa toda la altura disponible de la card */
+  .gift-card .gift-link {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+  }
+
+  /* La info se estira dentro del enlace, para que los botones queden abajo */
+  .gift-card .gift-info {
+    flex: 1;
+  }
+
+
+  /* Título y descripción responsivos */
+  .gift-info h4 {
+    font-size: clamp(1rem, 2.5vw, 1.25rem);
+    line-height: 1.3;
+    margin: 0;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+
+  .gift-info p {
+    font-size: clamp(0.875rem, 2vw, 1rem);
+    color: #666;
+    margin: 0;
+  }
+
+  /* Precio y fecha responsivos */
+  .gift-info .price,
+  .gift-info .received-date {
+    font-size: clamp(0.8rem, 2vw, 0.925rem);
+  }
+
+  /* Acciones responsivas */
+  .gift-card .gift-actions,
+  .recibido-item .gift-actions {
+    padding: clamp(10px, 2.5vw, 16px);
+    display: flex;
+    justify-content: flex-end;
+    gap: clamp(8px, 2vw, 12px);
+    border-top: 1px solid #f0f0f0;
+    flex-wrap: wrap;
+  }
+
+  /* Estilos compartidos para los botones de acción */
+  .gift-card .gift-actions a,
+  .recibido-item .gift-actions a {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f8f9fa;
+    color: #212529;
+    transition: all 0.2s ease;
+    text-decoration: none;
+  }
+
+  .gift-card .gift-actions a:hover,
+  .recibido-item .gift-actions a:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Botones responsivos */
+  .gift-actions a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: clamp(36px, 10vw, 44px);
+    height: clamp(36px, 10vw, 44px);
+    border-radius: 50%;
+    background: #f8f9fa;
+    transition: all 0.2s ease;
+    position: relative;
+  }
+
+  /* Colores de botones */
+  .gift-actions .wishlist-btn {
+    color: #dc3545;
+  }
+
+  .gift-actions .mark-received {
+    color: #198754;
+  }
+
+  .gift-actions .btn-agradecer {
+    color: #0d6efd;
+  }
+
+  .gift-actions .undo-received {
+    color: #dc3545;
+  }
+
+  /* Estados hover mejorados */
+  .gift-actions a:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .gift-actions .wishlist-btn:hover {
+    background: #fff5f5;
+  }
+
+  .gift-actions .mark-received:hover {
+    background: #f0fff4;
+  }
+
+  .gift-actions .btn-agradecer:hover {
+    background: #f0f6ff;
+  }
+
+  .gift-actions .undo-received:hover {
+    background: #fff5f5;
+  }
+
+  /* Iconos responsivos */
+  .gift-actions .bi {
+    font-size: clamp(1rem, 2.5vw, 1.2rem);
+  }
+
+  /* Tooltip responsivo en hover */
+  .gift-actions a::before {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 4px 8px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    font-size: 12px;
+    border-radius: 4px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s ease;
+  }
+
+  .gift-actions a:hover::before {
+    opacity: 1;
+    visibility: visible;
+    bottom: calc(100% + 5px);
+  }
+
+  /* Ajustes para pantallas pequeñas */
+  @media (max-width: 480px) {
+    .gift-actions {
+      justify-content: space-around;
+      padding: 12px 8px;
+    }
+
+    .gift-actions a {
+      width: 40px;
+      height: 40px;
+    }
+
+    .gift-actions a::before {
+      display: none;
+      /* Ocultar tooltips en móvil */
+    }
+  }
+
+  .recibido-item h4 {
+    margin: 0;
+    font-size: 1.1rem;
+    line-height: 1.3;
+  }
+
+  .recibido-item p {
+    margin: 0;
+    color: #666;
+  }
+
+  /* Responsive */
+  /* Estilos responsivos mejorados */
+  @media (max-width: 1200px) {
+    .gift-grid {
+      gap: 16px;
+    }
+
+    .gift-card,
+    .recibido-item {
+      min-height: 280px;
+    }
+  }
+
+  @media (max-width: 992px) {
+    .profile-header {
+      padding: 16px;
+    }
+
+    .gift-grid {
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    }
+  }
+
+  @media (max-width: 768px) {
+    .profile-info {
+      flex-direction: column;
+      text-align: center;
+      gap: 16px;
+    }
+
+    .user-interests .badge {
+      font-size: 0.8rem;
+    }
+
+    .gift-card,
+    .recibido-item {
+      min-height: 260px;
+    }
+  }
+
+  .profile-content .gift-grid {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  @media (max-width: 640px) {
+    .gift-grid {
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 12px;
+    }
+
+    .gift-card img,
+    .recibido-item img {
+      height: 140px;
+    }
+
+    .gift-info {
+      padding: 12px;
+    }
+
+    .gift-info h4 {
+      font-size: 0.95rem;
+    }
+
+    .gift-info p {
+      font-size: 0.85rem;
+    }
+
+    .gift-actions {
+      padding: 8px;
+      gap: 8px;
+    }
+
+    .gift-actions a {
+      width: 32px;
+      height: 32px;
+    }
+
+    .gift-actions .bi {
+      font-size: 1rem;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .profile-nav ul {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .profile-nav a {
+      padding: 8px 12px;
+      white-space: nowrap;
+    }
+
+    .gift-grid {
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    }
+
+    .gift-card,
+    .recibido-item {
+      min-height: 220px;
+    }
+  }
+
+  /* Optimizaciones para dispositivos con pantalla táctil */
+  @media (hover: none) {
+    .gift-actions a:hover::before {
+      display: none;
+    }
+
+    .gift-actions a {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .gift-actions a:active {
+      transform: scale(0.95);
+      background: rgba(0, 0, 0, 0.05);
+    }
+  }
+
   .events-header {
     display: grid;
     grid-template-columns: 1fr auto 1fr;
@@ -276,6 +659,17 @@
     transform: translateY(-1px);
   }
 </style>
+<style>
+  /* Tabs: ocultar todo salvo .active */
+  .tab-content {
+    display: none;
+  }
+
+  .tab-content.active {
+    display: block;
+  }
+</style>
+
 {% endblock %}
 
 {% block content %}
@@ -290,10 +684,10 @@
       <h2>{{ request.user.nombre }} {{ request.user.apellido }}</h2>
       <p class="text-muted">@{{ request.user.nombre_usuario }}</p>
       <p class="description">{{ request.user.perfil.bio|default:"Sin biografía aún." }}</p>
-      
+
     </div>
 
-    
+
     <div class="edit-profile">
 
       <a href="{% url 'perfil_editar' %}" class="btn-edit">Editar perfil ✎</a>
@@ -324,51 +718,52 @@
 <br>
 
 <div class="profile-content">
-  <div class="user-interests mt-3">
-    {% if user.intereses_categorias.all %}
-        <h6 class="small text-uppercase text-muted">Categorías de interés</h6>
-        <div class="interest-pills-container">
-            {% for categoria in user.intereses_categorias.all %}
-                <span class="badge rounded-pill bg-primary">{{ categoria.nombre_categoria }}</span>
-            {% endfor %}
-        </div>
-    {% endif %}
-
-    
-</div>
-{% if user.intereses_marcas.all %}
-        <h6 class="small text-uppercase text-muted mt-3">Marcas de interés</h6>
-        <div class="interest-pills-container">
-            {% for marca in user.intereses_marcas.all %}
-                <span class="badge rounded-pill bg-secondary">{{ marca.nombre_marca }}</span>
-            {% endfor %}
-        </div>
-    {% endif %}
   <!-- Wishlist -->
   <section id="wishlist" class="tab-content active">
     <h3>Tu WishList</h3>
     <hr class="my-3">
+    <div class="user-interests mt-3">
+      {% if user.intereses_categorias.all %}
+      <h6 class="small text-uppercase text-muted">Categorías de interés</h6>
+      <div class="interest-pills-container">
+        {% for categoria in user.intereses_categorias.all %}
+        <span class="badge rounded-pill bg-primary">{{ categoria.nombre_categoria }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+
+    </div>
+    {% if user.intereses_marcas.all %}
+    <h6 class="small text-uppercase text-muted mt-3">Marcas de interés</h6>
+    <div class="interest-pills-container">
+      {% for marca in user.intereses_marcas.all %}
+      <span class="badge rounded-pill bg-secondary">{{ marca.nombre_marca }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
 
     {# Placeholder de vacío (se oculta si hay items) #}
     <p id="empty-wishlist" class="text-muted" {% if wishlist_items %}hidden{% endif %}>
       Tu wishlist está vacía. Agrega productos desde el catálogo.
     </p>
-
+    <br><br>
     <div id="wishlist-container" class="gift-grid">
       {% if wishlist_items %}
       {% for it in wishlist_items %}
       {% with p=it.id_producto url_tienda=p.urls_tienda_activas.first %}
       <div class="gift-card" id="wl-item-{{ it.id_item }}" data-product-id="{{ p.id_producto }}" data-is-fav="1"
         data-shop-url="{% if url_tienda %}{{ url_tienda.url }}{% endif %}">
-        <img
-          src="{% if p.imagen and p.imagen.url %}{{ p.imagen.url }}{% else %}{% static 'img/Gifters/favicongift.png' %}{% endif %}"
-          alt="{{ p.nombre_producto }}">
-
-        <div class="gift-info">
-          <h4>{{ p.nombre_producto }}</h4>
-          <p>{{ p.id_marca.nombre_marca }}</p>
-          
-        </div>
+        <a href="{% url 'producto_detalle' p.id_producto %}" class="gift-link"
+          style="text-decoration:none;color:inherit;">
+          <img
+            src="{% if p.imagen and p.imagen.url %}{{ p.imagen.url }}{% else %}{% static 'img/Gifters/favicongift.png' %}{% endif %}"
+            alt="{{ p.nombre_producto }}">
+          <div class="gift-info">
+            <h4 class="gift-title">{{ p.nombre_producto }}</h4>
+            <p>{{ p.id_marca.nombre_marca }}</p>
+          </div>
+        </a>
 
         <div class="gift-actions">
           <a href="#" class="wishlist-btn {% if p.id_producto in favoritos_ids %}is-fav{% endif %}"
@@ -399,7 +794,7 @@
     <h3>Tus intereses</h3>
     <hr class="my-3">
 
-    
+
   </section>
 
 
@@ -408,7 +803,7 @@
   <!-- Regalos recibidos -->
   <section id="recibidos" class="tab-content">
     <h3>Tus Regalos Recibidos</h3>
-     <hr class="my-3">
+    <hr class="my-3">
 
     {# Placeholder de vacío (se oculta si hay items) #}
     <p id="empty-recibidos" class="text-muted" {% if recibidos_items %}hidden{% endif %}>
@@ -418,27 +813,40 @@
     <div id="recibidos-container" class="gift-grid">
       {% if recibidos_items %}
       {% for it in recibidos_items %}
-      {% with p=it.id_producto %}
-      <div class="gift-card" id="wl-item-{{ it.id_item }}" data-product-id="{{ p.id_producto }}" data-is-fav="1">
+      {% with p=it.id_producto url_tienda=p.urls_tienda_activas.first %}
+      <div class="gift-card" id="recibido-item-{{ it.id_item }}" data-product-id="{{ p.id_producto }}"
+        data-item-id="{{ it.id_item }}" data-shop-url="{% if url_tienda %}{{ url_tienda.url }}{% endif %}">
         <img
           src="{% if p.imagen and p.imagen.url %}{{ p.imagen.url }}{% else %}{% static 'img/Gifters/favicongift.png' %}{% endif %}"
-          alt="{{ p.nombre_producto }}">
+          alt="{{ p.nombre_producto }}" class="card-img">
 
         <div class="gift-info">
           <h4>{{ p.nombre_producto }}</h4>
-          <p>{{ p.id_marca.nombre_marca }}</p>
-          
-          <div class="text-muted" style="font-size:.85rem">
-            Recibido el {{ it.fecha_comprado|date:"d/m/Y H:i" }}
+          <p class="brand">{{ p.id_marca.nombre_marca }}</p>
+          <p class="price">{{ p.precio|floatformat:0 }}</p>
+          <div class="received-date text-muted">
+            Recibido el {{ it.fecha_comprado|date:"d/m/Y" }}
           </div>
         </div>
 
         <div class="gift-actions">
-          {# Solo basurero en Recibidos #}
-          <a href="#" class="undo-received" data-url="{% url 'wishlist_desmarcar_recibido' it.id_item %}"
-            title="Quitar de 'Recibidos' (volver a Wishlist)">
-            <i class="bi bi-trash"></i>
+          <a href="#" class="btn-agradecer" data-bs-toggle="modal" data-bs-target="#thankYouModal"
+            data-producto-id="{{ p.id_producto }}" data-producto-nombre="{{ p.nombre_producto }}"
+            data-producto-imagen="{% if p.imagen and p.imagen.url %}{{ p.imagen.url }}{% endif %}"
+            title="Agradecer este regalo">
+            <i class="bi bi-gift-fill text-primary"></i>
           </a>
+
+          <a href="#" class="undo-received" data-url="{% url 'wishlist_desmarcar_recibido' it.id_item %}"
+            data-item-id="{{ it.id_item }}" title="Volver a wishlist">
+            <i class="bi bi-arrow-90deg-left text-danger"></i>
+          </a>
+
+          {% if url_tienda %}
+          <a href="{{ url_tienda.url }}" target="_blank" rel="noopener" class="shop-link" title="Ver en tienda">
+            <i class="bi bi-link-45deg"></i>
+          </a>
+          {% endif %}
         </div>
       </div>
       {% endwith %}
@@ -460,9 +868,9 @@
 
       <button id="btn-toggle-nuevo-evento" class="btn btn-primary btn-rounded-sm" type="button" aria-expanded="false"
         aria-controls="panel-nuevo-evento" title="Agregar evento">＋</button>
-        
+
     </div>
-     <hr class="my-3">
+    <hr class="my-3">
 
     <!-- Panel colapsable (contenido del formulario de nuevo evento) -->
     <div id="panel-nuevo-evento" class="collapse-panel" hidden>
@@ -527,7 +935,7 @@
   <!-- Solicitudes -->
   <section id="solicitudes" class="tab-content">
     <h3>Solicitudes de amistad</h3>
-     <hr class="my-3">
+    <hr class="my-3">
 
     {% if solicitudes_recibidas %}
 
@@ -618,7 +1026,7 @@
   <!-- Amigos -->
   <section id="amigos" class="tab-content">
     <h3>Tus amigos</h3>
-     <hr class="my-3">
+    <hr class="my-3">
 
     {% if amigos %}
     <div class="friends-grid">
@@ -653,53 +1061,83 @@
     {% endif %}
   </section>
   <div class="modal fade" id="thankYouModal" tabindex="-1" aria-labelledby="thankYouModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="thankYouModalLabel">Agradecer por tu Regalo</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        
-        <div id="thankYouStep1">
-            <p>¡Felicidades por tu nuevo regalo! ¿Quieres agradecer a la persona que te lo dio?</p>
-            <div class="d-grid gap-2">
-                <button class="btn btn-primary" id="btnThankPublicly">📢 Agradecer en una publicación</button>
-                <button class="btn btn-info text-white" id="btnThankPrivately">✉️ Enviar un mensaje privado</button>
-                <button class="btn btn-secondary" data-bs-dismiss="modal">No, gracias</button>
-            </div>
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="thankYouModalLabel">Agradecer por tu Regalo</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
+        <div class="modal-body">
+          <h5 class="mb-3">Agradecer por: <strong id="modal-producto-nombre-manual"></strong></h5>
 
-        <div id="thankYouStep2" style="display: none;">
-            <div class="mb-3">
-                <label for="userSearchInput" class="form-label">¿Quién te hizo el regalo?</label>
-                <input type="text" class="form-control" id="userSearchInput" placeholder="Busca a un amigo...">
-                <div id="userSearchResults" class="list-group mt-1"></div>
-                <input type="hidden" id="thankedUserId">
+          <div class="mb-3">
+            <label for="friend-search-input" class="form-label">¿Quién te hizo el regalo?</label>
+            <input type="text" class="form-control" id="friend-search-input"
+              placeholder="Busca a un amigo por su nombre...">
+            <div id="friend-search-results" class="list-group mt-1" style="max-height: 150px; overflow-y: auto;"></div>
+          </div>
+
+          <div id="selected-user-display" class="alert alert-light align-items-center gap-2" style="display: none;">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">¿Cómo quieres agradecer?</label>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="tipoAgradecimiento" id="tipo-publico" value="publico"
+                checked>
+              <label class="form-check-label" for="tipo-publico">
+                📢 Publicar en el feed
+              </label>
             </div>
-            
-            <div id="selectedUserDisplay" class="alert alert-light" style="display:none;"></div>
-            
-            <div class="mb-3" id="privateMessageContainer" style="display:none;">
-                <label for="privateMessageText" class="form-label">Mensaje de agradecimiento (opcional)</label>
-                <textarea class="form-control" id="privateMessageText" rows="3" placeholder="Ej: ¡Muchas gracias por el regalo, me encantó!"></textarea>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="tipoAgradecimiento" id="tipo-privado" value="privado">
+              <label class="form-check-label" for="tipo-privado">
+                ✉️ Enviar mensaje privado
+              </label>
             </div>
-            
-            <div class="d-flex justify-content-end gap-2">
-                <button type="button" class="btn btn-secondary" id="btnBackToStep1">Volver</button>
-                <button type="button" class="btn btn-success" id="btnSendThankYou">Enviar Agradecimiento</button>
+          </div>
+
+          <div id="public-post-options" class="mb-3">
+            <label class="form-label">Imagen para la publicación:</label>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="imageOption" id="img-product" value="product" checked>
+              <label class="form-check-label" for="img-product">
+                🎁 Usar imagen del producto
+              </label>
             </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="imageOption" id="img-upload" value="upload">
+              <label class="form-check-label" for="img-upload">
+                📸 Subir mi propia imagen
+              </label>
+            </div>
+            <div id="image-upload-container" class="mt-2" style="display: none;">
+              <input type="file" class="form-control" id="thank-you-image" accept="image/*">
+            </div>
+          </div>
+
+          <div class="mb-3" id="private-message-container" style="display: none;">
+            <label for="private-message-text" class="form-label">Mensaje de agradecimiento (opcional)</label>
+            <textarea class="form-control" id="private-message-text" rows="3"></textarea>
+          </div>
+
+          <div class="d-flex justify-content-end gap-2 mt-4">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="button" class="btn btn-success" id="btn-enviar-agradecimiento-manual" disabled>Enviar
+              Agradecimiento</button>
+          </div>
+
+          <input type="hidden" id="modal-producto-id-manual">
+          <input type="hidden" id="modal-thanked-user-id">
+          <input type="hidden" id="modal-producto-imagen">
         </div>
-
       </div>
     </div>
+
+
+
   </div>
-</div>  
-
-
-
-</div>
-{% endblock %}
+  {% endblock %}
 
 
 
@@ -707,798 +1145,1320 @@
 
 
 
-{% block extra_js %}
-<script>
-  document.addEventListener("DOMContentLoaded", function () {
-    // Lee ?tab=amigos / ?tab=solicitudes / etc
-    const params = new URLSearchParams(window.location.search);
-    const wanted = (params.get("tab") || "").trim();
+  {% block extra_js %}
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      // Lee ?tab=amigos / ?tab=solicitudes / etc
+      const params = new URLSearchParams(window.location.search);
+      const wanted = (params.get("tab") || "").trim();
 
-    if (!wanted) return;
+      if (!wanted) return;
 
-    const tabs = document.querySelectorAll(".profile-nav a");
-    const sections = document.querySelectorAll(".tab-content");
+      const tabs = document.querySelectorAll(".profile-nav a");
+      const sections = document.querySelectorAll(".tab-content");
 
-    // Busca el <a data-tab="..."> que coincida
-    const targetTab = document.querySelector(`.profile-nav a[data-tab="${wanted}"]`);
-    const targetSection = document.getElementById(wanted);
+      // Busca el <a data-tab="..."> que coincida
+      const targetTab = document.querySelector(`.profile-nav a[data-tab="${wanted}"]`);
+      const targetSection = document.getElementById(wanted);
 
-    if (targetTab && targetSection) {
-      tabs.forEach(t => t.classList.remove("active"));
-      sections.forEach(s => s.classList.remove("active"));
-      targetTab.classList.add("active");
-      targetSection.classList.add("active");
-    }
-  });
-</script>
+      if (targetTab && targetSection) {
+        tabs.forEach(t => t.classList.remove("active"));
+        sections.forEach(s => s.classList.remove("active"));
+        targetTab.classList.add("active");
+        targetSection.classList.add("active");
+      }
+    });
+  </script>
 
-<style>
-  /* Corazón con pequeño "pop" */
-  .wishlist-btn i.heart-pop {
-    animation: heart-pop 380ms ease;
-  }
-
-  @keyframes heart-pop {
-    0% {
-      transform: scale(1);
+  <style>
+    /* Corazón con pequeño "pop" */
+    .wishlist-btn i.heart-pop {
+      animation: heart-pop 380ms ease;
     }
 
-    40% {
-      transform: scale(1.25);
+    @keyframes heart-pop {
+      0% {
+        transform: scale(1);
+      }
+
+      40% {
+        transform: scale(1.25);
+      }
+
+      100% {
+        transform: scale(1);
+      }
     }
 
-    100% {
-      transform: scale(1);
-    }
-  }
-
-  /* opcional: resaltar el botón un instante */
-  .wishlist-btn.pop-bg {
-    box-shadow: 0 0 0 0 rgba(108, 99, 255, .35);
-    animation: btn-glow 480ms ease;
-  }
-
-  @keyframes btn-glow {
-    0% {
-      box-shadow: 0 0 0 0 rgba(108, 99, 255, .35);
-      transform: translateY(-2px);
+    /* Estilos responsivos para el modal de agradecimiento */
+    .modal-dialog {
+      margin: clamp(10px, 4vw, 30px) auto;
+      max-width: min(90vw, 500px);
     }
 
-    100% {
-      box-shadow: 0 0 0 12px rgba(108, 99, 255, 0);
-      transform: translateY(0);
-    }
-  }
-</style>
-
-<style>
-  /* Oculta los mensajes clásicos solo en esta página */
-  #flash-messages,
-  .messages,
-  .django-messages,
-  .alert[role="alert"][data-django-message] {
-    display: none !important;
-  }
-</style>
-<style>
-  /* --- HEART ANIMS --- */
-  .wishlist-btn .bi {
-    transition: transform .18s ease;
-  }
-
-  .wishlist-btn.heart-pop .bi {
-    animation: heartPop .28s ease;
-  }
-
-  @keyframes heartPop {
-    0% {
-      transform: scale(1);
+    .modal-content {
+      border-radius: clamp(12px, 3vw, 20px);
+      border: none;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
     }
 
-    50% {
-      transform: scale(1.35);
+    .modal-header {
+      padding: clamp(16px, 4vw, 24px);
+      border-bottom: 1px solid #f0f0f0;
     }
 
-    100% {
-      transform: scale(1);
+    .modal-title {
+      font-size: clamp(1.1rem, 2.5vw, 1.25rem);
     }
-  }
 
-  /* brillo sutil cuando queda en favorito */
-  .wishlist-btn.is-fav .bi-heart-fill {
-    filter: drop-shadow(0 0 6px rgba(220, 53, 69, .35));
-  }
+    .modal-body {
+      padding: clamp(16px, 4vw, 24px);
+    }
 
-  /* --- CARD FADE-OUT AL QUITAR --- */
-  .card-fade-out {
-    animation: cardFadeOut .28s ease forwards;
-    transform-origin: center center;
-  }
+    /* Input y resultados de búsqueda responsivos */
+    #friend-search-input {
+      padding: clamp(8px, 2vw, 12px);
+      font-size: clamp(0.875rem, 2vw, 1rem);
+      border-radius: 8px;
+    }
 
-  @keyframes cardFadeOut {
-    to {
+    #friend-search-results {
+      max-height: min(60vh, 300px);
+      border-radius: 8px;
+    }
+
+    #friend-search-results a {
+      padding: clamp(8px, 2vw, 12px);
+      font-size: clamp(0.875rem, 2vw, 1rem);
+    }
+
+    /* Usuario seleccionado */
+    #selected-user-display {
+      padding: clamp(12px, 3vw, 16px);
+      border-radius: 8px;
+      gap: clamp(8px, 2vw, 12px);
+    }
+
+    /* Botones responsivos */
+    .modal-footer .btn {
+      padding: clamp(8px, 2vw, 12px) clamp(16px, 3vw, 24px);
+      font-size: clamp(0.875rem, 2vw, 1rem);
+      border-radius: 8px;
+    }
+
+    /* Animaciones suaves */
+    .modal.fade .modal-dialog {
+      transform: scale(0.95);
       opacity: 0;
-      transform: scale(.96);
+      transition: all 0.2s ease-out;
     }
-  }
-  /* Estilos para los contenedores de píldoras en perfil */
-.user-interests-scroll-container {
-    display: flex; /* Para que las píldoras se alineen horizontalmente */
-    flex-wrap: nowrap; /* Evita que las píldoras salten a la siguiente línea */
-    overflow-x: auto; /* Habilita el scroll horizontal si las píldoras exceden el ancho */
-    -webkit-overflow-scrolling: touch; /* Mejorar el scroll en iOS */
-    padding-bottom: 5px; /* Pequeño padding para evitar que la barra de scroll se pegue */
-    gap: 8px; /* Espacio entre las píldoras */
-    scrollbar-width: thin; /* Estilo de la barra de scroll en Firefox */
-    scrollbar-color: #0d6efd #f1f1f1; /* Color de la barra de scroll en Firefox */
-}
 
-/* Estilo de la barra de scroll para Webkit (Chrome, Safari) */
-.user-interests-scroll-container::-webkit-scrollbar {
-    height: 8px;
-}
-.user-interests-scroll-container::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 10px;
-}
-.user-interests-scroll-container::-webkit-scrollbar-thumb {
-    background: #0d6efd;
-    border-radius: 10px;
-}
-.user-interests-scroll-container::-webkit-scrollbar-thumb:hover {
-    background: #0a58ca;
-}
+    .modal.show .modal-dialog {
+      transform: scale(1);
+      opacity: 1;
+    }
 
-/* Estilo para las píldoras de interés */
-.interest-pill-display {
-    flex-shrink: 0; /* Evita que las píldoras se achiquen */
-    padding: 6px 12px;
-    font-size: 0.85rem;
-    font-weight: 500;
-    border-radius: 999px;
-    white-space: nowrap; /* Asegura que el texto no se rompa */
-}
-.interest-pill-display.bg-primary { /* Para categorías */
-    background-color: #0d6efd !important; /* Asegura que se aplique el color de Bootstrap */
-    color: #fff;
-}
-.interest-pill-display.bg-secondary { /* Para marcas */
-    background-color: #6c757d !important; /* Asegura que se aplique el color de Bootstrap */
-    color: #fff;
-}
-</style>
+    /* Ajustes para dispositivos móviles */
+    @media (max-width: 480px) {
+      .modal-dialog {
+        margin: 0;
+        max-width: 100%;
+        height: 100%;
+        display: flex;
+      }
+
+      .modal-content {
+        border-radius: 0;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .modal-body {
+        flex: 1;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      #friend-search-results {
+        max-height: none;
+        flex: 1;
+      }
+    }
+  </style>
+
+  <style>
+    /* Oculta los mensajes clásicos solo en esta página */
+    #flash-messages,
+    .messages,
+    .django-messages,
+    .alert[role="alert"][data-django-message] {
+      display: none !important;
+    }
+  </style>
+  <style>
+    /* --- HEART ANIMS --- */
+    .wishlist-btn .bi {
+      transition: transform .18s ease;
+    }
+
+    .wishlist-btn.heart-pop .bi {
+      animation: heartPop .28s ease;
+    }
+
+    @keyframes heartPop {
+      0% {
+        transform: scale(1);
+      }
+
+      50% {
+        transform: scale(1.35);
+      }
+
+      100% {
+        transform: scale(1);
+      }
+    }
+
+    /* brillo sutil cuando queda en favorito */
+    .wishlist-btn.is-fav .bi-heart-fill {
+      filter: drop-shadow(0 0 6px rgba(220, 53, 69, .35));
+    }
+
+    /* --- CARD FADE-OUT AL QUITAR --- */
+    .card-fade-out {
+      animation: cardFadeOut .28s ease forwards;
+      transform-origin: center center;
+    }
+
+    @keyframes cardFadeOut {
+      to {
+        opacity: 0;
+        transform: scale(.96);
+      }
+    }
+
+    /* Contenedor de intereses responsivo */
+    .user-interests-scroll-container {
+      display: flex;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: clamp(4px, 1vw, 8px) 0;
+      gap: clamp(6px, 1.5vw, 12px);
+      scrollbar-width: thin;
+      scrollbar-color: #0d6efd #f1f1f1;
+      position: relative;
+    }
+
+    /* Indicador de scroll horizontal */
+    .user-interests-scroll-container::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 24px;
+      background: linear-gradient(to right, transparent, #fff);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .user-interests-scroll-container:not(:hover)::-webkit-scrollbar {
+      height: 4px;
+    }
+
+    /* Estilos modernos para píldoras de intereses */
+    .interest-pill-display {
+      padding: clamp(6px, 1.5vw, 10px) clamp(12px, 2vw, 16px);
+      font-size: clamp(0.75rem, 1.5vw, 0.875rem);
+      font-weight: 500;
+      border-radius: 999px;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+    }
+
+    .interest-pill-display.bg-primary {
+      background-color: #0d6efd !important;
+      color: #fff;
+      box-shadow: 0 2px 4px rgba(13, 110, 253, 0.2);
+    }
+
+    .interest-pill-display.bg-secondary {
+      background-color: #6c757d !important;
+      color: #fff;
+      box-shadow: 0 2px 4px rgba(108, 117, 125, 0.2);
+    }
+
+    /* Hover effects en dispositivos no táctiles */
+    @media (hover: hover) {
+      .interest-pill-display:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+      }
+    }
+
+    /* Estilo de la barra de scroll para Webkit (Chrome, Safari) */
+    .user-interests-scroll-container::-webkit-scrollbar {
+      height: 8px;
+    }
+
+    .user-interests-scroll-container::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 10px;
+    }
+
+    .user-interests-scroll-container::-webkit-scrollbar-thumb {
+      background: #0d6efd;
+      border-radius: 10px;
+    }
+
+    .user-interests-scroll-container::-webkit-scrollbar-thumb:hover {
+      background: #0a58ca;
+    }
+
+    /* Estilo para las píldoras de interés */
+    .interest-pill-display {
+      flex-shrink: 0;
+      /* Evita que las píldoras se achiquen */
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      border-radius: 999px;
+      white-space: nowrap;
+      /* Asegura que el texto no se rompa */
+    }
+
+    .interest-pill-display.bg-primary {
+      /* Para categorías */
+      background-color: #0d6efd !important;
+      /* Asegura que se aplique el color de Bootstrap */
+      color: #fff;
+    }
+
+    .interest-pill-display.bg-secondary {
+      /* Para marcas */
+      background-color: #6c757d !important;
+      /* Asegura que se aplique el color de Bootstrap */
+      color: #fff;
+    }
+  </style>
 
 
 
-<!-- SweetAlert2 para confirmaciones -->
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script>
-  // Toast listo para usar
-  const Toast = Swal.mixin({
-    toast: true,
-    position: 'top-end',
-    showConfirmButton: false,
-    timer: 1600,
-    timerProgressBar: true
-  });
-</script>
-
-{% if messages %}
-<script>
-  document.addEventListener('DOMContentLoaded', function () {
+  <!-- SweetAlert2 para confirmaciones -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script>
+    // Toast listo para usar
     const Toast = Swal.mixin({
       toast: true,
       position: 'top-end',
-      timer: 1800,
-      timerProgressBar: true,
-      showConfirmButton: false
+      showConfirmButton: false,
+      timer: 1600,
+      timerProgressBar: true
     });
-
-    {% for m in messages %}
-    (function () {
-      const tag = "{{ m.tags|default:'info' }}";
-      const icon = tag.includes('success') ? 'success'
-        : tag.includes('error') ? 'error'
-          : tag.includes('warning') ? 'warning'
-            : 'info';
-      Toast.fire({ icon, title: "{{ m|escapejs }}" });
-    })();
-    {% endfor %}
-  });
-</script>
-{% endif %}
-
-
-<script>
-  document.addEventListener("DOMContentLoaded", function () {
-    /* ===== Helpers: placeholders vacíos ===== */
-    const emptyWishlist = document.getElementById("empty-wishlist");
-    const emptyRecibidos = document.getElementById("empty-recibidos");
-    const wlContainer = document.getElementById("wishlist-container");
-    const rcContainer = document.getElementById("recibidos-container");
-
-    function updateEmptyStates() {
-      if (emptyWishlist && wlContainer) {
-        const hasWL = wlContainer.querySelector(".gift-card");
-        emptyWishlist.hidden = !!hasWL;
-      }
-      if (emptyRecibidos && rcContainer) {
-        const hasRC = rcContainer.querySelector(".gift-card");
-        emptyRecibidos.hidden = !!hasRC;
-      }
-    }
-
-    /* estado inicial de placeholders */
-    updateEmptyStates();
-
-    /* ===== Panel “Nuevo evento” ===== */
-    const btn = document.getElementById("btn-toggle-nuevo-evento");
-    const panel = document.getElementById("panel-nuevo-evento");
-
-    if (btn && panel) {
-      panel.hidden = true;
-      panel.style.maxHeight = "0px";
-      panel.style.overflow = "hidden";
-      btn.setAttribute("aria-expanded", "false");
-      btn.textContent = "＋";
-
-      const setMaxPanel = (el) => el.style.maxHeight = el.scrollHeight + "px";
-      const openP = () => {
-        panel.hidden = false;
-        panel.classList.add("open");
-        setMaxPanel(panel);
-        btn.setAttribute("aria-expanded", "true");
-        btn.textContent = "–";
-      };
-      const closeP = () => {
-        if (!panel.style.maxHeight || panel.style.maxHeight === "0px") {
-          panel.style.maxHeight = panel.scrollHeight + "px";
-        }
-        requestAnimationFrame(() => {
-          panel.classList.remove("open");
-          panel.style.maxHeight = "0px";
-        });
-        btn.setAttribute("aria-expanded", "false");
-        btn.textContent = "＋";
-      };
-
-      btn.addEventListener("click", () =>
-        btn.getAttribute("aria-expanded") === "true" ? closeP() : openP()
-      );
-
-      panel.addEventListener("transitionend", (ev) => {
-        if (ev.propertyName !== "max-height") return;
-        btn.getAttribute("aria-expanded") === "true"
-          ? setMaxPanel(panel)
-          : (panel.hidden = true);
-      });
-
-      window.addEventListener("resize", () => {
-        if (btn.getAttribute("aria-expanded") === "true") setMaxPanel(panel);
-      });
-      panel.addEventListener("input", () => {
-        if (btn.getAttribute("aria-expanded") === "true") setMaxPanel(panel);
-      });
-    }
-
-    /* ===== Tabs ===== */
-    const nav = document.querySelector(".profile-nav");
-    const sections = document.querySelectorAll(".tab-content");
-
-    function activateTab(key) {
-      if (!key) return;
-      nav.querySelectorAll("a[data-tab]").forEach(a => a.classList.remove("active"));
-      sections.forEach(s => s.classList.remove("active"));
-      const link = nav.querySelector(`a[data-tab="${key}"]`);
-      const target = document.getElementById(key);
-      if (link) link.classList.add("active");
-      if (target) target.classList.add("active");
-    }
-
-    let initial = nav.querySelector("a[data-tab].active");
-    activateTab(initial ? initial.getAttribute("data-tab") : "wishlist");
-
-    nav.addEventListener("click", function (e) {
-      const a = e.target.closest("a[data-tab]");
-      if (!a) return;
-      e.preventDefault();
-      activateTab(a.getAttribute("data-tab"));
-    });
-
-    /* ===== Acordeón eventos ===== */
-    const items = document.querySelectorAll(".events-list .event-item");
-    const setMaxDesc = (el) => (el.style.maxHeight = el.scrollHeight + "px");
-
-    function openDesc(descPanel, toggle) {
-      descPanel.hidden = false;
-      descPanel.classList.add("open");
-      setMaxDesc(descPanel);
-      toggle.setAttribute("aria-expanded", "true");
-    }
-    function closeDesc(descPanel, toggle) {
-      if (!descPanel.style.maxHeight || descPanel.style.maxHeight === "0px") {
-        descPanel.style.maxHeight = descPanel.scrollHeight + "px";
-      }
-      requestAnimationFrame(() => {
-        descPanel.classList.remove("open");
-        descPanel.style.maxHeight = "0px";
-      });
-      toggle.setAttribute("aria-expanded", "false");
-    }
-    function closeAllExcept(current) {
-      items.forEach((it) => {
-        const tg = it.querySelector(".event-toggle");
-        const pn = it.querySelector(".event-desc");
-        if (pn && pn !== current && tg.getAttribute("aria-expanded") === "true") {
-          closeDesc(pn, tg);
-        }
-      });
-    }
-    items.forEach((item) => {
-      const toggle = item.querySelector(".event-toggle");
-      const descPanel = item.querySelector(".event-desc");
-      if (!toggle || !descPanel) return;
-
-      toggle.setAttribute("role", "button");
-      toggle.setAttribute("tabindex", "0");
-      toggle.setAttribute("aria-expanded", "false");
-      toggle.setAttribute("aria-controls", descPanel.id);
-
-      toggle.addEventListener("click", () => {
-        const isOpen = toggle.getAttribute("aria-expanded") === "true";
-        if (isOpen) { closeDesc(descPanel, toggle); }
-        else { closeAllExcept(descPanel); openDesc(descPanel, toggle); }
-      });
-      toggle.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          toggle.click();
-        }
-      });
-      descPanel.addEventListener("transitionend", (ev) => {
-        if (ev.propertyName !== "max-height") return;
-        toggle.getAttribute("aria-expanded") === "true"
-          ? setMaxDesc(descPanel)
-          : (descPanel.hidden = true);
-      });
-    });
-    window.addEventListener("resize", () =>
-      document.querySelectorAll(".event-desc.open").forEach((p) => setMaxDesc(p))
-    );
-
-    /* ===== Confirmar eliminación (SweetAlert2 con fetch) ===== */
-    document.body.addEventListener("click", function (e) {
-      const btnDel = e.target.closest(".delete-form .delete-link");
-      if (!btnDel) return;
-
-      e.preventDefault();
-      const form = btnDel.closest("form");
-      const titulo = btnDel.getAttribute("data-title") || "este evento";
-
-      if (btnDel.type && btnDel.type.toLowerCase() === "submit") {
-        btnDel.type = "button";
-      }
-
-      Swal.fire({
-        title: "¿Estás seguro?",
-        text: `Se eliminará «${titulo}» y no podrás recuperarlo.`,
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonText: "Sí, eliminar",
-        cancelButtonText: "Cancelar",
-      }).then((result) => {
-        if (!result.isConfirmed) return;
-
-        fetch(form.action, {
-          method: "POST",
-          body: new FormData(form),
-          headers: { "X-Requested-With": "XMLHttpRequest" },
-        }).then((r) => {
-          if (r.ok) {
-            Swal.fire({
-              title: "¡Eliminado!",
-              text: "El evento fue eliminado con éxito.",
-              icon: "success",
-              confirmButtonText: "OK",
-            }).then(() => window.location.reload());
-          }
-        });
-      });
-    });
-
-    /* ===== Wishlist (toggle desde el perfil) ===== */
-    function getCookie(name) {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop().split(';').shift();
-    }
-    const csrftoken = getCookie('csrftoken');
-
-    document.addEventListener('click', async function (e) {
-      const btn = e.target.closest('.wishlist-btn');
-      if (!btn) return;
-
-      e.preventDefault();
-      const id = btn.getAttribute('data-product-id');
-      const icon = btn.querySelector('i');
-      const wasFav = btn.classList.contains('is-fav');
-      const prevTitle = btn.title;
-
-      // animación corta
-      if (icon) icon.classList.add('heart-pop');
-      btn.classList.add('pop-bg');
-      setTimeout(() => { icon && icon.classList.remove('heart-pop'); btn.classList.remove('pop-bg'); }, 420);
-
-      try {
-        const url = `{% url 'favoritos_toggle' 0 %}`.replace('/0/', `/${id}/`);
-        const resp = await fetch(url, {
-          method: 'POST',
-          headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }
-        });
-
-        if (resp.redirected || resp.url.includes('{% url "login" %}')) {
-          window.location.href = "{% url 'login' %}?next={{ request.get_full_path|urlencode }}";
-          return;
-        }
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-
-        const data = await resp.json();
-        const isFav = data.state === 'added';
-
-        // 1) Actualiza icono/estado del botón
-        btn.classList.toggle('is-fav', isFav);
-        btn.setAttribute('aria-pressed', isFav ? 'true' : 'false');
-        btn.title = isFav ? 'Quitar de wishlist' : 'Agregar a wishlist';
-        if (icon) icon.className = isFav ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
-
-        // 2) Si fue REMOVED y estamos en el grid de wishlist del perfil → quitar tarjeta
-        const wlGrid = document.getElementById('wishlist-container');
-        const card = btn.closest('.gift-card, .product-card');
-        if (!isFav && wlGrid && card && wlGrid.contains(card)) {
-          card.classList.add('card-fade-out');      // tienes la animación en tu CSS
-          setTimeout(() => {
-            card.remove();
-            updateEmptyStates();                     // ya definida arriba
-          }, 280);
-        }
-
-        // 3) Toast
-        Toast.fire({ icon: isFav ? 'success' : 'info', title: isFav ? 'Agregado a tu wishlist' : 'Quitado de tu wishlist' });
-
-      } catch (err) {
-        console.error(err);
-        // revertir UI si falla
-        btn.classList.toggle('is-fav', wasFav);
-        btn.setAttribute('aria-pressed', wasFav ? 'true' : 'false');
-        btn.title = prevTitle;
-        if (icon) icon.className = wasFav ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
-        Toast.fire({ icon: 'error', title: 'Ups, no pudimos actualizar' });
-      }
-    });
-
-    /* ===== Marcar como recibido ===== */
-    document.body.addEventListener("click", async function (e) {
-      const btnMark = e.target.closest(".mark-received");
-      if (!btnMark) return;
-
-      e.preventDefault();
-
-      const url = btnMark.getAttribute("data-url");
-      const card = btnMark.closest(".gift-card, .product-card");
-
-      const confirm = await Swal.fire({
-        title: "¿Marcar como recibido?",
-        text: "Este producto saldrá de tu wishlist.",
-        icon: "question",
-        showCancelButton: true,
-        confirmButtonText: "Sí, marcar",
-        cancelButtonText: "Cancelar"
-      });
-      if (!confirm.isConfirmed) return;
-
-      try {
-        const resp = await fetch(url, {
-          method: "POST",
-          headers: {
-            "X-CSRFToken": getCookie("csrftoken"),
-            "X-Requested-With": "XMLHttpRequest"
-          }
-        });
-        if (!resp.ok) throw new Error("HTTP " + resp.status);
-        const data = await resp.json();
-        if (!data.ok) throw new Error("Respuesta inesperada");
-
-        const recibidos = document.getElementById("recibidos-container");
-        if (recibidos && card) {
-          const info = card.querySelector(".gift-info");
-          if (info) {
-            let lbl = info.querySelector(".js-recibido-label");
-            if (!lbl) {
-              lbl = document.createElement("div");
-              lbl.className = "text-muted js-recibido-label";
-              lbl.style.fontSize = ".85rem";
-              info.appendChild(lbl);
-            }
-            lbl.textContent = "Recibido el " + (data.fecha || "");
-          }
-
-          const actions = card.querySelector(".gift-actions");
-          if (actions) {
-            const oldBtn = actions.querySelector(".mark-received");
-            if (oldBtn) oldBtn.remove();
-            actions.querySelectorAll(".wishlist-btn, .bi-link-45deg").forEach(el => {
-              const a = el.closest("a") || el;
-              a.remove();
-            });
-
-            const undo = document.createElement("a");
-            undo.href = "#";
-            undo.className = "undo-received";
-            undo.setAttribute("data-url", "{% url 'wishlist_desmarcar_recibido' 0 %}".replace("/0/", `/${data.item_id}/`));
-            undo.title = "Quitar de 'Recibidos' (volver a Wishlist)";
-            undo.innerHTML = '<i class="bi bi-trash"></i>';
-            actions.prepend(undo);
-          }
-
-          recibidos.prepend(card);
-          updateEmptyStates();   // <— actualizar placeholders
-        }
-
-        Swal.fire({
-          title: "¡Listo!",
-          text: "El regalo se marcó como recibido.",
-          icon: "success",
-          timer: 1600,
-          showConfirmButton: false
-        });
-      } catch (err) {
-        console.error(err);
-        Swal.fire("Ups…", "No pudimos marcarlo como recibido.", "error");
-      }
-    });
-
-    /* ===== Deshacer recibido (volver a Wishlist) ===== */
-    document.body.addEventListener("click", async function (e) {
-      const btnUndo = e.target.closest(".undo-received");
-      if (!btnUndo) return;
-
-      e.preventDefault();
-
-      const url = btnUndo.getAttribute("data-url");
-      const card = btnUndo.closest(".gift-card, .product-card");
-
-      function getCookie(name) {
-        const value = `; ${document.cookie}`;
-        const parts = value.split(`; ${name}=`);
-        if (parts.length === 2) return parts.pop().split(";").shift();
-      }
-
-      try {
-        const resp = await fetch(url, {
-          method: "POST",
-          headers: {
-            "X-CSRFToken": getCookie("csrftoken"),
-            "X-Requested-With": "XMLHttpRequest"
-          }
-        });
-        if (!resp.ok) throw new Error("HTTP " + resp.status);
-        const data = await resp.json();
-        if (!data.ok) throw new Error("Respuesta inesperada");
-
-        const lbl = card.querySelector(".js-recibido-label");
-        if (lbl) lbl.remove();
-
-        const actions = card.querySelector(".gift-actions");
-        if (actions) {
-          actions.innerHTML = "";
-
-          const pid = card.dataset.productId;
-          const isFav = card.dataset.isFav === "1";
-          const heart = document.createElement("a");
-          heart.href = "#";
-          heart.className = `wishlist-btn ${isFav ? "is-fav" : ""}`;
-          heart.setAttribute("data-product-id", pid);
-          heart.title = isFav ? "Quitar de wishlist" : "Agregar a wishlist";
-          heart.setAttribute("aria-pressed", isFav ? "true" : "false");
-          heart.innerHTML = `<i class="bi ${isFav ? "bi-heart-fill text-danger" : "bi-heart"}"></i>`;
-          actions.appendChild(heart);
-
-          const mark = document.createElement("a");
-          mark.href = "#";
-          mark.className = "mark-received";
-          mark.setAttribute("data-item-id", data.item_id);
-          mark.setAttribute("data-url", "{% url 'wishlist_marcar_recibido' 0 %}".replace("/0/", `/${data.item_id}/`));
-          mark.title = "Marcar como recibido";
-          mark.innerHTML = '<i class="bi bi-bag-check-fill text-success"></i>';
-          actions.appendChild(mark);
-
-          const shopUrl = (card.dataset.shopUrl || "").trim();
-          if (shopUrl) {
-            const shop = document.createElement("a");
-            shop.href = shopUrl;
-            shop.target = "_blank";
-            shop.rel = "noopener";
-            shop.title = "Ver en tienda";
-            shop.innerHTML = '<i class="bi bi-link-45deg"></i>';
-            actions.appendChild(shop);
-          }
-        }
-
-        const wl = document.getElementById("wishlist-container");
-        if (wl && card) wl.prepend(card);
-
-        const goWishlist = document.querySelector('.profile-nav a[data-tab="wishlist"]');
-        if (goWishlist) goWishlist.click();
-
-        updateEmptyStates();    // <— actualizar placeholders
-
-        Swal.fire({
-          title: "Deshecho",
-          text: "Volvió a tu Wishlist.",
-          icon: "success",
-          timer: 1400,
-          showConfirmButton: false
-        });
-      } catch (err) {
-        console.error(err);
-        Swal.fire("Ups…", "No pudimos deshacerlo.", "error");
-      }
-    });
-
-    /* ===== /NUEVO ===== */
-  });
-</script>
-
-
-<script>
-  // --- Aceptar / Rechazar solicitudes con botones y AJAX ---
-  document.addEventListener("click", async function (e) {
-    const btnAceptar = e.target.closest(".js-aceptar");
-    const btnRechazar = e.target.closest(".js-rechazar");
-    if (!btnAceptar && !btnRechazar) return;
-
-    e.preventDefault();
-    const btn = btnAceptar || btnRechazar;
-    const isAceptar = !!btnAceptar;
-    const card = btn.closest(".d-flex.align-items-center.gap-3.p-2.border.rounded-3");
-    const url = btn.dataset.url;
-    const verb = isAceptar ? "aceptar" : "rechazar";
-
-    // Obtener CSRF
-    const getCookie = (name) => {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop().split(";").shift();
-    };
-    const csrfToken = getCookie("csrftoken");
-
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "X-CSRFToken": csrfToken,
-          "X-Requested-With": "XMLHttpRequest",
-        },
-      });
-
-      if (!res.ok) throw new Error("HTTP " + res.status);
-
-      await Swal.fire({
-        icon: "success",
-        title: isAceptar ? "¡Ahora son amigos!" : "Solicitud rechazada",
-        timer: 1300,
-        showConfirmButton: false,
-      });
-
-      // eliminar tarjeta
-      if (card) card.remove();
-
-      // actualizar badge
-      const badge = document.querySelector('.profile-nav a[data-tab="solicitudes"] .badge');
-      if (badge) {
-        const next = Math.max(0, parseInt(badge.textContent || "0") - 1);
-        if (next <= 0) badge.remove();
-        else badge.textContent = next;
-      }
-
-      // mensaje vacío si ya no quedan
-      const solicitudesSection = document.getElementById("solicitudes");
-      if (solicitudesSection && !solicitudesSection.querySelector(".d-flex.align-items-center")) {
-        const p = document.createElement("p");
-        p.className = "text-muted mt-3";
-        p.textContent = "No tienes solicitudes pendientes.";
-        solicitudesSection.appendChild(p);
-      }
-    } catch (err) {
-      console.error(err);
-      Swal.fire({
-        icon: "error",
-        title: "Ups…",
-        text: `No pudimos ${verb} la solicitud.`,
-      });
-    }
-  });
-</script>
-
-<script>
-  // Eliminar amigo (SweetAlert + AJAX, sin recargar)
-  document.addEventListener("click", async function (e) {
-    const btn = e.target.closest(".js-unfriend");
-    if (!btn) return;
-
-    e.preventDefault();
-
-    const url = btn.dataset.url;
-    const name = btn.dataset.name || "esta persona";
-    const card = btn.closest(".friend-card");
-
-    // CSRF
-    const getCookie = (name) => {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop().split(';').shift();
-    };
-    const csrftoken = getCookie('csrftoken');
-
-    const ask = await Swal.fire({
-      title: "¿Eliminar amigo?",
-      text: `Dejarás de ser amigo de ${name}.`,
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Sí, eliminar",
-      cancelButtonText: "Cancelar"
-    });
-    if (!ask.isConfirmed) return;
-
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "X-CSRFToken": csrftoken,
-          "X-Requested-With": "XMLHttpRequest"
-        }
-      });
-      if (!res.ok) throw new Error("HTTP " + res.status);
-
-      await Swal.fire({
-        icon: "success",
-        title: "Amigo eliminado",
-        timer: 1300,
+  </script>
+
+  {% if messages %}
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const Toast = Swal.mixin({
+        toast: true,
+        position: 'top-end',
+        timer: 1800,
+        timerProgressBar: true,
         showConfirmButton: false
       });
 
-      if (card) card.remove();
+      {% for m in messages %}
+      (function () {
+        const tag = "{{ m.tags|default:'info' }}";
+        const icon = tag.includes('success') ? 'success'
+          : tag.includes('error') ? 'error'
+            : tag.includes('warning') ? 'warning'
+              : 'info';
+        Toast.fire({ icon, title: "{{ m|escapejs }}" });
+      })();
+      {% endfor %}
+    });
+  </script>
+  {% endif %}
 
-      // si ya no quedan amigos, muestra placeholder
-      const grid = document.querySelector(".friends-grid");
-      if (grid && !grid.querySelector(".friend-card")) {
-        const msg = document.createElement("p");
-        msg.className = "text-muted";
-        msg.textContent = "Aún no tienes amigos agregados. ¡Empieza enviando solicitudes!";
-        const cont = document.getElementById("amigos");
-        if (cont) {
-          grid.remove();
-          cont.appendChild(msg);
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      /* ===== Helpers: placeholders vacíos ===== */
+      const emptyWishlist = document.getElementById("empty-wishlist");
+      const emptyRecibidos = document.getElementById("empty-recibidos");
+      const wlContainer = document.getElementById("wishlist-container");
+      const rcContainer = document.getElementById("recibidos-container");
+
+      function updateEmptyStates() {
+        if (emptyWishlist && wlContainer) {
+          const hasWL = wlContainer.querySelector(".gift-card");
+          emptyWishlist.hidden = !!hasWL;
+        }
+        if (emptyRecibidos && rcContainer) {
+          const hasRC = rcContainer.querySelector(".gift-card");
+          emptyRecibidos.hidden = !!hasRC;
         }
       }
-    } catch (err) {
-      console.error(err);
-      Swal.fire("Ups…", "No pudimos eliminar a tu amigo.", "error");
+
+      /* estado inicial de placeholders */
+      updateEmptyStates();
+
+      /* ===== Panel “Nuevo evento” ===== */
+      const btn = document.getElementById("btn-toggle-nuevo-evento");
+      const panel = document.getElementById("panel-nuevo-evento");
+
+      if (btn && panel) {
+        panel.hidden = true;
+        panel.style.maxHeight = "0px";
+        panel.style.overflow = "hidden";
+        btn.setAttribute("aria-expanded", "false");
+        btn.textContent = "＋";
+
+        const setMaxPanel = (el) => el.style.maxHeight = el.scrollHeight + "px";
+        const openP = () => {
+          panel.hidden = false;
+          panel.classList.add("open");
+          setMaxPanel(panel);
+          btn.setAttribute("aria-expanded", "true");
+          btn.textContent = "–";
+        };
+        const closeP = () => {
+          if (!panel.style.maxHeight || panel.style.maxHeight === "0px") {
+            panel.style.maxHeight = panel.scrollHeight + "px";
+          }
+          requestAnimationFrame(() => {
+            panel.classList.remove("open");
+            panel.style.maxHeight = "0px";
+          });
+          btn.setAttribute("aria-expanded", "false");
+          btn.textContent = "＋";
+        };
+
+        btn.addEventListener("click", () =>
+          btn.getAttribute("aria-expanded") === "true" ? closeP() : openP()
+        );
+
+        panel.addEventListener("transitionend", (ev) => {
+          if (ev.propertyName !== "max-height") return;
+          btn.getAttribute("aria-expanded") === "true"
+            ? setMaxPanel(panel)
+            : (panel.hidden = true);
+        });
+
+        window.addEventListener("resize", () => {
+          if (btn.getAttribute("aria-expanded") === "true") setMaxPanel(panel);
+        });
+        panel.addEventListener("input", () => {
+          if (btn.getAttribute("aria-expanded") === "true") setMaxPanel(panel);
+        });
+      }
+
+      /* ===== Tabs ===== */
+      const nav = document.querySelector(".profile-nav");
+      const sections = document.querySelectorAll(".tab-content");
+
+      function activateTab(key) {
+        if (!key) return;
+        nav.querySelectorAll("a[data-tab]").forEach(a => a.classList.remove("active"));
+        sections.forEach(s => s.classList.remove("active"));
+        const link = nav.querySelector(`a[data-tab="${key}"]`);
+        const target = document.getElementById(key);
+        if (link) link.classList.add("active");
+        if (target) target.classList.add("active");
+      }
+
+      let initial = nav.querySelector("a[data-tab].active");
+      activateTab(initial ? initial.getAttribute("data-tab") : "wishlist");
+
+      nav.addEventListener("click", function (e) {
+        const a = e.target.closest("a[data-tab]");
+        if (!a) return;
+        e.preventDefault();
+        activateTab(a.getAttribute("data-tab"));
+      });
+
+      /* ===== Acordeón eventos ===== */
+      const items = document.querySelectorAll(".events-list .event-item");
+      const setMaxDesc = (el) => (el.style.maxHeight = el.scrollHeight + "px");
+
+      function openDesc(descPanel, toggle) {
+        descPanel.hidden = false;
+        descPanel.classList.add("open");
+        setMaxDesc(descPanel);
+        toggle.setAttribute("aria-expanded", "true");
+      }
+      function closeDesc(descPanel, toggle) {
+        if (!descPanel.style.maxHeight || descPanel.style.maxHeight === "0px") {
+          descPanel.style.maxHeight = descPanel.scrollHeight + "px";
+        }
+        requestAnimationFrame(() => {
+          descPanel.classList.remove("open");
+          descPanel.style.maxHeight = "0px";
+        });
+        toggle.setAttribute("aria-expanded", "false");
+      }
+      function closeAllExcept(current) {
+        items.forEach((it) => {
+          const tg = it.querySelector(".event-toggle");
+          const pn = it.querySelector(".event-desc");
+          if (pn && pn !== current && tg.getAttribute("aria-expanded") === "true") {
+            closeDesc(pn, tg);
+          }
+        });
+      }
+      items.forEach((item) => {
+        const toggle = item.querySelector(".event-toggle");
+        const descPanel = item.querySelector(".event-desc");
+        if (!toggle || !descPanel) return;
+
+        toggle.setAttribute("role", "button");
+        toggle.setAttribute("tabindex", "0");
+        toggle.setAttribute("aria-expanded", "false");
+        toggle.setAttribute("aria-controls", descPanel.id);
+
+        toggle.addEventListener("click", () => {
+          const isOpen = toggle.getAttribute("aria-expanded") === "true";
+          if (isOpen) { closeDesc(descPanel, toggle); }
+          else { closeAllExcept(descPanel); openDesc(descPanel, toggle); }
+        });
+        toggle.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            toggle.click();
+          }
+        });
+        descPanel.addEventListener("transitionend", (ev) => {
+          if (ev.propertyName !== "max-height") return;
+          toggle.getAttribute("aria-expanded") === "true"
+            ? setMaxDesc(descPanel)
+            : (descPanel.hidden = true);
+        });
+      });
+      window.addEventListener("resize", () =>
+        document.querySelectorAll(".event-desc.open").forEach((p) => setMaxDesc(p))
+      );
+
+      /* ===== Confirmar eliminación (SweetAlert2 con fetch) ===== */
+      document.body.addEventListener("click", function (e) {
+        const btnDel = e.target.closest(".delete-form .delete-link");
+        if (!btnDel) return;
+
+        e.preventDefault();
+        const form = btnDel.closest("form");
+        const titulo = btnDel.getAttribute("data-title") || "este evento";
+
+        if (btnDel.type && btnDel.type.toLowerCase() === "submit") {
+          btnDel.type = "button";
+        }
+
+        Swal.fire({
+          title: "¿Estás seguro?",
+          text: `Se eliminará «${titulo}» y no podrás recuperarlo.`,
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonText: "Sí, eliminar",
+          cancelButtonText: "Cancelar",
+        }).then((result) => {
+          if (!result.isConfirmed) return;
+
+          fetch(form.action, {
+            method: "POST",
+            body: new FormData(form),
+            headers: { "X-Requested-With": "XMLHttpRequest" },
+          }).then((r) => {
+            if (r.ok) {
+              Swal.fire({
+                title: "¡Eliminado!",
+                text: "El evento fue eliminado con éxito.",
+                icon: "success",
+                confirmButtonText: "OK",
+              }).then(() => window.location.reload());
+            }
+          });
+        });
+      });
+
+      /* ===== Wishlist (toggle desde el perfil) ===== */
+      function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+      }
+      const csrftoken = getCookie('csrftoken');
+
+      document.addEventListener('click', async function (e) {
+        const btn = e.target.closest('.wishlist-btn');
+        if (!btn) return;
+
+        e.preventDefault();
+        const id = btn.getAttribute('data-product-id');
+        const icon = btn.querySelector('i');
+        const wasFav = btn.classList.contains('is-fav');
+        const prevTitle = btn.title;
+
+        // animación corta
+        if (icon) icon.classList.add('heart-pop');
+        btn.classList.add('pop-bg');
+        setTimeout(() => { icon && icon.classList.remove('heart-pop'); btn.classList.remove('pop-bg'); }, 420);
+
+        try {
+          const url = `{% url 'favoritos_toggle' 0 %}`.replace('/0/', `/${id}/`);
+          const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }
+          });
+
+          if (resp.redirected || resp.url.includes('{% url "login" %}')) {
+            window.location.href = "{% url 'login' %}?next={{ request.get_full_path|urlencode }}";
+            return;
+          }
+          if (!resp.ok) throw new Error('HTTP ' + resp.status);
+
+          const data = await resp.json();
+          const isFav = data.state === 'added';
+
+          // 1) Actualiza icono/estado del botón
+          btn.classList.toggle('is-fav', isFav);
+          btn.setAttribute('aria-pressed', isFav ? 'true' : 'false');
+          btn.title = isFav ? 'Quitar de wishlist' : 'Agregar a wishlist';
+          if (icon) icon.className = isFav ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
+
+          // 2) Si fue REMOVED y estamos en el grid de wishlist del perfil → quitar tarjeta
+          const wlGrid = document.getElementById('wishlist-container');
+          const card = btn.closest('.gift-card, .product-card');
+          if (!isFav && wlGrid && card && wlGrid.contains(card)) {
+            card.classList.add('card-fade-out');      // tienes la animación en tu CSS
+            setTimeout(() => {
+              card.remove();
+              updateEmptyStates();                     // ya definida arriba
+            }, 280);
+          }
+
+          // 3) Toast
+          Toast.fire({ icon: isFav ? 'success' : 'info', title: isFav ? 'Agregado a tu wishlist' : 'Quitado de tu wishlist' });
+
+        } catch (err) {
+          console.error(err);
+          // revertir UI si falla
+          btn.classList.toggle('is-fav', wasFav);
+          btn.setAttribute('aria-pressed', wasFav ? 'true' : 'false');
+          btn.title = prevTitle;
+          if (icon) icon.className = wasFav ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
+          Toast.fire({ icon: 'error', title: 'Ups, no pudimos actualizar' });
+        }
+      });
+
+      /* ===== Marcar como recibido ===== */
+      document.body.addEventListener("click", async function (e) {
+        const btnMark = e.target.closest(".mark-received");
+        if (!btnMark) return;
+
+        e.preventDefault();
+
+        const url = btnMark.getAttribute("data-url");
+        const card = btnMark.closest(".gift-card");
+        if (!card) return;
+
+        const result = await Swal.fire({
+          title: "¿Marcar como recibido?",
+          text: "Este producto saldrá de tu wishlist.",
+          icon: "question",
+          showCancelButton: true,
+          confirmButtonText: "Sí, marcar",
+          cancelButtonText: "Cancelar"
+        });
+
+        if (!result.isConfirmed) return;
+
+        try {
+          // Animación de salida suave
+          card.style.transition = "all 0.3s ease";
+          card.style.opacity = "0.5";
+          card.style.transform = "scale(0.95)";
+
+          const resp = await fetch(url, {
+            method: "POST",
+            headers: {
+              "X-CSRFToken": getCookie("csrftoken"),
+              "X-Requested-With": "XMLHttpRequest"
+            }
+          });
+
+          if (!resp.ok) throw new Error("HTTP " + resp.status);
+          const data = await resp.json();
+          if (!data.ok) throw new Error("Respuesta inesperada");
+
+          const recibidos = document.getElementById("recibidos-container");
+          if (!recibidos) throw new Error("Contenedor de recibidos no encontrado");
+
+          // Crear una copia exacta de la tarjeta para recibidos
+          const receivedCard = card.cloneNode(true);
+          receivedCard.style.opacity = "0";
+          receivedCard.style.transform = "scale(0.95)";
+
+          // Actualizar la información
+          const info = receivedCard.querySelector(".gift-info");
+          if (info) {
+            const dateDiv = document.createElement("div");
+            dateDiv.className = "received-date text-muted";
+            dateDiv.style.fontSize = "0.875rem";
+            dateDiv.textContent = "Recibido el " + (data.fecha || new Date().toLocaleDateString());
+            info.appendChild(dateDiv);
+          }
+
+          // Actualizar los botones de acción
+          const actions = receivedCard.querySelector(".gift-actions");
+          if (actions) {
+            actions.innerHTML = '';
+
+            // Botón de agradecer (si está permitido)
+            if (data.can_thank && data.product) {
+              const thankBtn = document.createElement("a");
+              thankBtn.href = "#";
+              thankBtn.className = "btn-agradecer";
+              thankBtn.setAttribute("data-bs-toggle", "modal");
+              thankBtn.setAttribute("data-bs-target", "#thankYouModal");
+              thankBtn.setAttribute("data-producto-id", data.product.id);
+              thankBtn.setAttribute("data-producto-nombre", data.product.nombre);
+              if (data.product.image_url) {
+                thankBtn.setAttribute("data-producto-imagen", data.product.image_url);
+              }
+              thankBtn.title = "Agradecer este regalo";
+              thankBtn.innerHTML = '<i class="bi bi-gift-fill text-primary"></i>';
+              actions.appendChild(thankBtn);
+            }
+
+            // Botón de deshacer
+            const undoBtn = document.createElement("a");
+            undoBtn.href = "#";
+            undoBtn.className = "undo-received";
+            undoBtn.setAttribute("data-url", `{% url 'wishlist_desmarcar_recibido' 0 %}`.replace("/0/", `/${data.item_id}/`));
+            undoBtn.setAttribute("data-item-id", data.item_id);
+            undoBtn.title = "Volver a wishlist";
+            undoBtn.innerHTML = '<i class="bi bi-arrow-90deg-left text-danger"></i>';
+            actions.appendChild(undoBtn);
+
+            // Mantener el link de la tienda si existe
+            const shopUrl = card.getAttribute("data-shop-url");
+            if (shopUrl) {
+              const shopLink = document.createElement("a");
+              shopLink.href = shopUrl;
+              shopLink.target = "_blank";
+              shopLink.rel = "noopener";
+              shopLink.className = "shop-link";
+              shopLink.title = "Ver en tienda";
+              shopLink.innerHTML = '<i class="bi bi-link-45deg"></i>';
+              actions.appendChild(shopLink);
+            }
+          }
+
+          // Insertar la nueva tarjeta con animación
+          recibidos.prepend(receivedCard);
+          // Forzar un reflow para que la animación funcione
+          receivedCard.offsetHeight;
+
+          // Animar entrada
+          receivedCard.style.transition = "all 0.3s ease";
+          receivedCard.style.opacity = "1";
+          receivedCard.style.transform = "scale(1)";
+
+          // Quitar la tarjeta original después de la animación
+          setTimeout(() => {
+            card.remove();
+            updateEmptyStates();
+          }, 300);
+
+          // Notificar éxito
+          Toast.fire({
+            icon: "success",
+            title: "¡Regalo marcado como recibido!",
+            timer: 1600
+          });
+
+        } catch (err) {
+          console.error(err);
+          // Restaurar la tarjeta si hubo error
+          card.style.opacity = "1";
+          card.style.transform = "scale(1)";
+
+          Swal.fire({
+            icon: "error",
+            title: "Ups...",
+            text: "No pudimos marcar el regalo como recibido.",
+            timer: 2000
+          });
+        }
+      });
+
+      /* ===== Desmarcar como recibido ===== */
+      document.addEventListener("click", async function (e) {
+        const btnUndo = e.target.closest(".undo-received");
+        if (!btnUndo) return;
+        e.preventDefault();
+
+        const card = btnUndo.closest(".gift-card");
+        if (!card) return;
+
+        const url = btnUndo.getAttribute("data-url");
+        if (!url) return;
+
+        const itemId = btnUndo.getAttribute("data-item-id");
+        const productId = card.getAttribute("data-product-id");
+        const shopUrl = card.getAttribute("data-shop-url");
+
+        try {
+          const result = await Swal.fire({
+            title: "¿Volver a wishlist?",
+            text: "El regalo volverá a tu lista de deseos.",
+            icon: "question",
+            showCancelButton: true,
+            confirmButtonText: "Sí, volver a wishlist",
+            cancelButtonText: "Cancelar"
+          });
+
+          if (!result.isConfirmed) return;
+
+          // Comenzar animación de salida
+          card.style.transition = "all 0.3s ease";
+          card.style.opacity = "0";
+          card.style.transform = "scale(0.95)";
+
+          const resp = await fetch(url, {
+            method: "POST",
+            headers: {
+              "X-CSRFToken": getCookie("csrftoken"),
+              "X-Requested-With": "XMLHttpRequest"
+            }
+          });
+
+          if (!resp.ok) throw new Error("HTTP " + resp.status);
+          const data = await resp.json();
+          if (!data.ok) throw new Error("Respuesta inesperada");
+
+          // OJO: usar el nuevo id que devuelve el backend
+          const newItemId = data.item_id || itemId;
+          // Usamos Django para generar la URL base y reemplazamos el ID
+          const marcarUrlBase = "{% url 'wishlist_marcar_recibido' 0 %}";
+          const marcarUrl = marcarUrlBase.replace("/0/", `/${newItemId}/`);
+
+
+          // Crear una copia limpia para wishlist
+          const wishlistCard = document.createElement("div");
+          wishlistCard.className = "gift-card";
+          wishlistCard.id = `wl-item-${newItemId}`;
+          wishlistCard.setAttribute("data-product-id", productId);
+          wishlistCard.setAttribute("data-item-id", newItemId);
+          if (shopUrl) wishlistCard.setAttribute("data-shop-url", shopUrl);
+          wishlistCard.style.opacity = "0";
+          wishlistCard.style.transform = "scale(0.95)";
+
+
+          const imgEl = card.querySelector("img");
+          const infoEl = card.querySelector(".gift-info");
+
+          // Quitamos explícitamente la fecha "Recibido el..."
+          if (infoEl) {
+            const received = infoEl.querySelector(".received-date");
+            if (received) {
+              received.remove();
+            }
+          }
+
+          // Reconstruimos la card de wishlist
+          wishlistCard.innerHTML = `
+  <img src="${imgEl.src}" 
+       alt="${imgEl.alt}"
+       class="card-img">
+  <div class="gift-info">
+    ${infoEl.innerHTML}
+  </div>
+  <div class="gift-actions">
+    <a href="#" class="wishlist-btn is-fav" 
+       data-product-id="${productId}" 
+       title="Quitar de wishlist"
+       aria-pressed="true">
+      <i class="bi bi-heart-fill text-danger"></i>
+    </a>
+    <a href="#" class="mark-received"
+       data-item-id="${newItemId}"
+       data-url="${marcarUrl}"
+       title="Marcar como recibido">
+      <i class="bi bi-bag-check-fill text-success"></i>
+    </a>
+    ${shopUrl ? `
+      <a href="${shopUrl}" 
+         target="_blank" 
+         rel="noopener"
+         class="shop-link" 
+         title="Ver en tienda">
+        <i class="bi bi-link-45deg"></i>
+      </a>
+    ` : ""}
+  </div>
+`;
+
+
+
+          // Insertar en wishlist con animación
+          const wishlistContainer = document.getElementById("wishlist-container");
+          if (wishlistContainer) {
+            wishlistContainer.prepend(wishlistCard);
+            // Forzar reflow
+            wishlistCard.offsetHeight;
+
+            // Animar entrada
+            wishlistCard.style.transition = "all 0.3s ease";
+            wishlistCard.style.opacity = "1";
+            wishlistCard.style.transform = "scale(1)";
+
+            // Remover la tarjeta original después de la animación
+            setTimeout(() => {
+              card.remove();
+              updateEmptyStates();
+
+              // Cambiar a la pestaña de wishlist
+              const wishlistTab = document.querySelector('.profile-nav a[data-tab="wishlist"]');
+              if (wishlistTab) wishlistTab.click();
+
+              // Notificar éxito
+              Toast.fire({
+                icon: "success",
+                title: "¡Movido a tu wishlist!",
+                timer: 1600
+              });
+            }, 300);
+          }
+
+        } catch (err) {
+          console.error(err);
+          // Restaurar la tarjeta si hay error
+          card.style.opacity = "1";
+          card.style.transform = "scale(1)";
+
+          Swal.fire({
+            icon: "error",
+            title: "Ups...",
+            text: "No pudimos mover el regalo a tu wishlist.",
+            timer: 2000
+          });
+        }
+      });
+
+      /* ===== /NUEVO ===== */
+
+      const thankYouModalEl = document.getElementById('thankYouModal');
+      if (thankYouModalEl) {
+        const modal = new bootstrap.Modal(thankYouModalEl);
+
+        // Referencias a los elementos del modal
+        const productoNombreEl = document.getElementById('modal-producto-nombre-manual');
+        const productoIdInput = document.getElementById('modal-producto-id-manual');
+        const thankedUserIdInput = document.getElementById('modal-thanked-user-id');
+
+        const searchInput = document.getElementById('friend-search-input');
+        const searchResultsEl = document.getElementById('friend-search-results');
+        const selectedUserDisplay = document.getElementById('selected-user-display');
+
+        const privateMessageContainer = document.getElementById('private-message-container');
+        const privateMessageText = document.getElementById('private-message-text');
+
+        const btnEnviar = document.getElementById('btn-enviar-agradecimiento-manual');
+
+        // Función para resetear el modal a su estado inicial
+        function resetModal() {
+          productoIdInput.value = '';
+          thankedUserIdInput.value = '';
+          searchInput.value = '';
+          searchInput.style.display = 'block';
+          searchResultsEl.innerHTML = '';
+          selectedUserDisplay.style.display = 'none';
+          btnEnviar.disabled = true;
+          document.getElementById('tipo-publico').checked = true;
+          document.getElementById('img-product').checked = true;
+          document.getElementById('image-upload-container').style.display = 'none';
+          document.getElementById('thank-you-image').value = '';
+          privateMessageContainer.style.display = 'none';
+        }
+
+        // 1. Al abrir el modal, capturamos los datos del producto
+        thankYouModalEl.addEventListener('show.bs.modal', function (event) {
+          resetModal();
+          const button = event.relatedTarget;
+          productoIdInput.value = button.getAttribute('data-producto-id');
+          productoNombreEl.textContent = button.getAttribute('data-producto-nombre');
+          document.getElementById('modal-producto-imagen').value = button.getAttribute('data-producto-imagen');
+        });
+
+        // Manejar cambio en la opción de imagen
+        document.querySelectorAll('input[name="imageOption"]').forEach(radio => {
+          radio.addEventListener('change', function () {
+            document.getElementById('image-upload-container').style.display =
+              this.value === 'upload' ? 'block' : 'none';
+          });
+        });
+
+        // Mostrar/ocultar opciones según el tipo de agradecimiento
+        document.querySelectorAll('input[name="tipoAgradecimiento"]').forEach(radio => {
+          radio.addEventListener('change', function () {
+            const isPublic = this.value === 'publico';
+            document.getElementById('public-post-options').style.display = isPublic ? 'block' : 'none';
+            privateMessageContainer.style.display = isPublic ? 'none' : 'block';
+          });
+        });
+
+        // 2. Buscamos amigos mientras el usuario escribe
+        searchInput.addEventListener('input', async () => {
+          const query = searchInput.value.trim();
+          if (query.length < 2) {
+            searchResultsEl.innerHTML = '';
+            return;
+          }
+
+          // Llamamos a TU vista existente para buscar amigos
+          try {
+            const response = await fetch(`{% url 'search_friends_for_thanks' %}?q=${encodeURIComponent(query)}`);
+            if (!response.ok) throw new Error('Network response was not ok');
+            const users = await response.json();
+
+            searchResultsEl.innerHTML = ''; // Limpiar resultados anteriores
+            users.forEach(user => {
+              const item = document.createElement('a');
+              item.href = '#';
+              item.className = 'list-group-item list-group-item-action d-flex align-items-center gap-2';
+              // Guardamos los datos del usuario en el elemento para usarlos después
+              item.dataset.userId = user.id;
+              item.dataset.userName = user.text;
+              item.dataset.userAvatar = user.avatar;
+
+              item.innerHTML = `<img src="${user.avatar}" width="32" height="32" class="rounded-circle"> ${user.text}`;
+              searchResultsEl.appendChild(item);
+            });
+          } catch (error) {
+            console.error("Error buscando amigos:", error);
+            searchResultsEl.innerHTML = '<div class="list-group-item text-danger">Error al buscar.</div>';
+          }
+        });
+
+        // 3. Al hacer clic en un amigo de la lista de resultados
+        searchResultsEl.addEventListener('click', (e) => {
+          e.preventDefault();
+          const selectedItem = e.target.closest('a');
+          if (!selectedItem) return;
+
+          // Guardamos el ID del amigo seleccionado en el input oculto
+          thankedUserIdInput.value = selectedItem.dataset.userId;
+
+          // Actualizamos la UI para mostrar al usuario seleccionado
+          selectedUserDisplay.innerHTML = `<img src="${selectedItem.dataset.userAvatar}" width="32" height="32" class="rounded-circle"> <strong>${selectedItem.dataset.userName}</strong>`;
+          selectedUserDisplay.style.display = 'flex';
+
+          // Ocultamos el buscador y los resultados
+          searchInput.style.display = 'none';
+          searchResultsEl.innerHTML = '';
+
+          // ¡Activamos el botón para enviar!
+          btnEnviar.disabled = false;
+        });
+
+        // 4. Lógica para mostrar/ocultar el mensaje privado (esto no cambia)
+        document.querySelectorAll('input[name="tipoAgradecimiento"]').forEach(radio => {
+          radio.addEventListener('change', function () {
+            privateMessageContainer.style.display = this.value === 'privado' ? 'block' : 'none';
+          });
+        });
+
+        // 5. Lógica para enviar el agradecimiento
+        btnEnviar.addEventListener('click', async () => {
+          const productoId = productoIdInput.value;
+          const thankedId = thankedUserIdInput.value;
+          const tipo = document.querySelector('input[name="tipoAgradecimiento"]:checked').value;
+
+          const formData = new FormData();
+          formData.append('product_id', productoId);
+          formData.append('thanked_user_id', thankedId);
+
+          // Manejo de imágenes
+          if (tipo === 'publico') {
+            const imageOption = document.querySelector('input[name="imageOption"]:checked').value;
+            formData.append('image_option', imageOption);
+
+            if (imageOption === 'upload') {
+              const fileInput = document.getElementById('thank-you-image');
+              if (fileInput.files && fileInput.files[0]) {
+                formData.append('image', fileInput.files[0]);
+              }
+            }
+          }
+
+          let url = '';
+          if (tipo === 'publico') {
+            url = "{% url 'create_thank_you_post' %}";
+          } else {
+            url = "{% url 'send_thank_you_notification' %}";
+            formData.append('message', privateMessageText.value.trim());
+            formData.append('send_private', '1');
+
+            // También permitimos adjuntar imagen en mensajes privados
+            const imageOption = document.querySelector('input[name="imageOption"]:checked').value;
+            if (imageOption === 'product') {
+              formData.append('image_option', 'product');
+            } else if (imageOption === 'upload') {
+              const fileInput = document.getElementById('thank-you-image');
+              if (fileInput.files && fileInput.files[0]) {
+                formData.append('image', fileInput.files[0]);
+                formData.append('image_option', 'upload');
+              }
+            }
+          }
+
+          btnEnviar.disabled = true;
+          btnEnviar.textContent = 'Enviando...';
+
+          try {
+            const response = await fetch(url, {
+              method: 'POST',
+              headers: { 'X-CSRFToken': getCookie('csrftoken') },
+              body: formData
+            });
+            const data = await response.json();
+            if (data.status !== 'ok') throw new Error(data.message);
+
+            modal.hide();
+            Swal.fire({
+              icon: 'success',
+              title: '¡Éxito!',
+              text: tipo === 'publico'
+                ? 'Tu agradecimiento se ha publicado en el feed.'
+                : 'Tu mensaje de agradecimiento ha sido enviado.',
+              timer: 2000,
+              showConfirmButton: false
+            });
+
+          } catch (error) {
+            Swal.fire('Error', error.message, 'error');
+          } finally {
+            btnEnviar.disabled = false;
+            btnEnviar.textContent = 'Enviar Agradecimiento';
+            resetModal(); // Limpia el modal después de enviar
+          }
+        });
+
+        // (duplicated handler removed) — handled by the main "Marcar como recibido" listener above.
+        // Mantener un no-op para compatibilidad si otros scripts esperan un listener.
+        document.addEventListener('click', function (e) {
+          /* duplicate removed to prevent double POSTs */
+        });
+      }
+
+
+    });
+  </script>
+
+
+  <script>
+    // --- Aceptar / Rechazar solicitudes con botones y AJAX ---
+    document.addEventListener("click", async function (e) {
+      const btnAceptar = e.target.closest(".js-aceptar");
+      const btnRechazar = e.target.closest(".js-rechazar");
+      if (!btnAceptar && !btnRechazar) return;
+
+      e.preventDefault();
+      const btn = btnAceptar || btnRechazar;
+      const isAceptar = !!btnAceptar;
+      const card = btn.closest(".d-flex.align-items-center.gap-3.p-2.border.rounded-3");
+      const url = btn.dataset.url;
+      const verb = isAceptar ? "aceptar" : "rechazar";
+
+      // Obtener CSRF
+      const getCookie = (name) => {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(";").shift();
+      };
+      const csrfToken = getCookie("csrftoken");
+
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: {
+            "X-CSRFToken": csrfToken,
+            "X-Requested-With": "XMLHttpRequest",
+          },
+        });
+
+        if (!res.ok) throw new Error("HTTP " + res.status);
+
+        await Swal.fire({
+          icon: "success",
+          title: isAceptar ? "¡Ahora son amigos!" : "Solicitud rechazada",
+          timer: 1300,
+          showConfirmButton: false,
+        });
+
+        // eliminar tarjeta
+        if (card) card.remove();
+
+        // actualizar badge
+        const badge = document.querySelector('.profile-nav a[data-tab="solicitudes"] .badge');
+        if (badge) {
+          const next = Math.max(0, parseInt(badge.textContent || "0") - 1);
+          if (next <= 0) badge.remove();
+          else badge.textContent = next;
+        }
+
+        // mensaje vacío si ya no quedan
+        const solicitudesSection = document.getElementById("solicitudes");
+        if (solicitudesSection && !solicitudesSection.querySelector(".d-flex.align-items-center")) {
+          const p = document.createElement("p");
+          p.className = "text-muted mt-3";
+          p.textContent = "No tienes solicitudes pendientes.";
+          solicitudesSection.appendChild(p);
+        }
+      } catch (err) {
+        console.error(err);
+        Swal.fire({
+          icon: "error",
+          title: "Ups…",
+          text: `No pudimos ${verb} la solicitud.`,
+        });
+      }
+    });
+  </script>
+
+  <script>
+    // Eliminar amigo (SweetAlert + AJAX, sin recargar)
+    document.addEventListener("click", async function (e) {
+      const btn = e.target.closest(".js-unfriend");
+      if (!btn) return;
+
+      e.preventDefault();
+
+      const url = btn.dataset.url;
+      const name = btn.dataset.name || "esta persona";
+      const card = btn.closest(".friend-card");
+
+      // CSRF
+      const getCookie = (name) => {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+      };
+      const csrftoken = getCookie('csrftoken');
+
+      const ask = await Swal.fire({
+        title: "¿Eliminar amigo?",
+        text: `Dejarás de ser amigo de ${name}.`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sí, eliminar",
+        cancelButtonText: "Cancelar"
+      });
+      if (!ask.isConfirmed) return;
+
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: {
+            "X-CSRFToken": csrftoken,
+            "X-Requested-With": "XMLHttpRequest"
+          }
+        });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+
+        await Swal.fire({
+          icon: "success",
+          title: "Amigo eliminado",
+          timer: 1300,
+          showConfirmButton: false
+        });
+
+        if (card) card.remove();
+
+        // si ya no quedan amigos, muestra placeholder
+        const grid = document.querySelector(".friends-grid");
+        if (grid && !grid.querySelector(".friend-card")) {
+          const msg = document.createElement("p");
+          msg.className = "text-muted";
+          msg.textContent = "Aún no tienes amigos agregados. ¡Empieza enviando solicitudes!";
+          const cont = document.getElementById("amigos");
+          if (cont) {
+            grid.remove();
+            cont.appendChild(msg);
+          }
+        }
+      } catch (err) {
+        console.error(err);
+        Swal.fire("Ups…", "No pudimos eliminar a tu amigo.", "error");
+      }
+    });
+    async function marcarRecibido(itemId) {
+      const resp = await fetch(`/wishlist/marcar_recibido/${itemId}/`, { method: 'POST', headers: { 'X-CSRFToken': csrftoken } });
+      const data = await resp.json();
+      if (data.ok) {
+        // actualizar UI fecha etc.
+        document.querySelector(`#item-fecha-${itemId}`).textContent = data.fecha;
+        // si el backend permite agradecer, añade botón dinámicamente
+        if (data.can_thank && data.product) {
+          const container = document.querySelector(`#item-actions-${itemId}`);
+          if (container && !container.querySelector('.btn-thank')) {
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-sm btn-primary btn-thank';
+            btn.textContent = 'Agradecer';
+            btn.onclick = () => openThankModal(data.product);
+            container.appendChild(btn);
+          }
+        }
+      } else {
+        alert('Error marcando recibido');
+      }
     }
-  });
-</script>
-<style>
-  .interest-pills-container {
-    display: flex;       /* Alinea las píldoras horizontalmente */
-    flex-wrap: wrap;     /* Permite que salten a la siguiente línea si no caben */
-    gap: 8px;            /* Espacio entre las píldoras */
-  }
-  .user-interests .badge {
-    padding: 6px 12px;
-    font-size: 0.85rem;
-    font-weight: 500;
-  }
-</style>
+
+    function openThankModal(product) {
+      // Abrir modal propio de tu UI; ejemplo simple de confirm:
+      // show modal donde el usuario elige público/privado y si usar imagen del producto o subir.
+      // Al enviar, usa create_thank_you_post (public) o send_thank_you_notification (privado)
+      // Ejemplo simple que abre prompt:
+      const tipo = confirm('¿Enviar agradecimiento privado? OK = privado, Cancel = público') ? 'privado' : 'publico';
+      const useProductImage = confirm('¿Usar la imagen guardada del producto? OK = sí, Cancel = subir o ninguno');
+      if (tipo === 'publico') {
+        const form = new FormData();
+        form.append('product_id', product.id);
+        form.append('thanked_user_id', /* id del comprador si lo conoces */ document.querySelector('#buyer_id').value || '');
+        form.append('image_option', useProductImage ? 'product' : '');
+        fetch('/create_thank_you_post/', { method: 'POST', body: form, headers: { 'X-CSRFToken': csrftoken } })
+          .then(r => r.json()).then(console.log).catch(console.error);
+      } else {
+        const form = new FormData();
+        form.append('product_id', product.id);
+        form.append('thanked_user_id', document.querySelector('#buyer_id').value || '');
+        form.append('send_private', '1');
+        form.append('image_option', useProductImage ? 'product' : '');
+        fetch('/send_thank_you_notification/', { method: 'POST', body: form, headers: { 'X-CSRFToken': csrftoken } })
+          .then(r => r.json()).then(console.log).catch(console.error);
+      }
+    }
+  </script>
+  <style>
+    .interest-pills-container {
+      display: flex;
+      /* Alinea las píldoras horizontalmente */
+      flex-wrap: wrap;
+      /* Permite que salten a la siguiente línea si no caben */
+      gap: 8px;
+      /* Espacio entre las píldoras */
+    }
+
+    .user-interests .badge {
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+  </style>
 
 
-{% endblock %}
+  {% endblock %}

@@ -712,17 +712,20 @@
         </nav>
 
 
-        {% if user.is_authenticated %}
 
+
+
+        {% if user.is_authenticated %}
         <!-- 🔔 Campanita de notificaciones -->
         <div class="nav-item dropdown me-2">
           <a class="nav-link position-relative" href="#" id="notifDropdown" role="button" data-bs-toggle="dropdown"
             aria-expanded="false" aria-label="Notificaciones">
             <i class="bi bi-bell" style="font-size:1.3rem;"></i>
             {% if notif_count and notif_count > 0 %}
-            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-              id="notifBadge" style="font-size:.7rem;">
-              {{ notif_count }}
+            <span id="notifBadge"
+              class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger {% if not notif_count %}d-none{% endif %}"
+              style="font-size:.7rem;">
+              {{ notif_count|default:0 }}
               <span class="visually-hidden">unread</span>
             </span>
             {% endif %}
@@ -732,9 +735,15 @@
             style="min-width:320px;max-height:70vh;overflow:auto;" data-bs-auto-close="outside">
             <li class="px-3 py-2 d-flex justify-content-between align-items-center">
               <span class="fw-semibold">Notificaciones</span>
-              {% if notif_count and notif_count > 0 %}
-              <button class="btn btn-sm btn-outline-secondary" id="markAllBtn">Marcar todo leído</button>
-              {% endif %}
+
+              <div class="d-flex align-items-center gap-1">
+                <button class="btn btn-sm btn-outline-secondary" id="markAllBtn">Marcar todo leído</button>
+                <button class="btn btn-sm btn-outline-secondary" id="hideReadBtn" title="Ocultar solo leídas">Ocultar
+                  leídas</button>
+                <button class="btn btn-sm btn-outline-secondary" id="hideAllBtn" title="Ocultar todas (vista)">Limpiar
+                  lista</button>
+                <button class="btn btn-sm btn-link" id="restoreHiddenBtn" title="Mostrar ocultas">Restaurar</button>
+              </div>
             </li>
             <li>
               <hr class="dropdown-divider">
@@ -742,29 +751,39 @@
 
             {% if notif_items %}
             {% for n in notif_items %}
-            <li>
-              <a class="dropdown-item d-flex gap-2 align-items-start notif-item {% if not n.leida %}fw-semibold{% endif %}"
-                href="#" {% if n.notificacion_id %} data-id="{{ n.notificacion_id }}"
-                data-click-url="{% url 'notificacion_click' n.notificacion_id %}" {% else %} data-id=""
-                data-click-url="#" {% endif %}>
+            <li class="px-2">
+              <div
+                class="dropdown-item d-flex align-items-center gap-2 notif-item {% if not n.leida %}fw-semibold{% endif %}"
+                data-id="{{ n.notificacion_id|default:n.id }}">
                 <span class="mt-1">
-                  {% if n.tipo == 'alerta' %}
-                  <i class="bi bi-exclamation-triangle"></i>
-                  {% elif n.tipo == 'evento' %}
-                  <i class="bi bi-calendar-event"></i>
-                  {% else %}
-                  <i class="bi bi-info-circle"></i>
+                  {% if n.tipo == 'alerta' %}<i class="bi bi-exclamation-triangle"></i>
+                  {% elif n.tipo == 'evento' %}<i class="bi bi-calendar-event"></i>
+                  {% else %}<i class="bi bi-info-circle"></i>
                   {% endif %}
                 </span>
+
+                {% if n.notificacion_id %}
+                <a class="flex-grow-1 text-decoration-none" href="{% url 'notificacion_click' n.notificacion_id %}">
+                  <span class="d-block">{{ n.titulo }}</span>
+                  {% if n.mensaje %}<small class="text-muted">{{ n.mensaje|truncatechars:90 }}</small>{% endif %}
+                  <small class="d-block text-muted">{{ n.creada_en|timesince }} atrás</small>
+                </a>
+                {% else %}
                 <span class="flex-grow-1">
                   <span class="d-block">{{ n.titulo }}</span>
                   {% if n.mensaje %}<small class="text-muted">{{ n.mensaje|truncatechars:90 }}</small>{% endif %}
                   <small class="d-block text-muted">{{ n.creada_en|timesince }} atrás</small>
                 </span>
-                {% if not n.leida %}
-                <span class="badge bg-primary rounded-pill">nuevo</span>
                 {% endif %}
-              </a>
+
+                {# Botón siempre visible por ahora #}
+                <button class="btn btn-sm btn-outline-secondary js-notif-mark-one ms-2 flex-shrink-0"
+                  data-id="{{ n.notificacion_id|default:n.id }}" type="button">✓</button>
+
+                {% if not n.leida %}
+                <span class="badge bg-primary rounded-pill ms-1 flex-shrink-0">nuevo</span>
+                {% endif %}
+              </div>
             </li>
             {% endfor %}
             {% else %}
@@ -856,11 +875,11 @@
     {% block content %}{% endblock %}
   </main>
 
-  <!-- FOOTER -->
   <footer id="footer" class="footer">
     <div class="container footer-top">
       <div class="row gy-4">
-        <div class="col-lg-4 col-md-6 footer-about">
+        <!-- Columna 1 -->
+        <div class="col-lg-3 col-md-6 footer-about">
           <a href="{% url 'home' %}" class="d-flex align-items-center">
             <span class="sitename">Gifter's</span>
           </a>
@@ -872,16 +891,16 @@
           </div>
         </div>
 
-        <div class="col-lg-2 col-md-3 footer-links">
+        <!-- Columna 2 -->
+        <div class="col-lg-3 col-md-3 footer-links">
           <h4>Enlaces útiles</h4>
           <ul>
             <li><i class="bi bi-chevron-right"></i> <a href="{% url 'home' %}">Inicio</a></li>
-            <li><i class="bi bi-chevron-right"></i> <a href="#">Acerca de</a></li>
-            <li><i class="bi bi-chevron-right"></i> <a href="{% url 'ayuda' %}">Contáctanos</a></li>
           </ul>
         </div>
 
-        <div class="col-lg-4 col-md-12">
+        <!-- Columna 3 -->
+        <div class="col-lg-3 col-md-12">
           <h4>Síguenos</h4>
           <div class="social-links d-flex">
             <a href=""><i class="bi bi-twitter-x"></i></a>
@@ -890,7 +909,18 @@
             <a href=""><i class="bi bi-linkedin"></i></a>
           </div>
         </div>
+
+        <!-- NUEVA COLUMNA DE CONTACTO -->
+        <div class="col-lg-3 col-md-6 footer-contact text-center">
+          <h4>¿Necesitas ayuda?</h4>
+          <p>Estamos aquí para ayudarte.</p>
+          <a href="{% url 'ayuda' %}" class="gift mt-2 d-inline-block">¡Contáctanos!</a>
+        </div>
       </div>
+    </div>
+
+    <div class="container text-center mt-4">
+      <p class="mb-0">&copy; 2025 <strong>Gifter’s</strong>. Todos los derechos reservados.</p>
     </div>
   </footer>
 
@@ -1001,6 +1031,7 @@
         </div>
 
         <button id="chatClose" class="btn btn-sm btn-light">✕</button>
+        <span id="eventActionsHook"></span>
       </div>
     </div>
 
@@ -1021,6 +1052,9 @@
 
     <div class="chat-head" hidden></div>
 
+
+
+
     <!-- OJO: todo dentro de .chat-body -->
     <div class="chat-body" style="display:flex; height:100%;">
 
@@ -1040,7 +1074,27 @@
           style="display:none; position:absolute; inset:0; overflow:auto; background:#fff;"></div>
       </div>
 
+      <style>
+        .event-actions {
+          position: sticky;
+          top: 0;
+          z-index: 11;
+          display: none;
+          /* se muestra solo en eventos */
+          justify-content: center;
+          align-items: center;
+          padding: 8px 0;
+          background: transparent;
+        }
 
+        .event-actions .btn-sortear {
+          font-weight: 600;
+        }
+      </style>
+      <div class="event-actions" id="eventActions"
+        style="display:none; justify-content:center; align-items:center; padding:8px 0; background:transparent;">
+        <button class="btn btn-warning btn-sortear" data-action="draw-event">Sortear</button>
+      </div>
 
       <!-- Columna derecha (mensajes) -->
       <div class="chat-pane" style="flex:1; display:flex; flex-direction:column;">
@@ -1081,12 +1135,11 @@
       grupoSalir: "{% url 'grupos_leave' 0 %}",
       eventosListCreate: "{% url 'events_list_create' 0 %}",     // .replace('/0/', `/${convId}/`)
       eventoDetail: "{% url 'event_detail' 0 %}",
-      eventoDraw: "{% url 'event_draw' 0 %}",
+      eventoDraw: '/api/events/0/draw/',
       eventoLock: "{% url 'event_lock' 0 %}",
       eventoMine: "{% url 'event_my_assignment' 0 %}",
       /* NUEVO: crea evento con su propio chat */
       eventCreateWithChat: "{% url 'event_create_with_chat' %}",
-
     };
   </script>
   {% if user.is_authenticated %}
@@ -2010,22 +2063,59 @@
             drawBtn.id = 'btnEventDraw';
             drawBtn.className = 'btn btn-sm btn-warning';
             drawBtn.textContent = 'Sortear';
+
             drawBtn.addEventListener('click', async () => {
+              const id = Number(meta?.evento?.id);
+              if (!id) {
+                console.warn('⚠️ Sin id de evento en meta.evento');
+                return;
+              }
               if (!confirm('¿Confirmas realizar el sorteo?')) return;
+
+              // Construye URL canónica: usa window.URLS.eventoDraw si existe, si no fallback
+              const base = window.URLS?.eventoDraw || '/api/events/0/draw/';
+              const url = base.replace(/\/0\/$/, `/${id}/`);
+
+              drawBtn.disabled = true;
+              const oldTxt = drawBtn.textContent;
+              drawBtn.textContent = 'Sorteando…';
+
               try {
-                const url = window.URLS.eventoDraw.replace('/0/', `/${meta.evento.id}/`);
-                const r = await fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': (window.CSRF_TOKEN || '') } });
-                if (!r.ok) throw 0;
-                // refresca mensajes y mete estado “sorteado”
+                const r = await fetch(url, {
+                  method: 'POST',
+                  credentials: 'same-origin',
+                  headers: {
+                    'X-CSRFToken': (window.CSRF_TOKEN || ''),
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({})
+                });
+
+                // intenta leer JSON (para capturar msg del backend)
+                const data = await r.json().catch(() => ({}));
+                if (!r.ok) {
+                  const msg = data?.msg || data?.error || `Error ${r.status}`;
+                  throw new Error(msg);
+                }
+
+                // éxito: refresca, marca estado y quita botón
                 if (typeof window.loadMessagesOnce === 'function') await window.loadMessagesOnce();
+                meta.evento.estado = 'sorteado';
                 drawBtn.remove();
-              } catch {
-                alert('No fue posible sortear.');
+              } catch (err) {
+                console.error('❌ Sorteo falló:', err);
+                alert(typeof err?.message === 'string' ? err.message : 'No fue posible sortear.');
+              } finally {
+                if (document.body.contains(drawBtn)) {
+                  drawBtn.disabled = false;
+                  drawBtn.textContent = oldTxt;
+                }
               }
             });
+
             actionsRight?.prepend(drawBtn);
           }
-
           // === Mostrar/ocultar menú kebab “junto a la bandeja” ===
           // === Mostrar/ocultar menús kebab (autor vs miembro) ===
           const kebabAutor = document.getElementById('groupKebab');
@@ -2137,6 +2227,46 @@
             modal.show();
           }
 
+          (function () {
+            const actionsBar = document.getElementById('eventActionsBar');
+            const btnDraw = document.getElementById('btnEventDraw');
+
+            window.renderEventActions = function (meta) {
+              const isEvento = String(meta?.tipo || '').toLowerCase() === 'evento';
+              // visible sólo si: es evento, no está sorteado y soy autor
+              const puedeSortear = !!(isEvento && meta?.evento && meta.evento.estado !== 'sorteado' && meta.es_autor);
+
+              if (!actionsBar || !btnDraw) return;
+
+              if (puedeSortear) {
+                actionsBar.style.display = 'flex';
+                btnDraw.onclick = async () => {
+                  if (!confirm('¿Confirmas realizar el sorteo?')) return;
+                  try {
+                    const url = `/api/events/${id}/draw/`;
+                    const r = await fetch(url, {
+                      method: 'POST',
+                      credentials: 'same-origin',
+                      headers: { 'X-CSRFToken': (window.CSRF_TOKEN || '') }
+                    });
+                    const j = await r.json().catch(() => ({}));
+                    if (!r.ok || j?.ok === false) {
+                      throw new Error(j?.msg || `HTTP ${r.status}`);
+                    }
+                    // éxito
+                    actionsBar.style.display = 'none';
+                    if (typeof window.loadMessagesOnce === 'function') await window.loadMessagesOnce();
+                    alert('Sorteo realizado. Revisa los mensajes privados.');
+                  } catch (err) {
+                    alert('No fue posible sortear. ' + (err?.message || ''));
+                  }
+                };
+              } else {
+                actionsBar.style.display = 'none';
+                btnDraw.onclick = null;
+              }
+            };
+          })();
           // Handler del botón "Ver miembros"
           document.addEventListener('click', async (e) => {
             const btn = e.target.closest('[data-action="view-members"]');
@@ -2163,6 +2293,8 @@
               // fallback simple
               alert('No se pudieron cargar los miembros del grupo.');
             }
+
+            window.renderEventActions(meta);
           });
 
 
@@ -2553,19 +2685,21 @@
 
         tabBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
 
-        const headerTitleEl = document.querySelector('.phone-header .brand span');
+        const headerTitleEl = document.querySelector('.phone-header .brand');
         const topKebab = document.getElementById('groupKebab');
 
         if (tab === 'amigos') {
           friendsEl.style.display = 'block';
           chatsEl.style.visibility = 'hidden';
           groupsEl.style.display = 'none';
+          eventsEl.style.display = 'none';
           if (headerTitleEl) headerTitleEl.textContent = "Gifter’s";
           if (topKebab) topKebab.style.display = 'none';  // el kebab ya no va en la barra azul
           loadFriends();
         } else if (tab === 'chats') {
           friendsEl.style.display = 'none';
           groupsEl.style.display = 'none';
+          eventsEl.style.display = 'none';
           chatsEl.style.visibility = 'visible';
           if (headerTitleEl) headerTitleEl.textContent = "Gifter’s";
           if (topKebab) topKebab.style.display = 'none';
@@ -2577,6 +2711,7 @@
           friendsEl.style.display = 'none';
           chatsEl.style.visibility = 'hidden';
           groupsEl.style.display = 'none';
+          eventsEl.style.display = 'none';
           eventsEl.style.display = 'block';
           if (headerTitleEl) headerTitleEl.textContent = "Eventos";
 
@@ -2586,6 +2721,7 @@
         } else { // grupos
           friendsEl.style.display = 'none';
           chatsEl.style.visibility = 'hidden';
+          eventsEl.style.display = 'none';
           groupsEl.style.display = 'block';
           if (headerTitleEl) headerTitleEl.textContent = "Grupos"; // 👈 título fijo
           if (topKebab) topKebab.style.display = 'none';           // en la barra azul nunca
@@ -3420,6 +3556,8 @@
   <script>
     (function () {
       const eventsEl = document.getElementById('eventsList');
+      const actionsEl = document.getElementById('eventActions');
+      const sortBtnBig = actionsEl ? actionsEl.querySelector('[data-action="draw-event"]') : null; // botón grande
       if (!eventsEl) return;
 
       function headerHTML() {
@@ -3454,24 +3592,74 @@
           const last = c.ultimo_mensaje || {};
           const prev = (last.tipo === 'imagen' || last.archivo_url) ? '📷 Imagen' : String(last.contenido || '').slice(0, 72);
           const when = last.creado_en ? new Date(last.creado_en).toLocaleDateString() : '';
+          const eventId = c.evento_id || c.id;
           return `
-      <div class="chat-list-item d-flex justify-content-between align-items-center" data-conv-id="${c.conversacion_id}">
+      <div class="chat-list-item d-flex justify-content-between align-items-center" 
+           data-event-id="${eventId}" 
+           data-conv-id="${c.conversacion_id}">
         <div class="chat-names">
           <div class="line1">${c.titulo || 'Amigo Secreto'}</div>
-          <div class="line2">${prev}</div>
+          <div class="line2">${c.estado || prev}</div>
         </div>
-        <div class="chat-time">${when}</div>
+        <div class="d-flex align-items-center gap-2">
+          <div class="chat-time">${when}</div>
+          ${c.estado !== 'sorteado' ? `<button class="btn btn-sm btn-warning" data-draw="${eventId}">Sortear</button>` : ''}
+        </div>
       </div>`;
         }).join('');
 
         eventsEl.innerHTML = headerHTML() + `<div class="px-2">${rows || '<div class="p-3 text-muted">Sin eventos</div>'}</div>`;
+
+        // Engancha los manejadores de eventos
         eventsEl.querySelector('#btnCreateEvent')?.addEventListener('click', openCreateEventModal);
-        eventsEl.querySelectorAll('[data-conv-id]').forEach(row => {
+
+        // Maneja clics en filas de eventos
+        eventsEl.querySelectorAll('.chat-list-item[data-event-id]').forEach(row => {
+          // Maneja el clic en la fila para abrir la conversación
           row.addEventListener('click', () => {
             const cid = Number(row.dataset.convId);
             if (cid && typeof window.openConversation === 'function') window.openConversation(cid);
           });
+
+          // Maneja el clic en el botón de sorteo
+          const sortBtn = row.querySelector('[data-draw]');
+          if (sortBtn) {
+            sortBtn.addEventListener('click', async (e) => {
+              e.stopPropagation(); // Evita que el clic se propague a la fila
+              const eventId = Number(sortBtn.dataset.draw);
+              if (!eventId) {
+                alert('Error: event_id inválido');
+                return;
+              }
+              if (!confirm('¿Confirmas realizar el sorteo?')) return;
+
+              try {
+                const url = window.URLS.eventoDraw.replace('/0/', `/${eventId}/`);
+                const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+                  document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+                const r = await fetch(url, {
+                  method: 'POST',
+                  credentials: 'same-origin',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrf
+                  }
+                });
+
+                if (!r.ok) {
+                  const error = await r.json();
+                  throw new Error(error.msg || 'Error al realizar el sorteo');
+                }
+
+                await loadEventsInbox(); // Recarga la lista de eventos
+                if (typeof window.loadMessagesOnce === 'function') await window.loadMessagesOnce();
+              } catch (error) {
+                alert('Sorteo falló: ' + error.message);
+              }
+            });
+          }
         });
+
       }
       async function loadEventsForCurrentGroup() {
         // Si hay grupo abierto, listamos sus events (para ofrecer "Sortear" ahí).
@@ -3503,32 +3691,52 @@
           eventsEl.innerHTML = headerHTML() + `<div class="px-2">${rows || '<div class="p-3 text-muted">Sin eventos</div>'}</div>`;
           eventsEl.querySelector('#btnCreateEvent')?.addEventListener('click', openCreateEventModal);
 
+          // 🔹 Vincula filas → botón grande
+          if (typeof window.__wireEventRows === 'function') window.__wireEventRows();
+
+          // 🔹 Autoselecciona la primera fila para precargar el id en el botón grande
+          const first = eventsEl.querySelector('.chat-list-item[data-event-id]');
+          if (first) first.click();
+
           // Sorteo por fila
           eventsEl.querySelectorAll('[data-draw]')?.forEach(btn => {
             btn.addEventListener('click', async () => {
               const id = Number(btn.dataset.draw);
-              if (!id) return;
+              if (!id) {
+                alert('Error: event_id inválido');
+                return;
+              }
               if (!confirm('¿Confirmas realizar el sorteo?')) return;
               try {
                 const url = window.URLS.eventoDraw.replace('/0/', `/${id}/`);
+                const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+                  document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
                 const r = await fetch(url, {
                   method: 'POST',
                   credentials: 'same-origin',
-                  headers: { 'X-CSRFToken': (window.CSRF_TOKEN || '') }
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrf
+                  }
                 });
-                if (!r.ok) throw 0;
+                if (!r.ok) {
+                  const error = await r.json();
+                  throw new Error(error.msg || 'Error al realizar el sorteo');
+                }
                 await loadEventsForCurrentGroup();
-                // refrescar mensajes si el chat abierto es el del evento
                 if (typeof window.loadMessagesOnce === 'function') await window.loadMessagesOnce();
-              } catch {
-                alert('No fue posible sortear.');
+              } catch (error) {
+                alert('Sorteo falló: ' + error.message);
               }
             });
           });
+          // 🔹 NUEVO: vincula las filas con el botón grande de la barra amarilla
+          if (typeof window.__wireEventRows === 'function') window.__wireEventRows();
         } catch {
           eventsEl.innerHTML = headerHTML() + '<div class="p-3 text-danger">No se pudieron cargar eventos.</div>';
           eventsEl.querySelector('#btnCreateEvent')?.addEventListener('click', openCreateEventModal);
         }
+
       }
 
       Object.assign(window, {
@@ -3654,12 +3862,6 @@
 
 
 
-
-
-
-
-
-
   <script>
     // Cache de amigos para reusar
     window._friendsCache = window._friendsCache || null;
@@ -3743,183 +3945,457 @@
 
 
 
-  <script>
-    (function () {
-      // --- Helpers ya existentes ---
-      const bellToggle = document.getElementById('notifDropdown');
-      function getCSRFCookie(name) {
-        const value = `; ${document.cookie}`;
-        const parts = value.split(`; ${name}=`);
-        if (parts.length === 2) return decodeURIComponent(parts.pop().split(';').shift());
-      }
-      const CSRFTOKEN = getCSRFCookie('csrftoken');
 
-      function unreadInList() {
-        return document.querySelectorAll('.dropdown-menu .notif-item .badge.bg-primary').length;
-      }
-      function ensureBellBadge() {
-        let b = bellToggle?.querySelector('.badge.rounded-pill');
-        if (!b && bellToggle) {
-          b = document.createElement('span');
-          b.className = 'position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger';
-          b.style.fontSize = '.7rem';
-          const hidden = document.createElement('span');
-          hidden.className = 'visually-hidden';
-          hidden.textContent = 'unread';
-          b.appendChild(hidden);
-          bellToggle.appendChild(b);
-        }
-        return b;
-      }
-      function updateBell(unread) {
-        const badge = bellToggle?.querySelector('.badge.rounded-pill');
-        if (!bellToggle) return;
-        if (unread <= 0) {
-          badge?.remove();
-          document.getElementById('markAllBtn')?.remove();
-        } else {
-          const b = badge || ensureBellBadge();
-          if (b) {
-            if (!b.firstChild || b.firstChild.nodeType !== Node.TEXT_NODE) {
-              b.insertBefore(document.createTextNode(String(unread) + ' '), b.firstChild);
-            } else {
-              b.firstChild.nodeValue = String(unread) + ' ';
-            }
-          }
-        }
-      }
 
-      // --- CLICK en una notificación: no navegar, no cerrar, marcar en servidor y actualizar contador ---
-      document.addEventListener('click', async (e) => {
-        const a = e.target.closest('.notif-item');
-        if (!a) return;
-
-        // Evita navegación a href="#" y evita que Bootstrap cierre el dropdown
-        e.preventDefault();
-        e.stopPropagation();
-
-        const notifId = a.getAttribute('data-id') || '';
-
-        // Optimista: quita "nuevo" y negrita al instante
-        const newBadge = a.querySelector('.badge.bg-primary');
-        const wasUnread = !!newBadge || a.classList.contains('fw-semibold');
-        if (newBadge) newBadge.remove();
-        a.classList.remove('fw-semibold');
-        if (wasUnread) updateBell(unreadInList());
-
-        if (!notifId) return; // sin id no podemos persistir
-
-        try {
-          // POST con keepalive para que NO se cancele si el menú se cierra o el usuario cliquea rápido
-          await fetch(`/notificaciones/click/${notifId}/`, {
-            method: 'POST',
-            headers: { 'X-CSRFToken': CSRFTOKEN },
-            credentials: 'same-origin',
-            keepalive: true,
-          });
-          // No navegamos: nos quedamos en el dropdown (lo pediste así).
-          // Si en el futuro quieres abrir una URL, hazlo aquí manualmente.
-        } catch (err) {
-          console.warn('No se pudo marcar como leída en servidor:', err);
-          // (Opcional) revertir UI si quieres:
-          // a.classList.add('fw-semibold');
-          // const badge = document.createElement('span'); badge.className='badge bg-primary rounded-pill'; badge.textContent='nuevo'; a.appendChild(badge);
-          // updateBell(unreadInList());
-        }
-      }, true);
-
-      // --- Marcar TODO leído (si ya lo tienes, puedes dejar el tuyo) ---
-      document.addEventListener('click', async (e) => {
-        const btn = e.target.closest('#markAllBtn');
-        if (!btn) return;
-        e.preventDefault();
-        try {
-          const r = await fetch("{% url 'notificaciones_mark_all' %}", {
-            method: "POST",
-            credentials: "same-origin",
-            headers: { "X-CSRFToken": getCSRFCookie('csrftoken') }
-          });
-          if (!r.ok) throw 0;
-          document.querySelectorAll('.notif-item .badge.bg-primary').forEach(el => el.remove());
-          document.querySelectorAll('.notif-item.fw-semibold').forEach(el => el.classList.remove('fw-semibold'));
-          updateBell(0);
-          btn.remove();
-        } catch (err) {
-          console.error('mark-all failed', err);
-          alert('No se pudo marcar como leído.');
-        }
-      });
-
-      // Ajusta la campana al cargar
-      updateBell(unreadInList());
-    })();
-  </script>
 
 
   <script>
     (function () {
-      // Utilidad CSRF si la estás usando en otros POST; para GET no hace falta:
+      // === CSRF (único) ===
       function getCookie(name) {
         const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
         return m ? m.pop() : '';
       }
-      const CSRFTOKEN = getCookie('csrftoken');
+      const csrftoken = getCookie('csrftoken');
 
-      // Contador de la campanita
-      function updateBadge(delta) {
-        const badge = document.getElementById('notifBadge');
-        if (!badge) return;
-        const curr = parseInt(badge.textContent.trim(), 10);
-        const next = Math.max(0, (isNaN(curr) ? 0 : curr) + delta);
-        if (next === 0) {
-          badge.remove();
+      // === Badge (único) ===
+      const badgeEl = document.getElementById('notifBadge');
+      function setBadge(count) {
+        if (!badgeEl) return;
+        if (typeof count === 'undefined' || count === null) return; // solo si el server lo envía
+        const n = Math.max(0, parseInt(count || 0, 10));
+        if (n > 0) {
+          badgeEl.textContent = n;
+          badgeEl.classList.remove('d-none');
         } else {
-          badge.textContent = next;
+          badgeEl.textContent = '0';
+          badgeEl.classList.add('d-none');
         }
       }
 
-      // Click en un item: marca leído en servidor y luego actualiza UI
-      document.addEventListener('click', async (e) => {
-        const a = e.target.closest('.notif-item');
-        if (!a) return;
+      // === Mostrar/Ocultar "Marcar todo leído" según el badge ===
+      const markAllBtn = document.getElementById('markAllBtn');
+      function currentUnread() {
+        if (!badgeEl) return 0;
+        const n = parseInt((badgeEl.textContent || '0').trim(), 10);
+        return isNaN(n) ? 0 : Math.max(0, n);
+      }
+      function toggleMarkAll() {
+        if (!markAllBtn) return;
+        markAllBtn.classList.toggle('d-none', currentUnread() === 0);
+      }
+      // Estado inicial + observar cambios de badge
+      toggleMarkAll();
+      if (badgeEl) {
+        const mo = new MutationObserver(toggleMarkAll);
+        mo.observe(badgeEl, { childList: true, characterData: true, subtree: true });
+      }
 
-        e.preventDefault(); // no navegar
-        e.stopPropagation(); // no cerrar el dropdown
-
-        // Si ya estaba leída en UI, no hagas nada más
-        if (!a.classList.contains('fw-semibold')) return;
-
-        const url = a.getAttribute('data-click-url');
-        if (!url) return; // protección
-
-        try {
-          // Llamada real al backend (GET) para persistir el "leído"
-          const r = await fetch(url, {
-            method: 'GET',
-            credentials: 'same-origin'
-            // No hace falta CSRF en GET
-          });
-
-          if (!r.ok) throw new Error('request-failed');
-
-          // Si el servidor marcó como leída, ahora ajusta UI:
-          a.classList.remove('fw-semibold');
-          const badgeNuevo = a.querySelector('.badge.bg-primary');
-          if (badgeNuevo) badgeNuevo.remove();
-          updateBadge(-1); // decrementa contador en la campana
-        } catch (err) {
-          console.error('No se pudo marcar como leída:', err);
-          // opcional: mostrar toast/error
+      // === UX helpers ===
+      function showLoading(btn, on) {
+        if (!btn) return;
+        if (on) {
+          btn.dataset._html = btn.innerHTML;
+          btn.disabled = true;
+          btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+        } else {
+          btn.disabled = false;
+          if (btn.dataset._html) btn.innerHTML = btn.dataset._html;
         }
-      });
+      }
 
-      // (Opcional) Asegúrate de que el dropdown no se cierre con clics adentro:
-      const menu = document.querySelector('#notifDropdown + .dropdown-menu');
-      if (menu) menu.setAttribute('data-bs-auto-close', 'outside');
+      // === Marcar TODO — robusto ===
+      if (markAllBtn) {
+        markAllBtn.addEventListener('click', function (e) {
+          e.preventDefault();
+          if (markAllBtn.disabled) return;
+
+          const original = markAllBtn.innerHTML;
+          markAllBtn.disabled = true;
+          markAllBtn.innerHTML = 'Marcando…';
+
+          fetch("{% url 'notificaciones_mark_all' %}", {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' },
+            keepalive: true
+          })
+            .then(r => r.ok ? r.json() : Promise.reject())
+            .then(data => {
+              // Preferimos el valor del servidor; si no llega, 0
+              setBadge(typeof data.unread_count !== 'undefined' ? data.unread_count : 0);
+
+              // Limpieza visual
+              document.querySelectorAll('.dropdown-item.fw-semibold').forEach(el => el.classList.remove('fw-semibold'));
+              document.querySelectorAll('.js-notif-mark-one').forEach(b => b.remove());
+              document.querySelectorAll('.badge.bg-primary').forEach(p => p.remove());
+
+              toggleMarkAll();
+            })
+            .catch(() => {
+              // Si falla, no cambiamos el DOM
+            })
+            .finally(() => {
+              markAllBtn.disabled = false;
+              markAllBtn.innerHTML = original;
+            });
+        });
+      }
     })();
   </script>
 
 
+
+
+  <script>
+    (function () {
+      function showLoading(btn, on) {
+        if (!btn) return;
+        if (on) {
+          btn.dataset._html = btn.innerHTML;
+          btn.disabled = true;
+          btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+        } else {
+          btn.disabled = false;
+          if (btn.dataset._html) btn.innerHTML = btn.dataset._html;
+        }
+      }
+      // (deja el resto de tu script tal cual, usando showLoading)
+    })();
+  </script>
+
+  <script>
+    // Helper global para el spinner del botón ✓
+    function showLoading(btn, on) {
+      if (!btn) return;
+      if (on) {
+        btn.dataset._html = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+      } else {
+        btn.disabled = false;
+        if (btn.dataset._html) btn.innerHTML = btn.dataset._html;
+      }
+    }
+  </script>
+
+
+
+  <script>
+    (function () {
+      // --- helpers/fallbacks globales (no duplican si ya existen) ---
+      if (typeof window.getCookie !== 'function') {
+        window.getCookie = function (name) {
+          const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+          return m ? m.pop() : '';
+        };
+      }
+      if (typeof window.csrftoken === 'undefined') {
+        window.csrftoken = window.getCookie('csrftoken');
+      }
+      if (typeof window.showLoading !== 'function') {
+        window.showLoading = function (btn, on) {
+          if (!btn) return;
+          if (on) {
+            btn.dataset._html = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+          } else {
+            btn.disabled = false;
+            if (btn.dataset._html) btn.innerHTML = btn.dataset._html;
+          }
+        };
+      }
+
+      // --- plantilla de URL con placeholder ENTERO (evita NoReverseMatch) ---
+      const markOneTpl = "{% url 'notificacion_mark_one' 0 %}";
+
+      // --- handler único: marcar UNA (✓) ---
+      document.addEventListener('click', function (e) {
+        const btn = e.target.closest('.js-notif-mark-one');
+        if (!btn) return;
+
+        e.preventDefault();
+        const id = btn.getAttribute('data-id') || btn.closest('.dropdown-item')?.getAttribute('data-id');
+        if (!id || btn.disabled) return;
+
+        // construye la URL reemplazando /0/ por el id real
+        const url = markOneTpl.replace('/0/', '/' + encodeURIComponent(id) + '/');
+        console.log('[notif] POST mark-one', { id, url });
+
+        showLoading(btn, true);
+
+        fetch(url, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': window.csrftoken, 'X-Requested-With': 'XMLHttpRequest' },
+          credentials: 'same-origin',
+          keepalive: true
+        })
+          .then(async (r) => {
+            console.log('[notif] response', r.status, r.statusText);
+            if (!r.ok) {
+              const text = await r.text().catch(() => '');
+              console.warn('[notif] body(non-OK)=', text.slice(0, 300));
+              throw new Error('non-ok');
+            }
+            return r.json();
+          })
+          .then((data) => {
+            console.log('[notif] json', data);
+
+            // si tienes setBadge y el server envía unread_count, actualiza el badge
+            if (typeof window.setBadge === 'function' && typeof data.unread_count !== 'undefined') {
+              window.setBadge(data.unread_count);
+            }
+
+            // limpia UI del item
+            const item = btn.closest('.dropdown-item');
+            if (item) item.classList.remove('fw-semibold');
+            const pill = item ? item.querySelector('.badge.bg-primary') : null;
+            if (pill) pill.remove();
+            btn.remove();
+
+            // mostrar/ocultar "Marcar todo" si tienes toggleMarkAll
+            if (typeof window.toggleMarkAll === 'function') {
+              window.toggleMarkAll();
+            }
+          })
+          .catch((err) => {
+            console.error('[notif] FAIL mark-one', err);
+            showLoading(btn, false); // no tocamos el DOM si falla
+          });
+      });
+    })();
+  </script>
+
+  <script>
+    // Badge global
+    (function () {
+      const badgeEl = document.getElementById('notifBadge');
+      window.setBadge = function (count) {
+        if (!badgeEl) return;
+        const n = Math.max(0, parseInt(count || 0, 10));
+        badgeEl.textContent = n;
+        if (n > 0) {
+          badgeEl.classList.remove('d-none');
+        } else {
+          badgeEl.classList.add('d-none');
+        }
+      };
+      // Estado inicial por si el server nos entregó 0 pero no aplicó la clase
+      if (badgeEl && (!badgeEl.textContent || badgeEl.textContent.trim() === '')) {
+        setBadge(0);
+      }
+    })();
+  </script>
+
+
+
+
+
+
+
+
+
+
+  <script>
+    (function () {
+      // === Helper para obtener el token CSRF desde las cookies ===
+      function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+      }
+
+      // === Función que realiza el POST del sorteo ===
+      async function drawEvent(eventId) {
+        const url = `/api/events/${eventId}/draw/`; // asegúrate que coincida con tu urls.py
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({}) // no enviamos nada, solo usamos el ID
+        });
+
+        let data = null;
+        try {
+          data = await response.json();
+        } catch (e) { }
+
+        if (!response.ok) {
+          const msg = (data && data.error) ? data.error : `Error ${response.status} al sortear`;
+          throw new Error(msg);
+        }
+        return data;
+      }
+
+      // === Vinculamos el botón Sortear ===
+      document.addEventListener('click', async (ev) => {
+        const btn = ev.target.closest('[data-action="draw-event"]');
+        if (!btn) return;
+
+        const eventId = btn.getAttribute('data-event-id');
+        // Validación más estricta: evita enviar 'undefined' o valores no numéricos
+        if (!eventId || eventId === 'undefined' || isNaN(Number(eventId))) {
+          console.warn('⚠️ data-event-id inválido en el botón Sortear:', eventId);
+          // Mostrar una advertencia amigable al usuario y evitar la petición
+          alert('ID de evento inválido en el cliente. Por favor recarga la página e intenta nuevamente.');
+          return;
+        }
+
+        btn.disabled = true;
+        const oldText = btn.textContent;
+        btn.textContent = 'Sorteando...';
+
+        try {
+          const result = await drawEvent(eventId);
+          console.log('✅ Sorteo realizado:', result);
+          alert(`Sorteo completado correctamente con ${result.count} participantes.`);
+          // Aquí puedes actualizar tu lista de eventos o emitir un evento DOM si lo necesitas:
+          document.dispatchEvent(new CustomEvent('gifters:event-sorteado', { detail: result }));
+        } catch (err) {
+          console.error(err);
+          alert(err.message);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = oldText;
+        }
+      });
+    })();
+
+    (function () {
+      const drawer = document.getElementById('globalChatDrawer');
+      if (!drawer) return;
+
+      const eventsEl = drawer.querySelector('#eventsList');      // lista izquierda
+      const actionsEl = drawer.querySelector('#eventActions');    // barra amarilla
+      const sortBtnBig = actionsEl ? actionsEl.querySelector('[data-action="draw-event"]') : null;
+
+      // 1) Cuando se renderiza la lista de eventos, enganchamos el click de cada fila
+      //    para cargar el id en el botón grande y mostrar la barra amarilla.
+      function wireEventRows() {
+        if (!eventsEl) return;
+        // filas con data-event-id (las renderizas en tu map(...))
+        eventsEl.querySelectorAll('.chat-list-item[data-event-id]').forEach(row => {
+          row.addEventListener('click', () => {
+            const id = row.getAttribute('data-event-id');
+            if (!id || !sortBtnBig || !actionsEl) return;
+            sortBtnBig.setAttribute('data-event-id', id);
+            actionsEl.style.display = 'flex'; // muestra la barra amarilla
+          });
+        });
+
+        // Si hay al menos una fila, precarga el id en el botón grande para evitar
+        // que el usuario tenga que hacer click en la fila antes de poder sortear.
+        // Esto también cubre escenarios donde la lista se renderiza pero no se
+        // dispara un `click` en la fila (p. ej. navegación rápida).
+        try {
+          const firstRow = eventsEl.querySelector('.chat-list-item[data-event-id]');
+          if (firstRow && sortBtnBig && actionsEl) {
+            const firstId = firstRow.getAttribute('data-event-id');
+            if (firstId) {
+              sortBtnBig.setAttribute('data-event-id', firstId);
+              // no forzamos mostrar la barra amarilla aquí, solo pre-cargamos el id
+            }
+          }
+        } catch (err) {
+          // no rompemos la UI por este paso adicional
+          console.warn('wireEventRows: no pude precargar id en botón grande', err);
+        }
+      }
+
+      // 2) Llama a wireEventRows() justo DESPUÉS de que termines de inyectar
+      //    el HTML de la lista de eventos (tras tu `eventsEl.innerHTML = ...`).
+      //    Ejemplo: al final de loadEventsInbox() y/o loadEventsForCurrentGroup():
+      //      wireEventRows();
+
+      sortBtnBig?.addEventListener('click', async (ev) => {
+        const btn = ev.currentTarget;
+        const rawId = btn.getAttribute('data-event-id');
+        const eventIdNum = parseInt(rawId, 10);
+        if (!Number.isInteger(eventIdNum) || eventIdNum <= 0) {
+          console.warn('⚠️ data-event-id inválido en el botón Sortear:', rawId);
+          alert('Selecciona un evento válido antes de sortear.');
+          return;
+        }
+
+        btn.disabled = true;
+        const oldText = btn.textContent;
+        btn.textContent = 'Sorteando...';
+
+        try {
+          const url = `/api/events/${eventIdNum}/draw/`;
+          const r = await fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'X-CSRFToken': (window.CSRF_TOKEN || '') }
+          });
+          if (!r.ok) throw new Error('draw-failed');
+
+          if (typeof window.loadEventsForCurrentGroup === 'function') {
+            await window.loadEventsForCurrentGroup();
+          }
+          if (typeof window.loadMessagesOnce === 'function') {
+            await window.loadMessagesOnce();
+          }
+        } catch (e) {
+          console.error('❌ Error al sortear', e);
+          alert('No se pudo realizar el sorteo.');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = oldText;
+        }
+      });
+      drawer.addEventListener('click', async (ev) => {
+        const btn = ev.target.closest('[data-action="draw-event"]');
+        if (!btn) return;
+
+        const rawId = btn.getAttribute('data-event-id');
+        const eventIdNum = parseInt(rawId, 10);
+        if (!Number.isInteger(eventIdNum) || eventIdNum <= 0) {
+          console.warn('⚠️ data-event-id inválido en el botón Sortear:', rawId);
+          alert('Selecciona un evento válido antes de sortear.');
+          return;
+        }
+
+        btn.disabled = true;
+        const oldText = btn.textContent;
+        btn.textContent = 'Sorteando...';
+
+        try {
+          // URL canónica sin depender de /0/
+          const url = `/api/events/${eventIdNum}/draw/`;
+
+          const r = await fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+              'X-CSRFToken': (window.CSRF_TOKEN || '')
+            }
+          });
+
+          if (!r.ok) throw new Error('draw-failed');
+
+          if (typeof window.loadEventsForCurrentGroup === 'function') {
+            await window.loadEventsForCurrentGroup();
+          }
+          if (typeof window.loadMessagesOnce === 'function') {
+            await window.loadMessagesOnce();
+          }
+        } catch (e) {
+          console.error('❌ Error al sortear', e);
+          alert('No se pudo realizar el sorteo.');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = oldText;
+        }
+      });
+
+      // Expón la función para que la llames después de pintar la lista:
+      window.__wireEventRows = wireEventRows;
+    })();
+  </script>
 
 
 </body>

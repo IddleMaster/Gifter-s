@@ -31,4 +31,5 @@ openpyxl
 xhtml2pdf
 pycairo
 gunicorn
-
+requests
+matplotlib

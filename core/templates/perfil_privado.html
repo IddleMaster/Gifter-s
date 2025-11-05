@@ -6,6 +6,58 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/perfil.css' %}">
+<style>
+  :root {
+    --brand: #1970ea;
+    --ink: #0f172a;
+    --line: #e5e7eb;
+    --ghost: #f8fafc;
+  }
+
+  .btn-edit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-radius: 30px;
+    font-weight: 600;
+    padding: 10px 20px;
+    width: 180px;
+    text-align: center;
+    transition: all .25s ease;
+    text-decoration: none;
+    border: none;
+    box-sizing: border-box;
+  }
+
+  .btn-edit.btn-brand {
+    background: var(--brand);
+    color: #fff;
+    border: 2px solid var(--brand);
+  }
+
+  .btn-edit.btn-brand:hover {
+    background: #fff;
+    color: var(--brand);
+  }
+
+  .btn-edit.btn-subtle {
+    background: var(--ghost);
+    color: var(--ink);
+    border: 2px solid var(--line);
+  }
+
+  .btn-edit.btn-subtle:hover {
+    background: #fff;
+    border-color: #cbd5e1;
+  }
+
+  .acciones-inline {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -23,39 +75,45 @@
     </div>
 
     <div class="edit-profile">
-      {# Se mantienen las acciones para poder enviar solicitud de amistad #}
       {% if request.user.is_authenticated %}
-        {% if es_amigo %}
-          {# Este caso no debería ocurrir en esta página, pero lo dejamos por si acaso #}
-          <a href="#" id="btnChatPerfilPublico" class="btn-edit" data-username="{{ usuario_publico.nombre_usuario }}">
-            <i class="bi bi-chat-dots"></i> Chatear
-          </a>
-        {% elif pendiente_enviada %}
-          <form method="post" action="{% url 'amistad_cancelar' usuario_publico.nombre_usuario %}">
-            {% csrf_token %}
-            <button class="btn-edit" style="background:#f44336;">Cancelar solicitud</button>
-          </form>
-        {% elif pendiente_recibida %}
-          <div class="d-flex gap-2">
-            <form method="post" action="{% url 'amistad_aceptar' usuario_publico.nombre_usuario %}">
-              {% csrf_token %}
-              <button type="submit" class="btn btn-sm btn-success">Aceptar</button>
-            </form>
-            <form method="post" action="{% url 'amistad_rechazar' usuario_publico.nombre_usuario %}">
-              {% csrf_token %}
-              <button type="submit" class="btn btn-sm btn-danger">Rechazar</button>
-            </form>
-          </div>
-        {% else %}
-          <form method="post" action="{% url 'amistad_enviar' usuario_publico.nombre_usuario %}">
-            {% csrf_token %}
-            <button class="btn-edit">➕ Agregar amigo</button>
-          </form>
-        {% endif %}
+      {% if es_amigo %}
+      <a href="#" id="btnChatPerfilPrivado" class="btn-edit btn-subtle"
+        data-username="{{ usuario_publico.nombre_usuario }}">
+        <i class="bi bi-chat-dots"></i> Chatear
+      </a>
+
+      {% elif pendiente_enviada %}
+      <form method="post" action="{% url 'amistad_cancelar' usuario_publico.nombre_usuario %}"
+        class="js-amistad-cancelar">
+        {% csrf_token %}
+        <button class="btn-edit btn-subtle"><i class="bi bi-x-lg"></i> Cancelar solicitud</button>
+      </form>
+
+      {% elif pendiente_recibida %}
+      <div class="acciones-inline">
+        <form method="post" action="{% url 'amistad_aceptar' usuario_publico.nombre_usuario %}"
+          class="js-amistad-aceptar">
+          {% csrf_token %}
+          <button type="submit" class="btn-edit btn-brand"><i class="bi bi-check2-circle"></i> Aceptar</button>
+        </form>
+        <form method="post" action="{% url 'amistad_rechazar' usuario_publico.nombre_usuario %}"
+          class="js-amistad-rechazar">
+          {% csrf_token %}
+          <button type="submit" class="btn-edit btn-subtle"><i class="bi bi-x-circle"></i> Rechazar</button>
+        </form>
+      </div>
+
       {% else %}
-        <a href="{% url 'login' %}?next={{ request.path }}" class="btn-edit">Inicia sesión</a>
+      <form method="post" action="{% url 'amistad_enviar' usuario_publico.nombre_usuario %}" class="js-amistad-enviar">
+        {% csrf_token %}
+        <button class="btn-edit btn-brand"><i class="bi bi-person-plus"></i> Agregar amigo</button>
+      </form>
+      {% endif %}
+      {% else %}
+      <a href="{% url 'login' %}?next={{ request.path }}" class="btn-edit btn-brand">Inicia sesión</a>
       {% endif %}
     </div>
+
   </div>
 
   <nav class="profile-nav">
@@ -70,20 +128,115 @@
 
 {# --- CONTENIDO DEL PERFIL (AQUÍ ESTÁ EL CAMBIO) --- #}
 <div class="profile-content">
-    <div class="container text-center" data-aos="fade-up">
-        <div class="container section-title mt-4">
-            <h2>Perfil Privado <i class="bi bi-lock"></i> </h2>
-        </div>
-        <p class="lead">
-            El perfil de <strong>{{ usuario_publico.nombre_usuario }}</strong> es privado.
-        </p>
-        <p>
-            Debes ser su amigo para poder ver sus listas de regalos, eventos y actividad.
-        </p>
+  <div class="container text-center" data-aos="fade-up">
+    <div class="container section-title mt-4">
+      <h2>Perfil Privado <i class="bi bi-lock"></i> </h2>
     </div>
+    <p class="lead">
+      El perfil de <strong>{{ usuario_publico.nombre_usuario }}</strong> es privado.
+    </p>
+    <p>
+      Debes ser su amigo para poder ver sus listas de regalos, eventos y actividad.
+    </p>
+  </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-{# No necesitamos el JavaScript de las pestañas ni de las acciones, ya que no se muestra contenido dinámico #}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+  // SweetAlert Toast
+  const Toast = Swal.mixin({ toast:true, position:'top-end', showConfirmButton:false, timer:1800, timerProgressBar:true });
+
+  // CSRF helper
+  function getCookie(name){
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return null;
+  }
+  const csrftoken = getCookie('csrftoken');
+
+  async function handleAmistadForm(form, onOk){
+    if (!csrftoken) { Toast.fire({icon:'error', title:'Error CSRF. Recarga la página.'}); return; }
+    try{
+      const resp = await fetch(form.action, {
+        method:'POST',
+        headers:{
+          'X-CSRFToken': csrftoken,
+          'X-Requested-With': 'XMLHttpRequest',
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+      });
+      const data = await resp.json();
+      if(!resp.ok || !data.ok) throw new Error(data?.detail || data?.error || 'Error de servidor.');
+      onOk(data, form);
+    }catch(err){
+      console.error(err);
+      Toast.fire({icon:'error', title: err.message || 'Ocurrió un error.'});
+    }
+  }
+
+  // Forzar volver al perfil del usuario objetivo (aunque estés en la variante privada)
+  const goToTargetProfile = () => {
+    window.location.href = "{% url 'perfil_publico' usuario_publico.nombre_usuario %}";
+  };
+
+  const btnContainer = document.querySelector('.edit-profile');
+
+  // (Opcional) Botón chatear
+  const btnChat = document.getElementById('btnChatPerfilPrivado');
+  const chatButtonClickHandler = function(ev){
+    ev.preventDefault();
+    const u = this.dataset.username;
+    if (window.openChatWith) window.openChatWith(u);
+    else document.getElementById('chatFab')?.click();
+  };
+  btnChat?.addEventListener('click', chatButtonClickHandler);
+
+  // AJAX amistad con redirección al perfil del usuario objetivo
+  btnContainer?.addEventListener('submit', async (e) => {
+    if (e.target.matches('.js-amistad-enviar')) {
+      e.preventDefault();
+      await handleAmistadForm(e.target, (data, form) => {
+        if (data.auto_accepted) {
+          Toast.fire({ icon: 'success', title: '¡Ahora son amigos!' });
+          setTimeout(goToTargetProfile, 650);
+        } else {
+          Toast.fire({ icon: 'success', title: data.reused ? 'Solicitud reenviada' : 'Solicitud enviada' });
+          // Si prefieres recargar también aquí:
+          // setTimeout(goToTargetProfile, 650);
+          form.outerHTML = `
+            <form method="post" action="{% url 'amistad_cancelar' usuario_publico.nombre_usuario %}" class="js-amistad-cancelar">
+              {% csrf_token %}
+              <button class="btn-edit btn-subtle"><i class="bi bi-x-lg"></i> Cancelar solicitud</button>
+            </form>`;
+        }
+      });
+
+    } else if (e.target.matches('.js-amistad-cancelar')) {
+      e.preventDefault();
+      await handleAmistadForm(e.target, (data, form) => {
+        Toast.fire({ icon: 'info', title: 'Solicitud cancelada' });
+        setTimeout(goToTargetProfile, 650);
+      });
+
+    } else if (e.target.matches('.js-amistad-aceptar')) {
+      e.preventDefault();
+      await handleAmistadForm(e.target, (data, form) => {
+        Toast.fire({ icon: 'success', title: '¡Solicitud aceptada!' });
+        setTimeout(goToTargetProfile, 650);
+      });
+
+    } else if (e.target.matches('.js-amistad-rechazar')) {
+      e.preventDefault();
+      await handleAmistadForm(e.target, (data, form) => {
+        Toast.fire({ icon: 'info', title: 'Solicitud rechazada' });
+        setTimeout(goToTargetProfile, 650);
+      });
+    }
+  });
+});
+</script>
 {% endblock %}

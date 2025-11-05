@@ -7,6 +7,11 @@ from core.models import Producto, Wishlist, ItemEnWishlist, User, Recommendation
 
 CACHE_TTL = 60 * 5  # 5 minutos
 
+# Key prefix for per-user cache versioning. We include a version number in the
+# recommendation cache key so that invalidation is a fast increment instead of
+# requiring wildcard deletes which most cache backends don't support.
+USER_RECO_VER_PREFIX = "ai:reco:ver:"
+
 def _already_seen_product_ids(usuario: User) -> List[int]:
     """Productos que el usuario ya recibió o tiene en wishlist activa."""
     wl = Wishlist.objects.filter(usuario=usuario).first()
@@ -77,8 +82,27 @@ def invalidate_user_reco_cache(usuario: User):
     """
     Útil si quieres invalidar manualmente desde algún view (por ej. toggle wishlist).
     """
-    cache.delete(f"ai:reco:v2:{usuario.id}:*")  # si tu backend soporta wildcard, OK
-    # si NO soporta wildcard, no pasa nada; el fingerprint ya forzará recálculo.
+    # Incrementamos una 'version' por usuario. La función `recommend_products_for_user`
+    # incluye esta versión dentro de la clave de caché. Al incrementarla, todas las
+    # entradas anteriores quedarán huérfanas y se recalcularán.
+    key = f"{USER_RECO_VER_PREFIX}{usuario.id}"
+    try:
+        # increment cache value atomically si el backend soporta incr; si no, fallback
+        # a get/put seguro
+        if cache.get(key) is None:
+            cache.set(key, 1)
+        else:
+            # Algunos backends tienen `incr`.
+            try:
+                cache.incr(key)
+            except Exception:
+                # Fallback: leer, incrementar y volver a setear
+                v = cache.get(key) or 0
+                cache.set(key, int(v) + 1)
+    except Exception:
+        # No queremos que la invalidación falle silenciosamente; en el peor caso
+        # el fingerprint puede aún forzar recálculo en cambios de wishlist/recibidos.
+        pass
 
 # --- 👇 AQUÍ ESTÁ LA FUNCIÓN CORREGIDA 👇 ---
 def recommend_products_for_user(usuario: User, limit: int = 6, exclude_ids: Optional[List[int]] = None) -> List[Producto]:
@@ -91,7 +115,10 @@ def recommend_products_for_user(usuario: User, limit: int = 6, exclude_ids: Opti
     - Fallback estable por usuario si no hay señales.
     """
     fp = _fingerprint_usuario(usuario)
-    cache_key = f"ai:reco:v2:{usuario.id}:{fp}:{limit}"
+    # Agregamos la versión de cache por usuario para forzar recálculo cuando
+    # se llame a `invalidate_user_reco_cache`.
+    ver = cache.get(f"{USER_RECO_VER_PREFIX}{usuario.id}") or 0
+    cache_key = f"ai:reco:v2:{usuario.id}:v{ver}:{fp}:{limit}"
     cached = cache.get(cache_key)
     if cached is not None:
         return cached

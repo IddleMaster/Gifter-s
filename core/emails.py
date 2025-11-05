@@ -47,3 +47,56 @@ def send_welcome_email(user):
     )
     email.attach_alternative(html_body, "text/html")
     email.send(fail_silently=False)
+
+
+def send_report_email(reporter, post, motivo=None, request=None):
+    """Envía un email al soporte cuando un usuario reporta un post.
+
+    reporter: instancia User que reporta
+    post: instancia Post reportada
+    motivo: texto opcional con la razón del reporte
+    request: opcional, para generar URLs absolutas
+    """
+    motivo = motivo or 'No especificado'
+    subject = f"[Reporte] Post #{getattr(post, 'id_post', getattr(post, 'pk', 'n/a'))} reportado"
+
+    author = getattr(post, 'id_usuario', None)
+    author_info = f"{getattr(author, 'nombre_usuario', '')} (id={getattr(author, 'id', '')})" if author else 'Desconocido'
+
+    post_content = getattr(post, 'contenido', '') or ''
+    post_excerpt = (post_content[:300] + '...') if len(post_content or '') > 300 else post_content
+
+    post_link = None
+    try:
+        if request:
+            # Intentamos construir una URL al feed o al post si es posible
+            post_link = request.build_absolute_uri(f"/feed/#post-{getattr(post, 'id_post', getattr(post, 'pk', ''))}")
+    except Exception:
+        post_link = None
+
+    body = (
+        f"Reporte de publicación\n\n"
+        f"Reportado por: {reporter.nombre_usuario} (id={reporter.id})\n"
+        f"Email reportero: {getattr(reporter, 'correo', '')}\n"
+        f"Motivo: {motivo}\n\n"
+        f"Post ID: {getattr(post, 'id_post', getattr(post, 'pk', ''))}\n"
+        f"Autor: {author_info}\n"
+        f"Contenido (excerpt):\n{post_excerpt}\n\n"
+    )
+    if post_link:
+        body += f"Link: {post_link}\n\n"
+
+    recipients = ["giftersg4@gmail.com"]
+
+    try:
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=recipients,
+        )
+        email.attach_alternative(body.replace('\n', '<br/>'), "text/html")
+        email.send(fail_silently=False)
+    except Exception:
+        # No queremos que esto rompa la UX; quien llame puede capturar la excepción
+        raise

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Reporte de Reseñas del Sitio</title>
+    <style>
+        @page { size: letter; margin: 2cm; }
+        body { font-family: "Helvetica", sans-serif; font-size: 11pt; }
+        h1 { text-align: center; color: #333; }
+        h4 { text-align: right; color: #777; font-weight: normal; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .stars { color: #f0ad4e; font-size: 14pt; }
+        .comment { font-style: italic; color: #555; }
+    </style>
+</head>
+<body>
+    <h1>Reporte de Reseñas del Sitio</h1>
+    <h4>Generado el: {{ generation_date|date:"d/m/Y H:i" }}</h4>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Usuario</th>
+                <th>Calificación</th>
+                <th>Comentario</th>
+                <th>Fecha</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for review in reviews %}
+            <tr>
+                <td>{{ review.id_usuario.nombre_usuario|default:"N/A" }}</td>
+                <td>
+                    <span class="stars">
+                    {% if review.calificacion == 5 %}★★★★★
+                    {% elif review.calificacion == 4 %}★★★★☆
+                    {% elif review.calificacion == 3 %}★★★☆☆
+                    {% elif review.calificacion == 2 %}★★☆☆☆
+                    {% elif review.calificacion == 1 %}★☆☆☆☆
+                    {% else %}{{ review.calificacion }}
+                    {% endif %}
+                    </span>
+                </td>
+                <td class="comment">"{{ review.comentario|default:"-" }}"</td>
+                <td>{{ review.fecha_resena|date:"d/m/Y" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4" style="text-align: center;">No hay reseñas para mostrar.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

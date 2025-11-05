@@ -11,7 +11,10 @@ from core.services.ai_recommender import rerank_fof
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
 import logging
 from core.models import Seguidor
+from django.views.decorators.http import require_GET
+from django.http import JsonResponse
 from .models import Notificacion, NotificationDevice, PreferenciasUsuario
+from .services.calendarific import next_holiday
 from .serializers import (
     NotificacionSerializer,
     NotificacionCreateSerializer,
@@ -183,4 +186,25 @@ class AmigosRecomendadosView(APIView):
 
         return Response({"results": payload}, status=status.HTTP_200_OK)
 
+
+@require_GET
+def proximo_feriado(request):
+    country = request.GET.get("country") or getattr(settings, "CALENDARIFIC_COUNTRY", "CL")
+    try:
+        h = next_holiday(country)
+        if not h:
+            return JsonResponse({"ok": True, "holiday": None})
+        return JsonResponse({
+            "ok": True,
+            "holiday": {
+                "date": h["date"].isoformat(),
+                "name": h["name"],          # EN
+                "name_es": h["name_es"],    # ES
+                "type": h["type"],
+                "description": h["description"],
+                "country": h["country"],
+            }
+        })
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=500)
 

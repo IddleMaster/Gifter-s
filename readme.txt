@@ -104,3 +104,17 @@ http://localhost:8000/chat/room/1/
 
 Para actualizar el descargable despues de cambiar el escritorio: 
  pyinstaller --onefile --windowed desktop_admin/main.py
+
+meiliservidorgithub
+GiftersClave123
+
+########################
+PARA COPIAR UN BACKUP AL ESCRITORIO POR EJ:
+    docker-compose cp db-backup:/backups/NOMBRE_DEL_ARCHIVO.sql .
+    #Así se vería:; docker-compose cp db-backup:/backups/backup-2025-10-30_03-00-01.sql .
+
+
+###Para poder hacer una restauración del respaldo! (Backup de BD)
+docker-compose exec db sh -c "mysql -u gifters_user -pgifters_pass gifters < /backups/NOMBRE_DEL_ARCHIVO.sql"
+##$## así se bvería
+docker-compose exec db sh -c "mysql -u gifters_user -pgifters_pass gifters < /backups/backup-2025-10-30_03-00-01.sql"

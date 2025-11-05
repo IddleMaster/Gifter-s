@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Reporte de Búsquedas Populares</title>
+    <style>
+        @page { size: letter; margin: 2cm; }
+        body { font-family: "Helvetica", sans-serif; font-size: 11pt; }
+        h1 { text-align: center; color: #333; }
+        h2 { color: #555; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
+        h4 { text-align: right; color: #777; font-weight: normal; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .chart-container {
+            text-align: center; /* Centra la imagen */
+            margin-top: 30px;
+            margin-bottom: 30px;
+        }
+        .chart-container img {
+            max-width: 90%; /* Asegura que la imagen no se desborde */
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Reporte de Búsquedas Populares</h1>
+    <h4>Generado el: {{ generation_date|date:"d/m/Y H:i" }}</h4>
+
+    <h2>Gráfico de Búsquedas (Top 20)</h2>
+    {% if image_base64 %}
+        <div class="chart-container">
+            <img src="data:image/png;base64,{{ image_base64 }}">
+        </div>
+    {% else %}
+        <p>No hay suficientes datos para generar un gráfico.</p>
+    {% endif %}
+
+    <h2>Tabla de Datos (Top 20)</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Término de Búsqueda</th>
+                <th>Conteo</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in search_data %}
+            <tr>
+                <td>{{ item.term_lower }}</td>
+                <td>{{ item.count }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="2" style="text-align: center;">No hay datos de búsqueda para mostrar.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

@@ -97,15 +97,29 @@ class MensajeSerializer(serializers.ModelSerializer):
 class ConversacionLiteSerializer(serializers.ModelSerializer):
     ultimo_mensaje = serializers.SerializerMethodField()
     participantes = serializers.SerializerMethodField()
-    is_group = serializers.SerializerMethodField()   # NUEVO
-    titulo = serializers.SerializerMethodField()     # NUEVO
+    is_group = serializers.SerializerMethodField()
+    evento_id = serializers.SerializerMethodField()
+    estado = serializers.SerializerMethodField()
+    titulo = serializers.SerializerMethodField()
+
+    def get_evento_id(self, obj):
+        if getattr(obj, 'tipo', '').lower() == 'evento':
+            evento = obj.eventos.first()
+            return evento.id if evento else None
+        return None
+
+    def get_estado(self, obj):
+        if getattr(obj, 'tipo', '').lower() == 'evento':
+            evento = obj.eventos.first()
+            return evento.estado if evento else None
+        return None
 
     class Meta:
         model = Conversacion
         fields = (
             "conversacion_id", "tipo", "nombre", "foto_url", "estado",
             "actualizada_en", "ultimo_mensaje", "participantes",
-            "is_group", "titulo"  # NUEVO
+            "is_group", "titulo", "evento_id"  # Añadido evento_id
         )
 
     def get_ultimo_mensaje(self, obj):
