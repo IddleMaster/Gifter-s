@@ -1062,38 +1062,27 @@
   </style>
 
   <style>
-  /* la campana es el ancla y no recorta */
-  #notifDropdown, #notifDropdown i.bi-bell { 
-    position: relative !important; 
-    overflow: visible !important; 
-    z-index: 4000 !important;
-  }
+    /* la campana es el ancla y no recorta */
+    #notifDropdown,
+    #notifDropdown i.bi-bell {
+      position: relative !important;
+      overflow: visible !important;
+      z-index: 4000 !important;
+    }
 
-  /* badge NUMÉRICO, por encima de todo y con borde blanco para que no “se coma” un trocito */
-  #notifBadge{
-    position: absolute !important;
-    top: -6px !important;
-    right: -6px !important;
-    left: auto !important;
-    transform: none !important;
-
-    display: inline-block !important;
-    z-index: 6000 !important;
-
-    min-width: 18px; 
-    height: 18px; 
-    line-height: 18px; 
-    padding: 0 4px;
-
-    border-radius: 999px;
-    background-color: #dc3545 !important;   /* fuerza rojo (no hereda .badge) */
-    color: #fff !important;
-    border: 2px solid #fff;                  /* halo blanco -> evita “mordida” del ícono */
-    font-size: 11px; 
-    text-align: center;
-    pointer-events: none;                    /* no intercepta clicks del ícono */
-  }
-</style>
+    /* badge NUMÉRICO, por encima de todo y con borde blanco para que no “se coma” un trocito */
+    
+    /* modo puntito (opcional) */
+    #notifBadge.badge-dot {
+      width: 10px;
+      height: 10px;
+      min-width: 10px;
+      line-height: 10px;
+      padding: 0;
+      text-indent: -9999px;
+      /* oculta el texto/número */
+    }
+  </style>
 
 
   {% block extra_css %}{% endblock %}
