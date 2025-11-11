@@ -54,7 +54,17 @@ urlpatterns = [
     path("buscar/", views.buscar_router, name="buscar_router"),
     path("producto/<int:id_producto>/", views.producto_detalle, name="producto_detalle"),
 
-    
+    path(
+    'productos/externo/<int:id_externo>/',
+    views.producto_externo_detalle,
+    name='producto_externo_detalle',
+),
+    path(
+    'favoritos/externo/<int:id_externo>/toggle/',
+    views.favoritos_toggle_externo,
+    name='favoritos_toggle_externo',
+),
+
     # Perfil
     path('perfil/', views.profile_view, name='perfil'),
     path('perfil/editar/', views.profile_edit, name='perfil_editar'),
@@ -142,10 +152,13 @@ urlpatterns = [
     path('api/amistad/amigos/', views.AmigosList.as_view(), name='api_amigos_list'),
     path('api/amistad/amigos/<int:pk>/', views.EliminarAmigo.as_view(), name='api_amigos_eliminar'),
     path('api/categorias/', views.CategoriaListAPIView.as_view(), name='api_categoria_list'),
+    path('api/categorias/<int:pk>/', views.CategoriaDetailAPIView.as_view(), name='api_categoria_detail'),
     path('api/marcas/', views.MarcaListAPIView.as_view(), name='api_marca_list'),
+    path('api/marcas/<int:pk>/', views.MarcaDetailAPIView.as_view(), name='api_marca_detail'),
     path("amistad/eliminar/<str:username>/", views.amistad_eliminar, name="amistad_eliminar"),
     path("amistad/rechazar/<str:username>/", views.amistad_rechazar, name="amistad_rechazar"),
-
+    
+    
     # Chat API
     path('api/chat/conversaciones/', views.ConversacionesList.as_view(), name='conversaciones_list'),
     path('api/chat/conversaciones/<int:conv_id>/mensajes/', views.MensajesListCreate.as_view(), name='mensajes_list_create'),
@@ -231,7 +244,7 @@ urlpatterns = [
     path('notificaciones/mark-one/<int:notificacion_id>/', views.notificacion_mark_one, name='notificacion_mark_one'),
     path('notificaciones/mark-all/', views.notificaciones_mark_all, name='notificaciones_mark_all'),
     path('notificaciones/click/<int:notificacion_id>/', views.notificacion_click, name='notificacion_click'),
-
+    
 
     path('recommendation-feedback/', recommendation_feedback, name='recommendation_feedback'),
 

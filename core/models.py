@@ -10,6 +10,26 @@ from django.utils.crypto import get_random_string
 
 
 
+
+def get_default_category():
+    """
+    Obtiene o crea la categoría por defecto 'Sin Categoría'.
+    """
+    # Usamos get_or_create para crearla solo si no existe
+    categoria, created = Categoria.objects.get_or_create(
+        nombre_categoria="Sin Categoría"
+    )
+    return categoria
+
+def get_default_brand():
+    """
+    Obtiene o crea la marca por defecto 'Sin Marca'.
+    """
+    marca, created = Marca.objects.get_or_create(
+        nombre_marca="Sin Marca"
+    )
+    return marca
+
 class NotificationDevice(models.Model):
     PLATFORM_CHOICES = (
         ("web", "Web"),
@@ -1021,8 +1041,14 @@ class Producto(models.Model):
     nombre_producto = models.CharField(max_length=255)
     descripcion = models.CharField(max_length=255)
     imagen = models.ImageField(upload_to="productos/", blank=True, null=True)
-    id_categoria = models.ForeignKey(Categoria, on_delete=models.CASCADE)
-    id_marca = models.ForeignKey(Marca, on_delete=models.CASCADE)
+    id_categoria = models.ForeignKey(
+        Categoria, 
+        on_delete=models.SET(get_default_category) 
+    )
+    id_marca = models.ForeignKey(
+        Marca, 
+        on_delete=models.SET(get_default_brand) 
+    )
     precio = models.IntegerField(null=True, blank=True)
     
     # Nuevo campo URL
@@ -1046,18 +1072,7 @@ class Producto(models.Model):
             models.Index(fields=['activo'], name='idx_producto_activo'),
         ]
     
-    # Campos calculados para rating
-    #@property
-    #def rating_promedio(self):
-    #    """Calcula el rating promedio basado en reseñas"""
-    #    from django.db.models import Avg
-    #    promedio = self.resenas.aggregate(Avg('calificacion'))['calificacion__avg']
-    #    return round(promedio, 1) if promedio else 0
-    
-    #@property
-    #def total_resenas(self):
-    #    """Total de reseñas del producto"""
-    #    return self.resenas.count()
+   
     
     @property
     def fue_comprado(self):
@@ -2019,3 +2034,97 @@ class RecommendationFeedback(models.Model):
 
     def __str__(self):
         return f"{self.user.nombre_usuario} no le gusta {self.product.nombre_producto}"        
+
+# PRODUCTOS EXTERNOS (por scraping)
+
+class ProductoExterno(models.Model):
+    id_producto_externo = models.AutoField(primary_key=True)
+    nombre = models.CharField(max_length=255)
+    precio = models.PositiveIntegerField(null=True, blank=True)
+    marca = models.CharField(max_length=100, blank=True, null=True)
+    categoria = models.CharField(max_length=100, blank=True, null=True)
+    url = models.URLField(max_length=1000)
+    imagen = models.URLField(max_length=1000, blank=True, null=True)
+    fuente = models.CharField(max_length=50, default="Falabella")  # Ej: Falabella, Paris, Ripley
+    fecha_extraccion = models.DateTimeField(auto_now_add=True)
+
+    # 🔹 NUEVO: producto interno asociado (opcional)
+    producto_interno = models.ForeignKey(
+        'Producto',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='versiones_externas'
+    )
+
+    class Meta:
+        db_table = 'producto_externo'
+        verbose_name = 'Producto Externo'
+        verbose_name_plural = 'Productos Externos'
+        ordering = ['-fecha_extraccion']
+        indexes = [
+            models.Index(fields=['fuente'], name='idx_ext_fuente'),
+            models.Index(fields=['nombre'], name='idx_ext_nombre'),
+        ]
+
+    def __str__(self):
+        return f"{self.nombre} ({self.fuente})"
+
+    
+    def ensure_producto_interno(self):
+        """
+        Devuelve un Producto interno asociado a este producto externo.
+        Si no existe, lo crea usando Categoria, Marca y UrlTienda.
+        """
+        if self.producto_interno and self.producto_interno.activo:
+            return self.producto_interno
+
+        # Obtener modelos sin crear import circular
+        Categoria = apps.get_model('core', 'Categoria')
+        Marca = apps.get_model('core', 'Marca')
+        Producto = apps.get_model('core', 'Producto')
+        UrlTienda = apps.get_model('core', 'UrlTienda')
+
+        # Categoría
+        if self.categoria:
+            cat, _ = Categoria.objects.get_or_create(
+                nombre_categoria=self.categoria
+            )
+        else:
+            cat, _ = Categoria.objects.get_or_create(
+                nombre_categoria='Otros'
+            )
+
+        # Marca
+        if self.marca:
+            marca_obj, _ = Marca.objects.get_or_create(
+                nombre_marca=self.marca
+            )
+        else:
+            marca_obj, _ = Marca.objects.get_or_create(
+                nombre_marca='Genérico'
+            )
+
+        # Crear Producto interno
+        p = Producto.objects.create(
+            nombre_producto=self.nombre[:255],
+            descripcion=f"[{self.fuente}] {self.nombre}",
+            id_categoria=cat,
+            id_marca=marca_obj,
+            precio=self.precio,
+            activo=True,
+        )
+
+        # URL principal asociada
+        UrlTienda.objects.create(
+            producto=p,
+            url=self.url,
+            nombre_tienda=self.fuente or "Tienda externa",
+            es_principal=True,
+            activo=True,
+        )
+
+        # Guardar vínculo y devolver
+        self.producto_interno = p
+        self.save(update_fields=['producto_interno'])
+        return p

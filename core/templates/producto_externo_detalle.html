@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ producto.nombre }} — Gifter’s{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <nav class="mb-3 small">
+    <a href="{% url 'home' %}">Inicio</a> /
+    {% if producto.categoria %}<span>{{ producto.categoria }}</span> /{% endif %}
+    <strong>{{ producto.nombre }}</strong>
+  </nav>
+
+  <div class="row g-4">
+    <!-- IMAGEN -->
+    <div class="col-lg-5">
+      <div class="border rounded overflow-hidden" style="aspect-ratio: 1/1; background:#fff">
+        {% if producto.imagen %}
+          <img src="{{ producto.imagen }}" alt="{{ producto.nombre }}"
+               style="width:100%;height:100%;object-fit:contain;">
+        {% else %}
+          <img src="{% static 'img/Gifters/favicongift.png' %}" alt="{{ producto.nombre }}"
+               style="width:100%;height:100%;object-fit:contain;">
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- INFO -->
+    <div class="col-lg-7">
+      <h1 class="h3 mb-2">{{ producto.nombre }}</h1>
+
+      {% if producto.marca %}
+        <div class="text-primary fw-semibold mb-2">{{ producto.marca }}</div>
+      {% endif %}
+
+      {% if producto.precio %}
+        <div class="h4 text-success mb-3">
+          $ {{ producto.precio }}
+        </div>
+      {% endif %}
+
+      <p class="text-muted mb-2">
+        Producto de tienda externa: <strong>{{ producto.fuente }}</strong>.
+      </p>
+      <p class="text-muted">
+        Categoría: {{ producto.categoria }}
+      </p>
+
+      <div class="d-flex gap-2 align-items-center mt-3">
+        {% if producto.url %}
+          <a href="{{ producto.url }}" target="_blank" rel="noopener"
+             class="btn btn-primary">
+            <i class="bi bi-box-arrow-up-right"></i> Ver en {{ producto.fuente|default:"tienda externa" }}
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- SIMILARES EXTERNOS -->
+  {% if similares %}
+    <hr class="my-5">
+    <h2 class="h5 mb-3">También de otras tiendas</h2>
+    <div class="row g-4">
+      {% for p in similares %}
+      <div class="col-12 col-sm-6 col-lg-4">
+        <div class="border rounded h-100 p-2">
+          <a href="{% url 'producto_externo_detalle' p.pk %}" class="d-block"
+             style="aspect-ratio:4/3; overflow:hidden;">
+            {% if p.imagen %}
+              <img src="{{ p.imagen }}" alt="{{ p.nombre }}"
+                   style="width:100%;height:100%;object-fit:cover;">
+            {% else %}
+              <img src="{% static 'img/Gifters/favicongift.png' %}" alt="{{ p.nombre }}"
+                   style="width:100%;height:100%;object-fit:cover;">
+            {% endif %}
+          </a>
+          <div class="p-2">
+            <a href="{% url 'producto_externo_detalle' p.pk %}"
+               class="fw-semibold text-decoration-none">
+              {{ p.nombre }}
+            </a>
+            {% if p.marca %}
+              <div class="small text-primary">{{ p.marca }}</div>
+            {% endif %}
+            {% if p.precio %}
+              <div class="small text-success fw-semibold">$ {{ p.precio }}</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

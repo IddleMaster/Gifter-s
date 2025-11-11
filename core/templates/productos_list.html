@@ -224,8 +224,6 @@
             </p>
         </div>
 
-    
-
 
 
 
@@ -252,6 +250,7 @@
             </div>
 
             {# --- Filtro por Categoría --- #}
+
             <div class="col-md-4">
                 <div class="filter-group">
                     <label for="categoria-filter"><i class="bi bi-tags"></i> Categoría</label>
@@ -263,14 +262,15 @@
                             {{ categoria.nombre_categoria }}
                         </option>
                         {% endwith %}
-
                         {% endfor %}
 
                     </select>
                 </div>
             </div>
 
+
             {# --- Filtro por Marca --- #}
+
             <div class="col-md-4">
                 <div class="filter-group">
                     <label for="marca-filter"><i class="bi bi-shop"></i> Marca</label>
@@ -282,12 +282,12 @@
                             {{ marca.nombre_marca }}
                         </option>
                         {% endwith %}
-
                         {% endfor %}
 
                     </select>
                 </div>
             </div>
+
 
 
             <!-- Botones de acción -->
@@ -324,7 +324,7 @@
                 <p class="product-brand">{{ producto.id_marca.nombre_marca }}</p>
 
                 {% if producto.precio %}
-                
+
                 {% endif %}
 
                 <p class="product-description">
@@ -367,6 +367,84 @@
         </div>
         {% endfor %}
     </div>
+
+    {% if productos_externos %}
+    <hr class="my-5">
+
+    <div class="results-header">
+        <div>
+            <h2 class="mb-2">Productos de otras tiendas</h2>
+            <p class="results-count">
+                Mostrando {{ productos_externos|length }} productos de tiendas externas
+            </p>
+        </div>
+    </div>
+
+    <div class="products-grid">
+        {% for producto in productos_externos %}
+        <div class="product-card">
+            <div class="product-image">
+                {% if producto.imagen %}
+                <img src="{{ producto.imagen }}" alt="{{ producto.nombre }}">
+                {% else %}
+                <img src="{% static 'img/Gifters/favicongift.png' %}" alt="{{ producto.nombre }}">
+                {% endif %}
+
+            </div>
+
+            <div class="product-info">
+                <h3 class="product-title">{{ producto.nombre }}</h3>
+
+                {% if producto.marca %}
+                <p class="product-brand">{{ producto.marca }}</p>
+                {% endif %}
+
+                {% if producto.precio %}
+                <p class="product-price">$ {{ producto.precio }}</p>
+                {% endif %}
+
+                <p class="product-description">
+                    {{ producto.categoria }} · {{ producto.fuente }}
+                </p>
+
+                <div class="product-actions">
+    {# 👁️ Detalle dentro de Gifter's (redirige a producto_detalle interno) #}
+    <a href="{% url 'producto_externo_detalle' producto.id_producto_externo %}"
+       class="btn-action"
+       title="Ver detalles en Gifter’s">
+        <i class="bi bi-eye"></i>
+    </a>
+
+    {# ❤️ Wishlist basada en producto interno asociado, si ya existe #}
+    {% with pid=producto.producto_interno_id %}
+    <a href="#"
+       class="btn-action wishlist-btn
+              {% if pid and pid in favoritos_ids %}is-fav{% endif %}"
+       data-external-id="{{ producto.id_producto_externo }}"
+       aria-pressed="{% if pid and pid in favoritos_ids %}true{% else %}false{% endif %}"
+       title="{% if pid and pid in favoritos_ids %}Quitar de wishlist{% else %}Agregar a wishlist{% endif %}">
+        {% if pid and pid in favoritos_ids %}
+            <i class="bi bi-heart-fill text-danger"></i>
+        {% else %}
+            <i class="bi bi-heart"></i>
+        {% endif %}
+    </a>
+    {% endwith %}
+
+    {# 🔗 Link directo a la tienda externa #}
+    <a href="{{ producto.url }}" target="_blank" rel="noopener" class="btn-action"
+       title="Ver en tienda externa">
+        <i class="bi bi-link-45deg"></i>
+    </a>
+</div>
+
+
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
 
     <!-- Paginación -->
     {% if productos.has_other_pages %}
@@ -449,7 +527,7 @@
 </script>
 
 <script>
-    // CSRF desde cookie (dejalo como ya lo tienes arriba)
+    // CSRF desde cookie (igual que antes)
     function getCookie(name) {
         const value = `; ${document.cookie}`;
         const parts = value.split(`; ${name}=`);
@@ -462,7 +540,20 @@
         if (!btn) return;
 
         e.preventDefault();
-        const id = btn.getAttribute('data-product-id');
+
+        // 🔹 Diferenciar producto interno vs externo
+        const productId = btn.getAttribute('data-product-id');        // internos
+        const externalId = btn.getAttribute('data-external-id');      // externos
+
+        let url;
+        if (externalId) {
+            url = "{% url 'favoritos_toggle_externo' 0 %}".replace('/0/', `/${externalId}/`);
+        } else if (productId) {
+            url = "{% url 'favoritos_toggle' 0 %}".replace('/0/', `/${productId}/`);
+        } else {
+            return; // nada que hacer
+        }
+
         const icon = btn.querySelector('i');
         const wasFav = btn.classList.contains('is-fav');
         const prevTitle = btn.title;
@@ -476,7 +567,6 @@
         }, 420);
 
         try {
-            const url = `{% url 'favoritos_toggle' 0 %}`.replace('/0/', `/${id}/`);
             const resp = await fetch(url, {
                 method: 'POST',
                 headers: {
@@ -502,7 +592,6 @@
             btn.title = isFav ? 'Quitar de wishlist' : 'Agregar a wishlist';
             if (icon) icon.className = isFav ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
 
-            // Toast: agregado / quitado
             Toast.fire({
                 icon: isFav ? 'success' : 'info',
                 title: isFav ? 'Agregado a tu wishlist' : 'Quitado de tu wishlist'
@@ -510,7 +599,6 @@
 
         } catch (err) {
             console.error(err);
-            // Revertir UI si falló
             btn.classList.toggle('is-fav', wasFav);
             btn.setAttribute('aria-pressed', wasFav ? 'true' : 'false');
             btn.title = prevTitle;
@@ -520,6 +608,7 @@
         }
     });
 </script>
+
 <style>
     /* Corazón con pequeño "pop" */
     .wishlist-btn i.heart-pop {

@@ -817,7 +817,7 @@ def productos_list(request):
     else:  # recientes
         productos = productos.order_by('-fecha_creacion', '-id_producto')
 
-    # Paginación
+    # Paginación de productos internos
     paginator = Paginator(productos, 12)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -834,42 +834,51 @@ def productos_list(request):
             .filter(id_wishlist=wl)
             .values_list('id_producto', flat=True)
         )
-        # ---- Personas que coinciden con la búsqueda ----
+
+    # ---- Personas que coinciden con la búsqueda ----
     personas_amigos, personas_otros = _people_matches(request, query)
 
-    
-                
+    # 🔹 Productos EXTERNOS (Falabella, etc.)
+    externos_qs = ProductoExterno.objects.all().order_by('-fecha_extraccion')
+
+    # Que también respondan a la búsqueda por nombre / marca / categoría
+    if query:
+        externos_qs = externos_qs.filter(
+            Q(nombre__icontains=query) |
+            Q(marca__icontains=query) |
+            Q(categoria__icontains=query)
+        )
+
+    # Por ahora mostramos solo los últimos 12 externos (sin paginar)
+    productos_externos = list(externos_qs[:12])
+
+    # === Historial de búsqueda efectiva (lo tuyo, intacto) ===
     if query and request.user.is_authenticated:
-        is_effective_search = False # Asumimos que no es efectiva por defecto
+        is_effective_search = False  # Asumimos que no es efectiva por defecto
         
         # 1. (Intento Fuzzy) Usar Meilisearch si está activo
-        # Esto cumple con tu requisito de "bien parecido"
         if getattr(settings, "USE_MEILI", False):
             try:
-                # meili y settings ya están importados al inicio de views.py [cite: 2, 6]
-                resp = meili().index("products").search(query, { # cite: 2
-                    "limit": 1, # Solo necesitamos saber si existe al menos 1
+                resp = meili().index("products").search(query, {
+                    "limit": 1,  # Solo necesitamos saber si existe al menos 1
                     "filter": "activo = true"
                 })
                 
-                # 'estimatedTotalHits' nos da el total de coincidencias (fuzzy)
                 if resp.get("estimatedTotalHits", 0) > 0:
                     is_effective_search = True
                     
             except Exception as me:
-                # Si Meilisearch falla (ej. está caído), pasamos al fallback
                 print(f"Fallo el pre-check de Meilisearch, se usará fallback a DB: {me}")
-                is_effective_search = False # Forzamos el fallback
+                is_effective_search = False
         
         # 2. (Fallback) Usar la DB si Meilisearch está apagado o falló
-        # Esta comprobación es menos "inteligente" (no es fuzzy, usa 'icontains')
         if not is_effective_search:
             is_effective_search = Producto.objects.filter(
                 activo=True
             ).filter(
-                Q(nombre_producto__icontains=query) | # cite: 66
-                Q(descripcion__icontains=query) | # cite: 66
-                Q(id_marca__nombre_marca__icontains=query) # cite: 66
+                Q(nombre_producto__icontains=query) |
+                Q(descripcion__icontains=query) |
+                Q(id_marca__nombre_marca__icontains=query)
             ).exists()
 
         # 3. Guardar en el historial SÓLO SI fue una búsqueda efectiva
@@ -882,10 +891,10 @@ def productos_list(request):
             except Exception as e:
                 print(f"Error al guardar historial de búsqueda efectiva: {e}")
         else:
-            # Opcional: Loggear que se evitó una búsqueda (para depuración)
             print(f"Búsqueda ignorada (no efectiva): '{query}'")
+
     context = {
-        'productos': page_obj,
+        'productos': page_obj,              # productos internos paginados
         'categorias': categorias,
         'marcas': marcas,
         'query': query,
@@ -895,8 +904,12 @@ def productos_list(request):
         'orden': orden,
         'personas_amigos': personas_amigos,
         'personas_otros': personas_otros,
+
+        # 🔹 NUEVO: productos scrappeados (Falabella)
+        'productos_externos': productos_externos,
     }
     return render(request, 'productos_list.html', context)
+
 
 
 
@@ -4757,7 +4770,6 @@ def notificacion_click(request, notificacion_id):
     return redirect(destino)
 
 
-
 #############################################
 #######################################
 
@@ -5507,7 +5519,46 @@ def api_event_sortear(request, event_id: int):
 
     return JsonResponse({"ok": True})  
 
+class CategoriaDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Vista de API para Ver, Actualizar o Borrar una Categoría específica.
+    """
+    queryset = Categoria.objects.all()
+    serializer_class = CategoriaSerializer
+    permission_classes = [IsAdminUser]
+    lookup_field = 'pk'
 
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        # Regla de negocio: No permitir borrar la categoría por defecto
+        if instance.nombre_categoria == "Sin Categoría":
+            return Response(
+                {"detail": "No se puede eliminar la categoría 'Sin Categoría'."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        logging.info(f"Admin '{request.user}' borrando Categoría: {instance.nombre_categoria}")
+        return super().destroy(request, *args, **kwargs)
+
+class MarcaDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Vista de API para Ver, Actualizar o Borrar una Marca específica.
+    """
+    queryset = Marca.objects.all()
+    serializer_class = MarcaSerializer
+    permission_classes = [IsAdminUser]
+    lookup_field = 'pk'
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        # Regla de negocio: No permitir borrar la marca por defecto
+        if instance.nombre_marca == "Sin Marca":
+            return Response(
+                {"detail": "No se puede eliminar la marca 'Sin Marca'."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        logging.info(f"Admin '{request.user}' borrando Marca: {instance.nombre_marca}")
+        return super().destroy(request, *args, **kwargs)
+    
 @require_POST
 @login_required
 def draw_event(request, event_id):
@@ -5775,3 +5826,65 @@ def resend_verification_view(request):
 
     # GET
     return render(request, "account/resend_verification.html")
+
+from core.models import ProductoExterno
+
+def producto_externo_detalle(request, pk):
+    producto = get_object_or_404(ProductoExterno, pk=pk)
+
+    # Opcional: “similares” por categoría
+    similares = (
+        ProductoExterno.objects
+        .filter(categoria__iexact=producto.categoria)
+        .exclude(pk=pk)[:6]
+    )
+
+    context = {
+        "producto": producto,          # ojo: aquí se llama igual que en tu template interno
+        "similares": similares,
+    }
+    return render(request, "producto_externo_detalle.html", context)
+
+
+@login_required
+@require_POST
+def favoritos_toggle_externo(request, id_externo):
+    externo = get_object_or_404(ProductoExterno, pk=id_externo)
+
+    # Wishlist por defecto del usuario
+    wishlist = get_default_wishlist(request.user)
+
+    # Buscar o crear producto interno "mirror"
+    producto, _ = Producto.objects.get_or_create(
+        nombre_producto=externo.nombre,
+        defaults={
+            "descripcion": f"{externo.nombre} (importado de {externo.fuente})",
+            "precio": externo.precio or 0,
+            "activo": True,
+        },
+    )
+
+    # Toggle en ItemEnWishlist
+    item, created = ItemEnWishlist.objects.get_or_create(
+        id_wishlist=wishlist,
+        id_producto=producto,
+        defaults={"cantidad": 1},
+    )
+
+    if created:
+        state = "added"
+    else:
+        item.delete()
+        state = "removed"
+
+    return JsonResponse({"state": state})
+
+
+def producto_externo_detalle(request, id_externo):
+    """
+    Redirige al detalle del Producto interno asociado a un ProductoExterno.
+    Si no existe, lo crea con ensure_producto_interno().
+    """
+    externo = get_object_or_404(ProductoExterno, pk=id_externo)
+    producto = externo.ensure_producto_interno()
+    return redirect('producto_detalle', id_producto=producto.id_producto)

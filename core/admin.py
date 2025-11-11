@@ -139,3 +139,11 @@ class GeneratedCardAdmin(admin.ModelAdmin):
     list_display = ("id", "user", "created_at")
     search_fields = ("prompt", "share_token")
     list_filter = ("created_at",)
+
+@admin.register(ProductoExterno)
+class ProductoExternoAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'precio', 'marca', 'categoria', 'fuente', 'fecha_extraccion')
+    list_filter = ('fuente', 'fecha_extraccion')
+    search_fields = ('nombre', 'marca', 'categoria')
+    readonly_fields = ('fecha_extraccion',)
+    ordering = ('-fecha_extraccion',)

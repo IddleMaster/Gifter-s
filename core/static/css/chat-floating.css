@@ -1,3 +1,14 @@
+:root {
+  --sidebar-w: 260px;
+  /* ancho lista (desktop) */
+  --input-h: 56px;
+  /* alto del input */
+  --pad: 12px;
+  /* padding general */
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  /* notch / iOS */
+}
+
 /* --- Floating launcher --- */
 .chat-fab {
   position: fixed;
@@ -15,24 +26,27 @@
 
 }
 
-/* --- Drawer --- */
 .chat-drawer {
   position: fixed;
-  right: 18px;
-  bottom: 84px;
-  z-index: 1040;
-  width: min(420px, 92vw);
-  height: 70vh;
+  right: 24px;
+  bottom: 24px;
+  width: min(860px, 96vw);
+  height: min(560px, 82vh);
   background: #fff;
   border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, .18);
   overflow: hidden;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, .2);
-  display: none;
-  flex-direction: column;
+  transform: translateY(8px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease;
+  z-index: 1050;
 }
 
 .chat-drawer.open {
-  display: flex;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
 }
 
 .chat-head {
@@ -50,11 +64,12 @@
 
 .chat-body {
   display: grid;
-  grid-template-columns: 320px 1fr;
-  /* + ancho para que entre el nombre */
+  grid-template-columns: var(--sidebar-w) 1fr;
   height: calc(100% - 56px);
+  /* 56px = alto header */
+  min-height: 0;
+  /* evitar overflow */
 }
-
 
 
 .chat-pane {
@@ -208,10 +223,15 @@
 
 /* Columna derecha (mensajes) */
 .chat-messages {
-  padding: 12px 12px 88px;
-  /* hueco para el input fijo */
+  position: absolute;
+  left: var(--pad);
+  right: var(--pad);
+  top: var(--pad);
+  bottom: calc(var(--input-h) + var(--pad) + var(--safe-b));
   overflow: auto;
-  background: #fafbff;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, #fafbff 0%, #fff 60%);
+  overflow-anchor: none;
 }
 
 /* Input pegado abajo, más compacto */
@@ -231,16 +251,15 @@
 
 /* Burbujas un poco más compactas */
 .msg {
-  max-width: 78%;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   margin: 6px 0;
-  padding: 8px 10px;
-  border-radius: 12px;
-  background: #eef1ff;
 }
 
 .msg.me {
-  margin-left: auto;
-  background: #e7e7ff;
+  justify-content: flex-end;
+  flex-direction: row-reverse;
 }
 
 /* Responsivo: en móviles usa el alto/ ancho de la pantalla */
@@ -286,29 +305,24 @@
   position: relative;
   height: 100%;
   overflow: hidden;
-  /* evita que el input haga crecer el panel */
+  min-width: 0;
 }
 
-/* La zona de mensajes ocupa todo, dejando hueco abajo para el input */
 .chat-messages {
   position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 68px;
-  /* altura reservada para el input */
-  left: 0;
+  inset: 0;
+  bottom: calc(var(--input-h) + var(--pad));
+  /* reserva para input */
   overflow: auto;
-  /* ← ahora sí hace scroll */
   padding: 12px;
   background: #fafbff;
 }
 
-/* Input fijo dentro del panel derecho, sin depender del ancho de la lista */
 .chat-input {
   position: absolute;
-  bottom: 12px;
-  left: 12px;
-  right: 12px;
+  left: var(--pad);
+  right: var(--pad);
+  bottom: var(--pad);
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 8px;
@@ -316,6 +330,7 @@
   border: 1px solid #e5e8f0;
   border-radius: 12px;
   padding: 8px;
+  height: var(--input-h);
 }
 
 @media (max-width: 992px) {
@@ -416,8 +431,10 @@
 .msg-avatar {
   width: 28px;
   height: 28px;
-  border-radius: 50%;
+  border-radius: 999px;
+  flex: 0 0 28px;
   object-fit: cover;
+  transform: translateY(-2px);
 }
 
 .msg-bubble {
@@ -431,13 +448,14 @@
 }
 
 .msg.me .msg-bubble {
-  background: #e0f0ff;
+  background: #e7e6ff;
+  border-bottom-right-radius: 6px;
 }
 
 .msg-meta {
   font-size: .75rem;
   opacity: .7;
-  margin-top: 2px;
+  margin-top: 4px;
   text-align: right;
 }
 
@@ -761,22 +779,37 @@
 }
 
 /* No tocar position del .chat-fab */
-.chat-emoji{ position:relative; display:inline-block; }
+.chat-emoji {
+  position: relative;
+  display: inline-block;
+}
 
-.chat-global-dot{
-  position:absolute;
-  top:-2px;
-  right:-2px;
-  width:10px;
-  height:10px;
-  border-radius:50%;
-  background:#ff3b30;
-  pointer-events:none;
+.chat-global-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff3b30;
+  pointer-events: none;
 }
 
 /* Ya lo usas globalmente */
-.hidden{ display:none; }
+.hidden {
+  display: none;
+}
 
 /* Si no tienes aún el puntito por conversación */
-.dot{ display:inline-block; width:8px; height:8px; border-radius:50%; background:#ff3b30; margin-left:6px; }
-.dot.hidden{ display:none; }
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff3b30;
+  margin-left: 6px;
+}
+
+.dot.hidden {
+  display: none;
+}

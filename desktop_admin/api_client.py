@@ -770,4 +770,59 @@ class ApiClient:
             logger.error(f"create_brand: Error de conexión: {e}", exc_info=True)
             return None, f"Error de conexión al crear marca: {e}"
         
+    def delete_category(self, category_id):
+        """Envía una petición DELETE para borrar una categoría."""
+        if not self.token:
+            logger.warning("delete_category llamado sin token.")
+            return False, "No autenticado."
+    
+        delete_url = f"{self.base_url}/categorias/{category_id}/" 
+        try:
+            logger.info(f"Intentando DELETE en {delete_url}")
+            response = requests.delete(delete_url, headers=self.headers)
+    
+            if response.status_code == 204: # Éxito
+                logger.info(f"Categoría {category_id} borrada exitosamente.")
+                return True, "Categoría borrada correctamente."
+            elif response.status_code == 404:
+                logger.warning(f"Intento de borrar categoría {category_id} falló (404 Not Found).")
+                return False, f"Error: Categoría con ID {category_id} no encontrada."
+            else:
+                # Captura otros errores (ej. 403 si intenta borrar "Sin Categoría")
+                error_detail = response.text
+                try: error_detail = response.json().get('detail', error_detail)
+                except json.JSONDecodeError: pass
+                logger.error(f"Error al borrar categoría {category_id}. Status: {response.status_code}, Error: {error_detail}")
+                return False, f"Error al borrar: {error_detail}"
+        except requests.exceptions.RequestException as e:
+            logger.error(f"delete_category: Error de conexión: {e}", exc_info=True)
+            return False, f"Error de conexión al borrar: {e}"
+
+    def delete_brand(self, brand_id):
+        """Envía una petición DELETE para borrar una marca."""
+        if not self.token:
+            logger.warning("delete_brand llamado sin token.")
+            return False, "No autenticado."
+    
+        delete_url = f"{self.base_url}/marcas/{brand_id}/" 
+        try:
+            logger.info(f"Intentando DELETE en {delete_url}")
+            response = requests.delete(delete_url, headers=self.headers)
+    
+            if response.status_code == 204:
+                logger.info(f"Marca {brand_id} borrada exitosamente.")
+                return True, "Marca borrada correctamente."
+            elif response.status_code == 404:
+                logger.warning(f"Intento de borrar marca {brand_id} falló (404 Not Found).")
+                return False, f"Error: Marca con ID {brand_id} no encontrada."
+            else:
+                error_detail = response.text
+                try: error_detail = response.json().get('detail', error_detail)
+                except json.JSONDecodeError: pass
+                logger.error(f"Error al borrar marca {brand_id}. Status: {response.status_code}, Error: {error_detail}")
+                return False, f"Error al borrar: {error_detail}"
+        except requests.exceptions.RequestException as e:
+            logger.error(f"delete_brand: Error de conexión: {e}", exc_info=True)
+            return False, f"Error de conexión al borrar: {e}"    
+        
     
