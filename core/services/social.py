@@ -4,7 +4,8 @@ from __future__ import annotations
 from typing import Iterable, List, Set, Dict
 from django.db.models import Count, QuerySet, Q
 from django.contrib.auth import get_user_model
-
+from collections import Counter
+from collections import defaultdict
 from core.models import Seguidor  
 
 User = get_user_model()
@@ -40,13 +41,18 @@ def sugerencias_qs(usuario: User, limit: int = 9) -> QuerySet[User]:
             return qs
 
     popular_ids = list(
-        Seguidor.objects.values("seguido_id").annotate(c=Count("id")).order_by("-c")
-        .values_list("seguido_id", flat=True)[: limit * 4]
-    )
+    Seguidor.objects
+    .values("seguido_id")
+    .annotate(c=Count("relacion_id"))
+    .order_by("-c")
+    .values_list("seguido_id", flat=True)[: limit * 4]
+)
+
     popular_ids = [uid for uid in popular_ids if uid and uid != usuario.id and uid not in sigo_ids]
     if not popular_ids:
         return User.objects.none()
     return User.objects.filter(id__in=popular_ids).select_related("perfil").order_by("-id")[:limit]
+
 
 def fof_con_senales(usuario: User, limit: int = 30) -> List[Dict]:
     """

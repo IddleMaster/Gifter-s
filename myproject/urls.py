@@ -142,6 +142,7 @@ urlpatterns = [
     # --- Rutas API para Usuarios (Admin) --- # <-- NUEVA SECCIÓN
     path('api/users/', views.UserListAPIView.as_view(), name='api_user_list'),
     path('api/users/<int:pk>/', views.UserDetailAPIView.as_view(), name='api_user_detail'),
+    
     # Amistad
     path('api/amistad/solicitudes/', views.EnviarSolicitudAmistad.as_view(), name='api_amistad_enviar'),
     path('api/amistad/solicitudes/recibidas/', views.SolicitudesRecibidasList.as_view(), name='api_amistad_recibidas'),
@@ -209,7 +210,7 @@ urlpatterns = [
     path('grupos/<int:pk>/leave/', views.grupos_leave, name='grupos_leave'),
     path('chat/<int:conv_id>/mark-read/', views.conversacion_mark_read, name='conversacion_mark_read'),
     path('chat/unread-summary/', views.chat_unread_summary, name='chat_unread_summary'),
-    path("chat/unread-summary/", views.chat_unread_summary, name="chat_unread_summary"),
+    
     path("chat/<int:conv_id>/mark-read/", views.conversacion_mark_read, name="conversacion_mark_read"),
 
    # Eventos standalone (no dependen de un grupo existente)

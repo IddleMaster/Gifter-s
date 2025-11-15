@@ -1062,7 +1062,7 @@
   </style>
 
   <style>
-    /* la campana es el ancla y no recorta */
+    /* ancla y stacking */
     #notifDropdown,
     #notifDropdown i.bi-bell {
       position: relative !important;
@@ -1070,44 +1070,51 @@
       z-index: 4000 !important;
     }
 
-    /* badge NUMÉRICO, por encima de todo y con borde blanco para que no “se coma” un trocito */
+    /* SOLO PUNTO (sin texto) */
     #notifBadge {
       position: absolute !important;
-      top: -6px !important;
-      right: -6px !important;
+      top: -7px !important;
+      right: -7px !important;
       left: auto !important;
       transform: none !important;
 
-      display: inline-block !important;
+      display: none;
+      /* oculto cuando hay 0 */
       z-index: 6000 !important;
 
-      min-width: 18px;
-      height: 18px;
-      line-height: 18px;
-      padding: 0 4px;
-
-      border-radius: 999px;
-      background-color: #dc3545 !important;
-      /* fuerza rojo (no hereda .badge) */
-      color: #fff !important;
-      border: 2px solid #fff;
-      /* halo blanco -> evita “mordida” del ícono */
-      font-size: 11px;
-      text-align: center;
-      pointer-events: none;
-      /* no intercepta clicks del ícono */
-    }
-    /* modo puntito (opcional) */
-    #notifBadge.badge-dot {
       width: 10px;
       height: 10px;
       min-width: 10px;
       line-height: 10px;
       padding: 0;
+
+      border-radius: 999px;
+      background-color: #dc3545 !important;
+      /* rojo */
+      border: 2px solid #fff;
+      /* halo blanco */
       text-indent: -9999px;
-      /* oculta el texto/número */
+      /* oculta números si alguien los pone */
+      overflow: hidden;
+      pointer-events: none;
     }
   </style>
+
+  <style>
+    /* estado por defecto: oculto */
+    #notifBadge {
+      display: none !important;
+    }
+
+    /* visible sólo si tiene esta clase */
+    #notifBadge.is-on {
+      display: inline-block !important;
+    }
+  </style>
+
+
+
+
 
 
   {% block extra_css %}{% endblock %}
@@ -3934,36 +3941,73 @@
 
     // === Puntitos ===
     async function refreshGlobalUnreadDot() {
-      try {
+    try {
         const r = await fetch("/chat/unread-summary/", { credentials: "same-origin" });
-        if (!r.ok) return;
+
+        // Si la respuesta no es OK (ej: 500, 404), para.
+        if (!r.ok) {
+            // Si el status es 401 o 403, significa que el backend nos dijo
+            // explícitamente que no estamos logueados.
+            if (r.status === 401 || r.status === 403) {
+                 console.warn("[unread-summary] No autenticado (401/403). Deteniendo polling.");
+                 if (window.unreadLightPoll) {
+                    clearInterval(window.unreadLightPoll);
+                    window.unreadLightPoll = null;
+                 }
+            }
+            return; // No continuar
+        }
+
+        // --- ESTE ES EL ARREGLO CLAVE ---
+        // Antes de .json(), revisamos si la respuesta ES JSON.
+        const contentType = r.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+            // ¡Esto es HTML! El @login_required nos redirigió al login.
+            console.warn("[unread-summary] Respuesta no es JSON (es HTML). Usuario desconectado. Deteniendo polling.");
+            
+            // Detenemos el bucle para no seguir pidiendo la página de login.
+            if (window.unreadLightPoll) {
+                clearInterval(window.unreadLightPoll);
+                window.unreadLightPoll = null;
+            }
+            return; // No intentes parsear JSON.
+        }
+        // --- FIN DEL ARREGLO ---
+
+        // Si llegamos aquí, ES JSON y estamos logueados.
         const { total, per_conversation } = await r.json();
 
-        // Puntito del botón
+        // (El resto de tu código para pintar los puntitos)
         const dot = document.getElementById("chatGlobalDot");
         if (dot) dot.classList.toggle("hidden", !(total > 0));
 
-        // Puntitos por conversación
         if (window.Chat?.applyUnreadToInbox) {
-          window.Chat.applyUnreadToInbox(per_conversation || {});
+            window.Chat.applyUnreadToInbox(per_conversation || {});
         }
-        // 👉 NUEVO: puntitos por pestaña (Chats vs Grupos)
         const map = per_conversation || {};
         let unreadChats = 0, unreadGroups = 0;
         for (const [id, cnt] of Object.entries(map)) {
-          if (!(cnt > 0)) continue;
-          const sid = String(id);
-          // si está en el índice de grupos => cuenta para grupos; si no, va a chats
-          if (window.CHAT_INDEX?.groups?.has(sid)) unreadGroups += cnt;
-          else unreadChats += cnt;
+            if (!(cnt > 0)) continue;
+            const sid = String(id);
+            if (window.CHAT_INDEX?.groups?.has(sid)) unreadGroups += cnt;
+            else unreadChats += cnt;
         }
-        // Apagar/encender dots de tabs
         const tabChatsDot = document.getElementById("tabDotChats");
         const tabGroupsDot = document.getElementById("tabDotGrupos");
         if (tabChatsDot) tabChatsDot.classList.toggle("hidden", unreadChats === 0);
         if (tabGroupsDot) tabGroupsDot.classList.toggle("hidden", unreadGroups === 0);
-      } catch (e) { console.error("unread-summary failed", e); }
+
+    } catch (e) {
+        // Esta es la línea que ves en tu consola.
+        console.error("unread-summary failed (probablemente por JSON inválido/redirect).", e);
+        // Detener el polling aquí también.
+        if (window.unreadLightPoll) {
+            clearInterval(window.unreadLightPoll);
+            window.unreadLightPoll = null;
+        }
     }
+}
+      
     // 🔔 Poll ligero global para el FAB (corre aunque nunca abras el cajón)
     window.unreadLightPoll ??= null;
     document.addEventListener("DOMContentLoaded", () => {
@@ -4423,108 +4467,7 @@
 
 
 
-  <!-- 1) BADGE ÚNICO — crea/actualiza y observa cambios -->
-  <script>
-    /* ===== BADGE ÚNICO — crea/actualiza y observa cambios ===== */
-    (function () {
-      const TOGGLE_ID = 'notifDropdown';
-      const BADGE_ID = 'notifBadge';
-      const MENU = document.querySelector('ul.dropdown-menu[aria-labelledby="notifDropdown"]');
-      const MARK_ALL_BTN = document.getElementById('markAllBtn');
 
-      function ensureBadge() {
-        let badge = document.getElementById(BADGE_ID);
-        if (badge) return badge;
-
-        const toggle = document.getElementById(TOGGLE_ID);
-        if (!toggle) return null;
-
-        badge = document.createElement('span');
-        badge.id = BADGE_ID;
-        badge.className = 'position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none';
-        badge.style.fontSize = '.7rem';
-        // número (texto) + etiqueta sr
-        badge.appendChild(document.createTextNode('0'));
-        const sr = document.createElement('span');
-        sr.className = 'visually-hidden';
-        sr.textContent = 'unread';
-        badge.appendChild(sr);
-
-        toggle.appendChild(badge);
-        return badge;
-      }
-
-      function setMarkAllVisibility(n) {
-        if (!MARK_ALL_BTN) return;
-        MARK_ALL_BTN.classList.toggle('d-none', n <= 0);
-      }
-
-      // expone API global: también crea badge si falta
-      window.setBadge = function (count) {
-        const badge = ensureBadge();
-        if (!badge) return;
-        const n = Math.max(0, parseInt(count || 0, 10));
-
-        // actualiza el número (primer nodo de texto del badge)
-        if (badge.firstChild && badge.firstChild.nodeType === Node.TEXT_NODE) {
-          badge.firstChild.nodeValue = String(n);
-        } else {
-          badge.insertBefore(document.createTextNode(String(n)), badge.firstChild || null);
-        }
-
-        if (n > 0) badge.classList.remove('d-none');
-        else badge.classList.add('d-none');
-
-        setMarkAllVisibility(n);
-      };
-
-      // contar no leídas visibles desde el DOM
-      function countUnreadVisible() {
-        if (!MENU) return 0;
-        const items = MENU.querySelectorAll('.notif-item.fw-semibold');
-        let total = 0;
-        items.forEach(it => {
-          const li = it.closest('li');
-          if (!(li && li.classList.contains('d-none')) && !it.classList.contains('d-none')) total++;
-        });
-        return total;
-      }
-
-      // recalcula desde el DOM (para cuando no hay respuesta del server)
-      function refreshFromDom() {
-        window.setBadge(countUnreadVisible());
-      }
-
-      // inicial: crea/oculta badge si falta y calcula desde DOM
-      document.addEventListener('DOMContentLoaded', function () {
-        ensureBadge();            // crea si no existía (cuando notif_count==0)
-        refreshFromDom();         // sincroniza con lo que se ve
-      });
-
-      // también al abrir el dropdown (por si el contenido cambió)
-      document.getElementById(TOGGLE_ID)?.addEventListener('click', () => {
-        setTimeout(refreshFromDom, 0);
-      });
-
-      // observa cambios en la lista/clases
-      if (MENU) {
-        const mo = new MutationObserver(refreshFromDom);
-        mo.observe(MENU, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
-      }
-
-      // clicks que cambian estado → refresco pequeño
-      document.addEventListener('click', (e) => {
-        if (e.target.closest('.js-notif-mark-one') ||
-          e.target.closest('.js-notif-dismiss') ||
-          e.target.closest('#hideReadBtn') ||
-          e.target.closest('#hideAllBtn') ||
-          e.target.closest('#restoreHiddenBtn') ||
-          e.target.closest('#markAllBtn')) {
-          setTimeout(refreshFromDom, 40);
-        }
-      });
-    })();
-  </script>
 
   <!-- 2) Helper global para el spinner del botón ✓ -->
   <script>
@@ -4865,6 +4808,124 @@
 
 
 
+  <script>
+    (function () {
+      function getMenu() {
+        return document.querySelector('ul.dropdown-menu[aria-labelledby="notifDropdown"]')
+          || document.querySelector('#notifDropdown ~ .dropdown-menu');
+      }
+
+      // cuenta NO leídas visibles (fw-semibold o con la pill "nuevo")
+      function unreadCount() {
+        var menu = getMenu();
+        if (!menu) return 0;
+        var visible = menu.querySelectorAll('.notif-item:not(.d-none)');
+        var total = 0;
+        visible.forEach(function (it) {
+          if (it.classList.contains('fw-semibold') || it.querySelector('.badge.bg-primary')) total++;
+        });
+        return total;
+      }
+
+      function updateDot() {
+        var b = document.getElementById('notifBadge');
+        if (!b) return;
+        var n = unreadCount();
+        // solo puntito (sin número)
+        b.textContent = '';
+        b.style.display = n > 0 ? 'inline-block' : 'none';
+      }
+
+      // wrapea setBadge si existe (para cuando tus fetch devuelven unread_count)
+      var prev = window.setBadge;
+      window.setBadge = function (n) {
+        try { if (typeof prev === 'function') prev(n); } catch (e) { }
+        var b = document.getElementById('notifBadge');
+        if (!b) return;
+        b.textContent = '';
+        b.style.display = (parseInt(n || 0, 10) > 0) ? 'inline-block' : 'none';
+      };
+
+      // inicial + redesencadenadores típicos
+      document.addEventListener('DOMContentLoaded', updateDot);
+
+      // cuando abres/cerras el dropdown (Eventos de Bootstrap si están, y fallback a click)
+      var toggle = document.getElementById('notifDropdown');
+      toggle && toggle.addEventListener('shown.bs.dropdown', updateDot);
+      toggle && toggle.addEventListener('hidden.bs.dropdown', updateDot);
+      toggle && toggle.addEventListener('click', function () { setTimeout(updateDot, 0); });
+
+      // acciones que cambian el estado
+      document.addEventListener('click', function (e) {
+        if (e.target.closest('.js-notif-mark-one') ||
+          e.target.closest('.js-notif-dismiss') ||
+          e.target.closest('#markAllBtn') ||
+          e.target.closest('#hideReadBtn') ||
+          e.target.closest('#hideAllBtn') ||
+          e.target.closest('#restoreHiddenBtn')) {
+          setTimeout(updateDot, 80);
+        }
+      });
+
+      // red de seguridad periódica (por si el DOM cambió silenciosamente)
+      setInterval(updateDot, 4000);
+    })();
+  </script>
+
+
+
+
+  <script>
+    (function () {
+      function getMenu() {
+        return document.querySelector('ul.dropdown-menu[aria-labelledby="notifDropdown"]')
+          || document.querySelector('#notifDropdown ~ .dropdown-menu');
+      }
+      function unreadCount() {
+        const menu = getMenu();
+        if (!menu) return 0;
+        const items = menu.querySelectorAll('.notif-item:not(.d-none)');
+        let n = 0;
+        items.forEach(it => {
+          if (it.classList.contains('fw-semibold') || it.querySelector('.badge.bg-primary')) n++;
+        });
+        return n;
+      }
+      function setDotOn(has) {
+        const b = document.getElementById('notifBadge');
+        if (!b) return;
+        b.textContent = '';                         // sin número
+        b.classList.toggle('is-on', !!has);         // usa la clase que vence al !important
+      }
+
+      // Hookea tu setBadge si existe
+      const prev = window.setBadge;
+      window.setBadge = function (n) {
+        try { if (typeof prev === 'function') prev(n); } catch (e) { }
+        setDotOn(parseInt(n || 0, 10) > 0);
+      };
+
+      // Inicial + eventos que cambian el DOM
+      document.addEventListener('DOMContentLoaded', function () {
+        setDotOn(unreadCount() > 0);
+      });
+      document.getElementById('notifDropdown')?.addEventListener('click', () => {
+        setTimeout(() => setDotOn(unreadCount() > 0), 0);
+      });
+      document.addEventListener('click', (e) => {
+        if (e.target.closest('.js-notif-mark-one') ||
+          e.target.closest('.js-notif-dismiss') ||
+          e.target.closest('#markAllBtn') ||
+          e.target.closest('#hideReadBtn') ||
+          e.target.closest('#hideAllBtn') ||
+          e.target.closest('#restoreHiddenBtn')) {
+          setTimeout(() => setDotOn(unreadCount() > 0), 60);
+        }
+      });
+      // red de seguridad
+      setInterval(() => setDotOn(unreadCount() > 0), 4000);
+    })();
+  </script>
 
 
 
@@ -4877,9 +4938,6 @@
   <!-- -->
   <!-- -->
   <!-- -->
-
-
-
 
 
 

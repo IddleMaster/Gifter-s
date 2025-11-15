@@ -30,23 +30,7 @@ from django.db import IntegrityError, transaction, models
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
-# Mínimo de participantes para que el sorteo sea interesante y aleatorio
-# Se puede sobreescribir desde settings.py con SECRET_SANTA_MIN_PARTICIPANTS
-MIN_SECRET_SANTA_PARTICIPANTS = getattr(settings, 'SECRET_SANTA_MIN_PARTICIPANTS', 4)
 
-def _validate_participants_count(count: int, is_standalone: bool = False) -> tuple[bool, str]:
-    """
-    Valida que haya suficientes participantes para un sorteo.
-    Args:
-        count: Número de participantes únicos
-        is_standalone: True si es un evento standalone (sin grupo asociado)
-    Returns:
-        (válido, mensaje de error) donde válido es True si hay suficientes participantes
-    """
-    if count < MIN_SECRET_SANTA_PARTICIPANTS:
-        msg = f"Se necesitan al menos {MIN_SECRET_SANTA_PARTICIPANTS} participantes para generar un sorteo aleatorio interesante"
-        return False, msg
-    return True, ""
 import uuid, base64
 import requests
 from django.shortcuts import get_object_or_404
@@ -85,10 +69,9 @@ from xhtml2pdf import pisa
 from io import BytesIO
 
 import matplotlib
-matplotlib.use('Agg') # Importante: le dice a Matplotlib que no intente abrir una ventana de GUI
+matplotlib.use('Agg') 
 import matplotlib.pyplot as plt
 
-#########################
 
 from django.shortcuts import render, redirect
 from django.contrib import messages
@@ -156,7 +139,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.files.base import ContentFile
 
 # Importa explícitamente el modelo (evita depender de import *)
-from core.models import GeneratedCard
+from core.models import GeneratedCard, ProductoExterno, ProductoExternoFavorito
 
 from django.http import Http404 
 import traceback
@@ -175,6 +158,24 @@ from allauth.account.models import EmailAddress
 
 
 from .models import Conversacion, ConversationEvent, SecretSantaAssignment
+
+# Mínimo de participantes para que el sorteo sea interesante y aleatorio
+# Se puede sobreescribir desde settings.py con SECRET_SANTA_MIN_PARTICIPANTS
+MIN_SECRET_SANTA_PARTICIPANTS = getattr(settings, 'SECRET_SANTA_MIN_PARTICIPANTS', 4)
+
+def _validate_participants_count(count: int, is_standalone: bool = False) -> tuple[bool, str]:
+    """
+    Valida que haya suficientes participantes para un sorteo.
+    Args:
+        count: Número de participantes únicos
+        is_standalone: True si es un evento standalone (sin grupo asociado)
+    Returns:
+        (válido, mensaje de error) donde válido es True si hay suficientes participantes
+    """
+    if count < MIN_SECRET_SANTA_PARTICIPANTS:
+        msg = f"Se necesitan al menos {MIN_SECRET_SANTA_PARTICIPANTS} participantes para generar un sorteo aleatorio interesante"
+        return False, msg
+    return True, ""
 # Descubrir en runtime si existe EventParticipant
 # === Modelos (autocarga por nombre de app y clase) ===
 ConversationEvent = apps.get_model('core', 'ConversationEvent')
@@ -787,12 +788,14 @@ from django.db.models import Q
 from django.core.paginator import Paginator
 
 def productos_list(request):
-    """Lista de productos activos con filtros (sin dependencia de 'resenas')."""
+    """Lista de productos internos + externos, con wishlist para ambos."""
+
     query = (request.GET.get('q') or '').strip()
     categoria_id = (request.GET.get('categoria') or '').strip()
     marca_id = (request.GET.get('marca') or '').strip()
     orden = request.GET.get('orden', 'recientes')  # recientes | precio_asc | precio_desc | nombre
 
+    # === PRODUCTOS INTERNOS (TODOS, sin ocultar clones) ===
     productos = Producto.objects.filter(activo=True)
 
     # Filtros
@@ -807,17 +810,17 @@ def productos_list(request):
     if marca_id:
         productos = productos.filter(id_marca_id=marca_id)
 
-    # Orden (sin 'resenas')
+    # Orden
     if orden == 'precio_asc':
         productos = productos.order_by('precio')
     elif orden == 'precio_desc':
         productos = productos.order_by('-precio')
     elif orden == 'nombre':
         productos = productos.order_by('nombre_producto')
-    else:  # recientes
+    else:
         productos = productos.order_by('-fecha_creacion', '-id_producto')
 
-    # Paginación de productos internos
+    # Paginación internos
     paginator = Paginator(productos, 12)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -825,23 +828,38 @@ def productos_list(request):
     categorias = Categoria.objects.all()
     marcas = Marca.objects.all()
 
-    # Favoritos del usuario (si está logueado)
+    # === WISHLIST ===
     favoritos_ids = set()
+    favoritos_externos_ids = set()
+
     if request.user.is_authenticated:
         wl = get_default_wishlist(request.user)
+
+        wishlist_items = ItemEnWishlist.objects.filter(id_wishlist=wl)
+
+        # ids de Producto internos en wishlist
         favoritos_ids = set(
-            ItemEnWishlist.objects
-            .filter(id_wishlist=wl)
-            .values_list('id_producto', flat=True)
+            wishlist_items.values_list('id_producto_id', flat=True)
         )
 
-    # ---- Personas que coinciden con la búsqueda ----
+        # ids de externos cuya versión interna está marcada
+        favoritos_externos_ids = set(
+            ProductoExterno.objects
+            .filter(producto_interno_id__in=favoritos_ids)
+            .values_list('id_producto_externo', flat=True)
+        )
+
+    # === Match de personas ===
     personas_amigos, personas_otros = _people_matches(request, query)
 
-    # 🔹 Productos EXTERNOS (Falabella, etc.)
-    externos_qs = ProductoExterno.objects.all().order_by('-fecha_extraccion')
+    # === PRODUCTOS EXTERNOS (SOLO LOS QUE TIENEN IMAGEN) ===
+    externos_qs = (
+        ProductoExterno.objects
+        .filter(imagen__isnull=False)
+        .exclude(imagen="")
+        .order_by('-fecha_extraccion')
+    )
 
-    # Que también respondan a la búsqueda por nombre / marca / categoría
     if query:
         externos_qs = externos_qs.filter(
             Q(nombre__icontains=query) |
@@ -849,66 +867,46 @@ def productos_list(request):
             Q(categoria__icontains=query)
         )
 
-    # Por ahora mostramos solo los últimos 12 externos (sin paginar)
     productos_externos = list(externos_qs[:12])
 
-    # === Historial de búsqueda efectiva (lo tuyo, intacto) ===
+    # === Historial búsquedas ===
     if query and request.user.is_authenticated:
-        is_effective_search = False  # Asumimos que no es efectiva por defecto
-        
-        # 1. (Intento Fuzzy) Usar Meilisearch si está activo
-        if getattr(settings, "USE_MEILI", False):
-            try:
-                resp = meili().index("products").search(query, {
-                    "limit": 1,  # Solo necesitamos saber si existe al menos 1
-                    "filter": "activo = true"
-                })
-                
-                if resp.get("estimatedTotalHits", 0) > 0:
-                    is_effective_search = True
-                    
-            except Exception as me:
-                print(f"Fallo el pre-check de Meilisearch, se usará fallback a DB: {me}")
-                is_effective_search = False
-        
-        # 2. (Fallback) Usar la DB si Meilisearch está apagado o falló
-        if not is_effective_search:
-            is_effective_search = Producto.objects.filter(
-                activo=True
-            ).filter(
-                Q(nombre_producto__icontains=query) |
-                Q(descripcion__icontains=query) |
-                Q(id_marca__nombre_marca__icontains=query)
-            ).exists()
+        is_effective_search = Producto.objects.filter(
+            activo=True
+        ).filter(
+            Q(nombre_producto__icontains=query) |
+            Q(descripcion__icontains=query) |
+            Q(id_marca__nombre_marca__icontains=query)
+        ).exists()
 
-        # 3. Guardar en el historial SÓLO SI fue una búsqueda efectiva
         if is_effective_search:
             try:
                 HistorialBusqueda.objects.create(
-                    id_user=request.user, 
+                    id_user=request.user,
                     term=query
                 )
             except Exception as e:
-                print(f"Error al guardar historial de búsqueda efectiva: {e}")
-        else:
-            print(f"Búsqueda ignorada (no efectiva): '{query}'")
+                print(f"Error al guardar historial de búsqueda: {e}")
 
     context = {
-        'productos': page_obj,              # productos internos paginados
+        'productos': page_obj,
         'categorias': categorias,
         'marcas': marcas,
         'query': query,
         'selected_categoria': categoria_id,
         'selected_marca': marca_id,
         'favoritos_ids': favoritos_ids,
+        'favoritos_externos_ids': favoritos_externos_ids,
         'orden': orden,
         'personas_amigos': personas_amigos,
         'personas_otros': personas_otros,
-
-        # 🔹 NUEVO: productos scrappeados (Falabella)
         'productos_externos': productos_externos,
     }
     return render(request, 'productos_list.html', context)
+
+
+
+
 
 
 
@@ -1886,9 +1884,11 @@ def login_view(request):
 
 @login_required
 def profile_view(request):
+    # --- Perfil + preferencias ---
     perfil, _ = Perfil.objects.get_or_create(user=request.user)
     prefs, _ = PreferenciasUsuario.objects.get_or_create(user=request.user)
 
+    # --- Eventos del usuario ---
     eventos = (
         Evento.objects
         .filter(id_usuario=request.user)
@@ -1907,68 +1907,100 @@ def profile_view(request):
     else:
         evento_form = EventoForm()
 
-    # ===== Amigos (seguimiento mutuo) =====
+    # ================== AMIGOS (seguimiento mutuo) ==================
     User = get_user_model()
-    ids_yo_sigo   = Seguidor.objects.filter(seguidor=request.user)\
-                      .values_list('seguido_id', flat=True)
-    ids_me_siguen = Seguidor.objects.filter(seguido=request.user)\
-                      .values_list('seguidor_id', flat=True)
+
+    ids_yo_sigo = (
+        Seguidor.objects
+        .filter(seguidor=request.user)
+        .values_list('seguido_id', flat=True)
+    )
+    ids_me_siguen = (
+        Seguidor.objects
+        .filter(seguido=request.user)
+        .values_list('seguidor_id', flat=True)
+    )
+
     ids_amigos = set(ids_yo_sigo).intersection(set(ids_me_siguen))
 
     amigos = (
-        User.objects.filter(id__in=ids_amigos)
+        User.objects
+        .filter(id__in=ids_amigos)
         .select_related('perfil')
         .order_by('nombre', 'apellido')
     )
 
+    # ================== WISHLIST + RECIBIDOS ==================
     wl = get_default_wishlist(request.user)
 
-    # Wishlist: solo NO recibidos
+    # Solo items NO recibidos (wishlist)
     wishlist_items = (
         ItemEnWishlist.objects
-        .filter(id_wishlist=wl, fecha_comprado__isnull=True)
+        .filter(
+            id_wishlist=wl,
+            fecha_comprado__isnull=True,   # en wishlist
+        )
         .select_related('id_producto', 'id_producto__id_marca')
+        # si tu related_name es distinto, ajusta esto
         .prefetch_related('id_producto__urls_tienda')
         .order_by('-id_item')
     )
 
-    # Recibidos (para pestaña "Regalos recibidos")
+    # Items ya recibidos (para pestaña "Regalos recibidos")
     recibidos_items = (
         ItemEnWishlist.objects
-        .filter(id_wishlist=wl, fecha_comprado__isnull=False)
+        .filter(
+            id_wishlist=wl,
+            fecha_comprado__isnull=False   # recibidos
+        )
         .select_related('id_producto', 'id_producto__id_marca')
         .prefetch_related('id_producto__urls_tienda')
         .order_by('-fecha_comprado', '-id_item')
     )
 
-    # ==== Solicitudes (mismos nombres que en index) ====
+    # IDs de productos que están en la wishlist (para pintar corazones)
+    favoritos_ids = set(
+        wishlist_items.values_list('id_producto_id', flat=True)
+    )
+
+    # ================== SOLICITUDES DE AMISTAD ==================
     solicitudes_recibidas = (
         SolicitudAmistad.objects
-        .filter(receptor=request.user, estado=SolicitudAmistad.Estado.PENDIENTE)
+        .filter(
+            receptor=request.user,
+            estado=SolicitudAmistad.Estado.PENDIENTE
+        )
         .select_related('emisor', 'emisor__perfil')
         .order_by('-creada_en')
     )
+
     solicitudes_enviadas = (
         SolicitudAmistad.objects
-        .filter(emisor=request.user, estado=SolicitudAmistad.Estado.PENDIENTE)
+        .filter(
+            emisor=request.user,
+            estado=SolicitudAmistad.Estado.PENDIENTE
+        )
         .select_related('receptor', 'receptor__perfil')
         .order_by('-creada_en')
     )
-    sol_pendientes_count = solicitudes_recibidas.count()
 
-    favoritos_ids = set(wishlist_items.values_list('id_producto', flat=True))
+    sol_pendientes_count = solicitudes_recibidas.count()
 
     context = {
         'perfil': perfil,
         'prefs': prefs,
         'eventos': eventos,
         'evento_form': evento_form,
-        'amigos': amigos,
-        'wishlist_items': wishlist_items,
-        'favoritos_ids': favoritos_ids,
-        'recibidos_items': recibidos_items,
 
-        # ← nombres idénticos a index.html
+        # Amigos
+        'amigos': amigos,
+
+        # Wishlist / recibidos
+        'wishlist_items': wishlist_items,
+        'recibidos_items': recibidos_items,
+        'favoritos_ids': favoritos_ids,
+
+        # Solicitudes (nombres iguales a los que usa el template)
         'solicitudes_recibidas': solicitudes_recibidas,
         'solicitudes_enviadas': solicitudes_enviadas,
         'sol_pendientes_count': sol_pendientes_count,
@@ -5849,42 +5881,55 @@ def producto_externo_detalle(request, pk):
 @login_required
 @require_POST
 def favoritos_toggle_externo(request, id_externo):
+    """
+    Toggle de wishlist para productos EXTERNOS.
+    - Usa ensure_producto_interno() para obtener/crear el clon interno.
+    - Mete/quita ese Producto en la wishlist por defecto del usuario.
+    """
+    wl = get_default_wishlist(request.user)
+
     externo = get_object_or_404(ProductoExterno, pk=id_externo)
 
-    # Wishlist por defecto del usuario
-    wishlist = get_default_wishlist(request.user)
+    # 1) Obtener o crear el Producto interno asociado
+    interno = externo.ensure_producto_interno()
 
-    # Buscar o crear producto interno "mirror"
-    producto, _ = Producto.objects.get_or_create(
-        nombre_producto=externo.nombre,
-        defaults={
-            "descripcion": f"{externo.nombre} (importado de {externo.fuente})",
-            "precio": externo.precio or 0,
-            "activo": True,
-        },
-    )
-
-    # Toggle en ItemEnWishlist
+    # 2) Toggle en la wishlist (mismo modelo que usas para los internos)
     item, created = ItemEnWishlist.objects.get_or_create(
-        id_wishlist=wishlist,
-        id_producto=producto,
-        defaults={"cantidad": 1},
+        id_wishlist=wl,
+        id_producto=interno,
+        defaults={'cantidad': 1}
     )
 
     if created:
-        state = "added"
+        state = 'added'
     else:
         item.delete()
-        state = "removed"
+        state = 'removed'
 
-    return JsonResponse({"state": state})
+    # Respuesta AJAX
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({
+            'ok': True,
+            'state': state,
+            'producto_id': interno.pk,
+        })
+
+    # Fallback no-AJAX
+    messages.success(
+        request,
+        "Producto agregado a tu wishlist." if state == 'added'
+        else "Producto eliminado de tu wishlist."
+    )
+    return redirect('productos_list')
+
 
 
 def producto_externo_detalle(request, id_externo):
     """
     Redirige al detalle del Producto interno asociado a un ProductoExterno.
-    Si no existe, lo crea con ensure_producto_interno().
+    Si no existe, lo crea automáticamente.
     """
     externo = get_object_or_404(ProductoExterno, pk=id_externo)
     producto = externo.ensure_producto_interno()
-    return redirect('producto_detalle', id_producto=producto.id_producto)
+    return redirect("producto_detalle", id_producto=producto.id_producto)
+

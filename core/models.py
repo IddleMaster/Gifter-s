@@ -1041,6 +1041,7 @@ class Producto(models.Model):
     nombre_producto = models.CharField(max_length=255)
     descripcion = models.CharField(max_length=255)
     imagen = models.ImageField(upload_to="productos/", blank=True, null=True)
+    
     id_categoria = models.ForeignKey(
         Categoria, 
         on_delete=models.SET(get_default_category) 
@@ -2035,8 +2036,6 @@ class RecommendationFeedback(models.Model):
     def __str__(self):
         return f"{self.user.nombre_usuario} no le gusta {self.product.nombre_producto}"        
 
-# PRODUCTOS EXTERNOS (por scraping)
-
 class ProductoExterno(models.Model):
     id_producto_externo = models.AutoField(primary_key=True)
     nombre = models.CharField(max_length=255)
@@ -2070,42 +2069,34 @@ class ProductoExterno(models.Model):
     def __str__(self):
         return f"{self.nombre} ({self.fuente})"
 
-    
+    # ✅ Método mejorado: clona el producto externo y copia imagen + datos base
     def ensure_producto_interno(self):
         """
-        Devuelve un Producto interno asociado a este producto externo.
-        Si no existe, lo crea usando Categoria, Marca y UrlTienda.
+        Devuelve o crea un Producto interno asociado a este producto externo.
+        Copia nombre, descripción, precio, marca, categoría, imagen y URL.
         """
         if self.producto_interno and self.producto_interno.activo:
             return self.producto_interno
 
-        # Obtener modelos sin crear import circular
+        from django.apps import apps
         Categoria = apps.get_model('core', 'Categoria')
         Marca = apps.get_model('core', 'Marca')
         Producto = apps.get_model('core', 'Producto')
         UrlTienda = apps.get_model('core', 'UrlTienda')
 
-        # Categoría
+        # --- Categoría ---
         if self.categoria:
-            cat, _ = Categoria.objects.get_or_create(
-                nombre_categoria=self.categoria
-            )
+            cat, _ = Categoria.objects.get_or_create(nombre_categoria=self.categoria)
         else:
-            cat, _ = Categoria.objects.get_or_create(
-                nombre_categoria='Otros'
-            )
+            cat, _ = Categoria.objects.get_or_create(nombre_categoria='Otros')
 
-        # Marca
+        # --- Marca ---
         if self.marca:
-            marca_obj, _ = Marca.objects.get_or_create(
-                nombre_marca=self.marca
-            )
+            marca_obj, _ = Marca.objects.get_or_create(nombre_marca=self.marca)
         else:
-            marca_obj, _ = Marca.objects.get_or_create(
-                nombre_marca='Genérico'
-            )
+            marca_obj, _ = Marca.objects.get_or_create(nombre_marca='Genérico')
 
-        # Crear Producto interno
+        # --- Crear producto interno ---
         p = Producto.objects.create(
             nombre_producto=self.nombre[:255],
             descripcion=f"[{self.fuente}] {self.nombre}",
@@ -2115,7 +2106,12 @@ class ProductoExterno(models.Model):
             activo=True,
         )
 
-        # URL principal asociada
+        # --- Copiar la imagen externa si existe ---
+        if self.imagen:
+            p.imagen = self.imagen  # asigna la URL directamente
+            p.save(update_fields=['imagen'])
+
+        # --- Crear URL principal ---
         UrlTienda.objects.create(
             producto=p,
             url=self.url,
@@ -2124,7 +2120,30 @@ class ProductoExterno(models.Model):
             activo=True,
         )
 
-        # Guardar vínculo y devolver
+        # --- Asociar el producto interno creado ---
         self.producto_interno = p
         self.save(update_fields=['producto_interno'])
+
         return p
+
+class ProductoExternoFavorito(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='favoritos_externos'
+    )
+    producto_externo = models.ForeignKey(
+        'ProductoExterno',
+        on_delete=models.CASCADE,
+        related_name='favoritos'
+    )
+    fecha_agregado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'producto_externo_favorito'
+        unique_together = ('user', 'producto_externo')
+        ordering = ['-fecha_agregado']
+
+    def __str__(self):
+        return f"{self.user.nombre_usuario} ♥ {self.producto_externo.nombre}"
+

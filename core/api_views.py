@@ -138,7 +138,7 @@ class AmigosRecomendadosView(APIView):
             recientes = (
                 User.objects.exclude(id__in=excluir_ids)
                 .select_related("perfil")
-                .order_by("-last_login", "-token_created_at", "-id")[:12]
+                .order_by("-last_login", "-id")[:12]
             )
 
             # si last_login está muy vacío en tu data, cae a -id
@@ -191,21 +191,24 @@ class AmigosRecomendadosView(APIView):
 @require_GET
 def proximo_feriado(request):
     country = request.GET.get("country") or getattr(settings, "CALENDARIFIC_COUNTRY", "CL")
+
     try:
         h = next_holiday(country)
         if not h:
             return JsonResponse({"ok": True, "holiday": None})
+
         return JsonResponse({
             "ok": True,
             "holiday": {
                 "date": h["date"].isoformat(),
-                "name": h["name"],          # EN
-                "name_es": h["name_es"],    # ES
+                "name": h["name"],
+                "name_es": h["name_es"],
                 "type": h["type"],
                 "description": h["description"],
                 "country": h["country"],
             }
         })
-    except Exception as e:
-        return JsonResponse({"ok": False, "error": str(e)}, status=500)
+
+    except Exception:
+        return JsonResponse({"ok": True, "holiday": None})
 

@@ -353,11 +353,9 @@ class MainWindow(QMainWindow):
         self.stacked_widget.addWidget(self.page_reportes)   # Índice 0
         self.stacked_widget.addWidget(self.page_admin)      # Índice 1
         self.stacked_widget.addWidget(self.page_catalogo)   # Índice 2
-
+        
         # --- Conectar Sidebar al Stack Principal ---
         self.btn_reportes.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(0))
-        self.btn_admin.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(1))
-        self.btn_catalogo.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(2))
         self.btn_importar.clicked.connect(self.open_csv_importer) 
         
         # --- Carga Inicial ---
@@ -400,13 +398,9 @@ class MainWindow(QMainWindow):
         sidebar_layout.addWidget(title_label)
 
         self.btn_reportes = QPushButton("Reportes")
-        self.btn_admin = QPushButton("Administración")
-        self.btn_catalogo = QPushButton("Catálogo")
         self.btn_importar = QPushButton("Importar CSV")
         
         sidebar_layout.addWidget(self.btn_reportes)
-        sidebar_layout.addWidget(self.btn_admin)
-        sidebar_layout.addWidget(self.btn_catalogo)
         sidebar_layout.addWidget(self.btn_importar)
         
         if self.is_offline:
@@ -526,7 +520,7 @@ class MainWindow(QMainWindow):
     def create_report_main_menu_page(self):
         """
         Crea el widget para el MENÚ PRINCIPAL de reportes (Índice 0).
-        (Rediseñado con QScrollArea y TAMAÑOS MÍNIMOS para evitar aplastamiento)
+        (Rediseñado para poner las 2 secciones de tarjetas en horizontal)
         """
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True) 
@@ -549,18 +543,19 @@ class MainWindow(QMainWindow):
             }
         """)
 
+        # Layout vertical principal
         layout = QVBoxLayout(main_widget)
         layout.setContentsMargins(25, 20, 25, 20)
         layout.setSpacing(15)
 
-        # --- Sección: Reportes de Catálogo (Fila 1) ---
+        # --- Sección 1: Reportes de Catálogo (Fila 1) ---
         layout.addWidget(QLabel("Reportes de Catálogo", objectName="SectionTitle"))
         row1_layout = QHBoxLayout()
         row1_layout.setSpacing(20)
 
         # Tarjeta 1: Generar Reporte de Productos
         card_gen_report = QGroupBox("Generar Reporte de Productos")
-        card_gen_report.setMinimumWidth(320) # <-- **** SOLUCIÓN AQUÍ ****
+        card_gen_report.setMinimumWidth(320) 
         card_gen_layout = QVBoxLayout(card_gen_report)
         format_layout = QHBoxLayout()
         format_label = QLabel("Formato:")
@@ -568,11 +563,9 @@ class MainWindow(QMainWindow):
         self.combo_report_format.addItems(["CSV", "Excel (.xlsx)", "PDF"])
         format_layout.addWidget(format_label)
         format_layout.addWidget(self.combo_report_format)
-        
         self.btn_download_report = QPushButton("Descargar Reporte")
         self.btn_download_report.setStyleSheet("background-color: #28a745; color: white; padding: 10px; font-size: 14px;")
         self.btn_download_report.clicked.connect(self.handle_download_report)
-        
         card_gen_layout.addLayout(format_layout)
         card_gen_layout.addStretch()
         card_gen_layout.addWidget(self.btn_download_report)
@@ -580,10 +573,9 @@ class MainWindow(QMainWindow):
 
         # Tarjeta 2: Cargar Archivo CSV
         card_load_csv = QGroupBox("Cargar Archivo CSV")
-        card_load_csv.setMinimumWidth(320) # <-- **** SOLUCIÓN AQUÍ ****
+        card_load_csv.setMinimumWidth(320) 
         card_load_csv_layout = QVBoxLayout(card_load_csv)
         card_load_csv_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
         self.btn_importar_card = QPushButton("☁️\nSeleccionar Archivo")
         self.btn_importar_card.setMinimumHeight(100)
         self.btn_importar_card.setFont(QFont("Arial", 12))
@@ -596,21 +588,24 @@ class MainWindow(QMainWindow):
             QPushButton:hover { background-color: #e9f2ff; }
         """)
         self.btn_importar_card.clicked.connect(self.open_csv_importer)
-        
         card_load_csv_layout.addWidget(self.btn_importar_card)
         row1_layout.addWidget(card_load_csv)
-        
-        # --- 👇 AÑADIDO: Spacer para que las 2 tarjetas no se estiren en pantalla completa 👇 ---
         row1_layout.addStretch(1) 
         layout.addLayout(row1_layout)
 
-        # --- Sección: Información General y Monitoreo (Cuadrícula) ---
-        layout.addWidget(QLabel("Información General y Monitoreo", objectName="SectionTitle"))
+        # --- 👇 MODIFICACIÓN AQUÍ 👇 ---
+        
+        # --- Layout Horizontal para las dos cuadrículas ---
+        middle_row_layout = QHBoxLayout()
+        layout.addLayout(middle_row_layout)
+
+        # --- Columna Izquierda: Información General ---
+        info_column = QVBoxLayout()
+        info_column.addWidget(QLabel("Información General y Monitoreo", objectName="SectionTitle"))
         
         grid_layout = QGridLayout()
         grid_layout.setSpacing(20)
-
-        # (Estas tarjetas ya tienen 'setMinimumSize(180, 100)' desde la función create_info_card)
+        
         card_search = self.create_info_card("Búsquedas Populares", "🔍", "#007bff",
             lambda: (self.reports_stack.setCurrentIndex(2), self.load_search_report()))
         card_reviews = self.create_info_card("Reseñas del Sitio", "💬", "#28a745",
@@ -625,38 +620,47 @@ class MainWindow(QMainWindow):
         grid_layout.addWidget(card_top_users, 1, 0)
         grid_layout.addWidget(card_logs_web, 1, 1)
         
-        # --- 👇 AÑADIDO: Spacer para que las 4 tarjetas no se estiren en pantalla completa 👇 ---
-        grid_layout.setColumnStretch(2, 1) # Añade una columna invisible que absorbe el espacio
-        layout.addLayout(grid_layout)
+        info_column.addLayout(grid_layout)
+        info_column.addStretch(1) # Estira para alinear con la otra columna
+        middle_row_layout.addLayout(info_column, 1) # '1' = factor de estiramiento
 
-        # --- Sección: Acciones Rápidas ---
-        layout.addWidget(QLabel("Acciones Rápidas", objectName="SectionTitle"))
-        row3_layout = QHBoxLayout()
-        row3_layout.setSpacing(10)
+        # --- Columna Derecha: Navegación Principal ---
+        nav_column = QVBoxLayout()
+        nav_column.addWidget(QLabel("Navegación Principal", objectName="SectionTitle"))
         
-        self.btn_goto_moderation = QPushButton("Ver Reporte de Moderación")
-        self.btn_goto_moderation.clicked.connect(lambda: self.reports_stack.setCurrentIndex(1))
-        
-        self.btn_open_local_log = QPushButton("Ver Log Local")
-        self.btn_open_local_log.clicked.connect(lambda: self.reports_stack.setCurrentIndex(6))
-        self.btn_open_local_log.clicked.connect(self.load_local_logs)
+        grid_layout_2 = QGridLayout()
+        grid_layout_2.setSpacing(20)
 
-        action_btn_style = """
-            QPushButton { 
-                background-color: #007bff; color: white; padding: 10px; 
-                font-size: 14px; border-radius: 5px; 
-            }
-            QPushButton:hover { background-color: #0056b3; }
-        """
-        self.btn_goto_moderation.setStyleSheet(action_btn_style)
-        self.btn_open_local_log.setStyleSheet(action_btn_style)
-        
-        row3_layout.addWidget(self.btn_goto_moderation)
-        row3_layout.addWidget(self.btn_open_local_log)
-        row3_layout.addStretch()
-        layout.addLayout(row3_layout)
+        card_moderation = self.create_info_card(
+            "Reporte de Moderación", "🛡️", "#dc3545", # Rojo
+            lambda: (self.reports_stack.setCurrentIndex(1), self.load_moderation_report())
+        )
+        card_log_local = self.create_info_card(
+            "Ver Log Local", "📄", "#6c757d", # Gris
+            lambda: (self.reports_stack.setCurrentIndex(6), self.load_local_logs())
+        )
+        card_admin_users = self.create_info_card(
+            "Administrar Usuarios", "🧑‍⚖️", "#17a2b8", # Teal/Info
+            lambda: self.stacked_widget.setCurrentIndex(1) # Va al stack principal
+        )
+        card_admin_catalog = self.create_info_card(
+            "Administrar Catálogo", "📚", "#17a2b8", # Teal/Info
+            lambda: self.stacked_widget.setCurrentIndex(2) # Va al stack principal
+        )
 
-        layout.addStretch(1) # Empuja todo hacia arriba
+        grid_layout_2.addWidget(card_moderation, 0, 0)
+        grid_layout_2.addWidget(card_log_local, 0, 1)
+        grid_layout_2.addWidget(card_admin_users, 1, 0)
+        grid_layout_2.addWidget(card_admin_catalog, 1, 1)
+        
+        nav_column.addLayout(grid_layout_2)
+        nav_column.addStretch(1) # Estira para alinear
+        middle_row_layout.addLayout(nav_column, 1) # '1' = factor de estiramiento
+
+        # --- (Sección "Acciones Rápidas" eliminada) ---
+        # --- ------------------------------- ---
+
+        layout.addStretch(1) 
         
         scroll_area.setWidget(main_widget)
         return scroll_area
@@ -2300,3 +2304,4 @@ if __name__ == '__main__':
     else:
         logging.info("Login cancelado por el usuario. Saliendo de la aplicación.")
         sys.exit(0)
+        

@@ -3,6 +3,8 @@ from typing import Iterable, List, Optional, Sequence, Tuple, Dict, Any
 from core.models import Producto, Wishlist, ItemEnWishlist
 from core.services.openai_client import get_openai_client
 import json 
+import hashlib
+
 
 # Modelo de embeddings barato y efectivo
 EMBED_MODEL = "text-embedding-3-small"  # 1536 dims

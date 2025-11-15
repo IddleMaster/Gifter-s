@@ -4,6 +4,8 @@ from typing import List, Tuple, Optional
 from django.core.cache import cache
 from django.db.models import Q, Case, When, Value, IntegerField, F, ExpressionWrapper, Max
 from core.models import Producto, Wishlist, ItemEnWishlist, User, RecommendationFeedback
+import hashlib
+
 
 CACHE_TTL = 60 * 5  # 5 minutos
 

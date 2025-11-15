@@ -44,7 +44,8 @@ services:
       REDIS_URL: "redis://redis:6379/0"
       MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
       MEILI_URL: ${MEILI_URL}
-      USE_MEILI: ${USE_MEILI} 
+      USE_MEILI: ${USE_MEILI}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
