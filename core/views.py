@@ -788,42 +788,37 @@ from django.db.models import Q
 from django.core.paginator import Paginator
 
 def productos_list(request):
-    """Lista de productos internos + externos, con wishlist para ambos."""
+    """Lista de productos internos + externos mezclados en una sola grilla."""
 
     query = (request.GET.get('q') or '').strip()
     categoria_id = (request.GET.get('categoria') or '').strip()
     marca_id = (request.GET.get('marca') or '').strip()
-    orden = request.GET.get('orden', 'recientes')  # recientes | precio_asc | precio_desc | nombre
+    orden = request.GET.get('orden', 'recientes')
 
-    # === PRODUCTOS INTERNOS (TODOS, sin ocultar clones) ===
-    productos = Producto.objects.filter(activo=True)
+    # === PRODUCTOS INTERNOS ===
+    productos_internos = Producto.objects.filter(activo=True)
 
-    # Filtros
+    # Filtros internos
     if query:
-        productos = productos.filter(
+        productos_internos = productos_internos.filter(
             Q(nombre_producto__icontains=query) |
             Q(descripcion__icontains=query) |
             Q(id_marca__nombre_marca__icontains=query)
         )
     if categoria_id:
-        productos = productos.filter(id_categoria_id=categoria_id)
+        productos_internos = productos_internos.filter(id_categoria_id=categoria_id)
     if marca_id:
-        productos = productos.filter(id_marca_id=marca_id)
+        productos_internos = productos_internos.filter(id_marca_id=marca_id)
 
-    # Orden
+    # Orden internos
     if orden == 'precio_asc':
-        productos = productos.order_by('precio')
+        productos_internos = productos_internos.order_by('precio')
     elif orden == 'precio_desc':
-        productos = productos.order_by('-precio')
+        productos_internos = productos_internos.order_by('-precio')
     elif orden == 'nombre':
-        productos = productos.order_by('nombre_producto')
+        productos_internos = productos_internos.order_by('nombre_producto')
     else:
-        productos = productos.order_by('-fecha_creacion', '-id_producto')
-
-    # Paginación internos
-    paginator = Paginator(productos, 12)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+        productos_internos = productos_internos.order_by('-fecha_creacion', '-id_producto')
 
     categorias = Categoria.objects.all()
     marcas = Marca.objects.all()
@@ -834,25 +829,19 @@ def productos_list(request):
 
     if request.user.is_authenticated:
         wl = get_default_wishlist(request.user)
-
         wishlist_items = ItemEnWishlist.objects.filter(id_wishlist=wl)
 
-        # ids de Producto internos en wishlist
         favoritos_ids = set(
             wishlist_items.values_list('id_producto_id', flat=True)
         )
 
-        # ids de externos cuya versión interna está marcada
         favoritos_externos_ids = set(
             ProductoExterno.objects
             .filter(producto_interno_id__in=favoritos_ids)
             .values_list('id_producto_externo', flat=True)
         )
 
-    # === Match de personas ===
-    personas_amigos, personas_otros = _people_matches(request, query)
-
-    # === PRODUCTOS EXTERNOS (SOLO LOS QUE TIENEN IMAGEN) ===
+    # === PRODUCTOS EXTERNOS ===
     externos_qs = (
         ProductoExterno.objects
         .filter(imagen__isnull=False)
@@ -867,9 +856,24 @@ def productos_list(request):
             Q(categoria__icontains=query)
         )
 
-    productos_externos = list(externos_qs[:12])
+    # Convertimos a lista
+    productos_externos = list(externos_qs)
 
-    # === Historial búsquedas ===
+    # === UNIFICAR INTERNOS + EXTERNOS ===
+    from itertools import chain
+
+    # Los internos vienen como queryset → los externos como dict-like
+    todos = list(chain(productos_internos, productos_externos))
+
+    # === PAGINACIÓN COMBINADA ===
+    paginator = Paginator(todos, 12)
+    page_number = request.GET.get('page')
+    productos = paginator.get_page(page_number)
+
+    # === MATCH PERSONAS (no tocado) ===
+    personas_amigos, personas_otros = _people_matches(request, query)
+
+    # === HISTORIAL DE BÚSQUEDAS ===
     if query and request.user.is_authenticated:
         is_effective_search = Producto.objects.filter(
             activo=True
@@ -888,23 +892,23 @@ def productos_list(request):
             except Exception as e:
                 print(f"Error al guardar historial de búsqueda: {e}")
 
+    # === CONTEXT FINAL ===
     context = {
-        'productos': page_obj,
+        'productos': productos,  # ← YA VIENE INTERNOS + EXTERNOS JUNTOS
         'categorias': categorias,
         'marcas': marcas,
         'query': query,
         'selected_categoria': categoria_id,
         'selected_marca': marca_id,
+        'orden': orden,
         'favoritos_ids': favoritos_ids,
         'favoritos_externos_ids': favoritos_externos_ids,
-        'orden': orden,
         'personas_amigos': personas_amigos,
         'personas_otros': personas_otros,
-        'productos_externos': productos_externos,
+        # YA NO SE USA productos_externos EN EL TEMPLATE
     }
+
     return render(request, 'productos_list.html', context)
-
-
 
 
 
@@ -5880,47 +5884,27 @@ def producto_externo_detalle(request, pk):
 
 @login_required
 @require_POST
-def favoritos_toggle_externo(request, id_externo):
-    """
-    Toggle de wishlist para productos EXTERNOS.
-    - Usa ensure_producto_interno() para obtener/crear el clon interno.
-    - Mete/quita ese Producto en la wishlist por defecto del usuario.
-    """
-    wl = get_default_wishlist(request.user)
+def favoritos_toggle_externo(request, producto_externo_id):
+    from core.models import ProductoExterno, ProductoExternoFavorito
 
-    externo = get_object_or_404(ProductoExterno, pk=id_externo)
+    try:
+        producto = ProductoExterno.objects.get(pk=producto_externo_id)
+    except ProductoExterno.DoesNotExist:
+        return JsonResponse({"error": "Producto externo no encontrado"}, status=404)
 
-    # 1) Obtener o crear el Producto interno asociado
-    interno = externo.ensure_producto_interno()
-
-    # 2) Toggle en la wishlist (mismo modelo que usas para los internos)
-    item, created = ItemEnWishlist.objects.get_or_create(
-        id_wishlist=wl,
-        id_producto=interno,
-        defaults={'cantidad': 1}
+    fav, created = ProductoExternoFavorito.objects.get_or_create(
+        user=request.user,
+        producto_externo=producto
     )
 
-    if created:
-        state = 'added'
-    else:
-        item.delete()
-        state = 'removed'
+    if not created:
+        # Ya existía → eliminarlo
+        fav.delete()
+        return JsonResponse({"state": "removed"})
 
-    # Respuesta AJAX
-    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-        return JsonResponse({
-            'ok': True,
-            'state': state,
-            'producto_id': interno.pk,
-        })
+    # Si se agregó → devolver respuesta
+    return JsonResponse({"state": "added"})
 
-    # Fallback no-AJAX
-    messages.success(
-        request,
-        "Producto agregado a tu wishlist." if state == 'added'
-        else "Producto eliminado de tu wishlist."
-    )
-    return redirect('productos_list')
 
 
 

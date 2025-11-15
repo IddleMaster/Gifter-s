@@ -2044,10 +2044,10 @@ class ProductoExterno(models.Model):
     categoria = models.CharField(max_length=100, blank=True, null=True)
     url = models.URLField(max_length=1000)
     imagen = models.URLField(max_length=1000, blank=True, null=True)
-    fuente = models.CharField(max_length=50, default="Falabella")  # Ej: Falabella, Paris, Ripley
+    fuente = models.CharField(max_length=50, default="Falabella")
     fecha_extraccion = models.DateTimeField(auto_now_add=True)
 
-    # 🔹 NUEVO: producto interno asociado (opcional)
+    # 🔹 Producto interno asociado (opcional)
     producto_interno = models.ForeignKey(
         'Producto',
         on_delete=models.SET_NULL,
@@ -2069,12 +2069,10 @@ class ProductoExterno(models.Model):
     def __str__(self):
         return f"{self.nombre} ({self.fuente})"
 
-    # ✅ Método mejorado: clona el producto externo y copia imagen + datos base
+    # ✅ MÉTODO FINAL CORREGIDO — NO DUPLICA, NO COPIA IMÁGENES
     def ensure_producto_interno(self):
-        """
-        Devuelve o crea un Producto interno asociado a este producto externo.
-        Copia nombre, descripción, precio, marca, categoría, imagen y URL.
-        """
+
+        # Si ya existe y está activo → devolverlo
         if self.producto_interno and self.producto_interno.activo:
             return self.producto_interno
 
@@ -2096,7 +2094,7 @@ class ProductoExterno(models.Model):
         else:
             marca_obj, _ = Marca.objects.get_or_create(nombre_marca='Genérico')
 
-        # --- Crear producto interno ---
+        # --- Crear producto interno (SIN IMAGEN) ---
         p = Producto.objects.create(
             nombre_producto=self.nombre[:255],
             descripcion=f"[{self.fuente}] {self.nombre}",
@@ -2105,11 +2103,6 @@ class ProductoExterno(models.Model):
             precio=self.precio,
             activo=True,
         )
-
-        # --- Copiar la imagen externa si existe ---
-        if self.imagen:
-            p.imagen = self.imagen  # asigna la URL directamente
-            p.save(update_fields=['imagen'])
 
         # --- Crear URL principal ---
         UrlTienda.objects.create(
@@ -2120,7 +2113,7 @@ class ProductoExterno(models.Model):
             activo=True,
         )
 
-        # --- Asociar el producto interno creado ---
+        # Asociar
         self.producto_interno = p
         self.save(update_fields=['producto_interno'])
 

@@ -712,30 +712,46 @@
     color: white;
     border-color: #6c757d;
   }
-
-  /* Estilo para el amigo seleccionado */
-  #selected-user-display {
-    border-radius: 8px;
-    background-color: #f8f9fa; /* Fondo más sutil que 'alert-light' */
-    border: 1px solid #e9ecef;
+  
+  /* --- ESTILO PARA EL NUEVO "CHIP" DE AMIGO SELECCIONADO --- */
+  .friend-chip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     padding: 0.5rem 0.75rem;
+    background-color: #e9ecef; /* Un gris suave */
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
   }
-
-  #selected-user-display img {
+  .friend-chip-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .friend-chip-info img {
     width: 32px;
     height: 32px;
     object-fit: cover;
+    border-radius: 50%;
   }
-
-  #selected-user-display strong {
+  .friend-chip-info strong {
     font-weight: 600;
     color: #212529;
   }
-  
-  #btn-change-thanked-user {
-    font-size: 0.8rem;
-    font-weight: 600;
+  .btn-remove-friend {
+    background: none;
+    border: none;
+    font-size: 1.5rem; /* Un poco más grande para ser fácil de tocar */
+    line-height: 1;
+    color: #6c757d;
+    padding: 0 0.25rem;
+    cursor: pointer;
   }
+  .btn-remove-friend:hover {
+    color: #212529;
+  }
+  /* --- FIN ESTILO CHIP --- */
+  
 </style>
 {# #}
 
@@ -817,27 +833,16 @@
     </p>
     <br><br>
     <div id="wishlist-container" class="gift-grid">
-  {% if wishlist_items %}
-    {% for it in wishlist_items %}
-      {% with p=it.id_producto url_tienda=p.urls_tienda_activas.first ext=p.versiones_externas.all.0 %}
-      <div class="gift-card" id="wl-item-{{ it.id_item }}"
-           data-product-id="{{ p.id_producto }}"
-           data-is-fav="1"
-           data-shop-url="{% if url_tienda %}{{ url_tienda.url }}{% endif %}">
-        
-        <a href="{% url 'producto_detalle' p.id_producto %}"
-           class="gift-link"
-           style="text-decoration:none;color:inherit;">
-
-          {# 🔹 IMAGEN: local si existe, si no la del ProductoExterno, si no favicon #}
-          {% if p.imagen %}
-            <img src="{{ p.imagen.url }}" alt="{{ p.nombre_producto }}">
-          {% elif ext and ext.imagen %}
-            <img src="{{ ext.imagen }}" alt="{{ p.nombre_producto }}">
-          {% else %}
-            <img src="{% static 'img/Gifters/favicongift.png' %}" alt="{{ p.nombre_producto }}">
-          {% endif %}
-
+      {% if wishlist_items %}
+      {% for it in wishlist_items %}
+      {% with p=it.id_producto url_tienda=p.urls_tienda_activas.first %}
+      <div class="gift-card" id="wl-item-{{ it.id_item }}" data-product-id="{{ p.id_producto }}" data-is-fav="1"
+        data-shop-url="{% if url_tienda %}{{ url_tienda.url }}{% endif %}">
+        <a href="{% url 'producto_detalle' p.id_producto %}" class="gift-link"
+          style="text-decoration:none;color:inherit;">
+          <img
+            src="{% if p.imagen and p.imagen.url %}{{ p.imagen.url }}{% else %}{% static 'img/Gifters/favicongift.png' %}{% endif %}"
+            alt="{{ p.nombre_producto }}">
           <div class="gift-info">
             <h4 class="gift-title">{{ p.nombre_producto }}</h4>
             <p>{{ p.id_marca.nombre_marca }}</p>
@@ -845,34 +850,28 @@
         </a>
 
         <div class="gift-actions">
-          <a href="#"
-             class="wishlist-btn {% if p.id_producto in favoritos_ids %}is-fav{% endif %}"
-             data-product-id="{{ p.id_producto }}"
-             title="Quitar de wishlist"
-             aria-pressed="true">
-            <i class="bi {% if p.id_producto in favoritos_ids %}bi-heart-fill text-danger{% else %}bi-heart{% endif %}"></i>
+          <a href="#" class="wishlist-btn {% if p.id_producto in favoritos_ids %}is-fav{% endif %}"
+            data-product-id="{{ p.id_producto }}" title="Quitar de wishlist" aria-pressed="true">
+            <i
+              class="bi {% if p.id_producto in favoritos_ids %}bi-heart-fill text-danger{% else %}bi-heart{% endif %}"></i>
           </a>
 
-          <a href="#"
-             class="mark-received"
-             data-item-id="{{ it.id_item }}"
-             data-url="{% url 'wishlist_marcar_recibido' it.id_item %}"
-             title="Marcar como recibido">
+          <a href="#" class="mark-received" data-item-id="{{ it.id_item }}"
+            data-url="{% url 'wishlist_marcar_recibido' it.id_item %}" title="Marcar como recibido">
             <i class="bi bi-bag-check-fill text-success"></i>
           </a>
 
           {% if url_tienda %}
-            <a href="{{ url_tienda.url }}" target="_blank" rel="noopener" title="Ver en tienda">
-              <i class="bi bi-link-45deg"></i>
-            </a>
+          <a href="{{ url_tienda.url }}" target="_blank" rel="noopener" title="Ver en tienda">
+            <i class="bi bi-link-45deg"></i>
+          </a>
           {% endif %}
         </div>
       </div>
       {% endwith %}
-    {% endfor %}
-  {% endif %}
-</div>
-
+      {% endfor %}
+      {% endif %}
+    </div>
   </section>
   <section id="Intereses" class="tab-content active">
     <h3>Tus intereses</h3>
@@ -1162,11 +1161,11 @@
             </div>
 
             {# #}
-            <div id="selected-user-display" class="alert alert-info d-flex align-items-center justify-content-between gap-2" style="display: none;">
-              <span id="selected-user-info" class="d-flex align-items-center gap-2">
+            <div id="selected-user-display" class="friend-chip" style="display: none;">
+              <div id="selected-user-info" class="friend-chip-info">
                 {# #}
-              </span>
-              <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-change-thanked-user">Cambiar</button>
+              </div>
+              <button type="button" class="btn-remove-friend" id="btn-change-thanked-user" title="Cambiar amigo">×</button>
             </div>
           </div>
 
@@ -1315,11 +1314,9 @@
     font-size: clamp(0.875rem, 2vw, 1rem);
   }
 
-  /* Usuario seleccionado */
+  /* Usuario seleccionado (chip) */
   #selected-user-display {
-    padding: clamp(12px, 3vw, 16px);
-    border-radius: 8px;
-    gap: clamp(8px, 2vw, 12px);
+    /* (los estilos ya están en el block extra_css) */
   }
 
   /* Botones responsivos */
@@ -2131,9 +2128,7 @@
       }
     });
 
-    /* ===== /NUEVO ===== */
 
-    {# #}
     const thankYouModalEl = document.getElementById('thankYouModal');
     if (thankYouModalEl) {
       const modal = new bootstrap.Modal(thankYouModalEl);
@@ -2142,12 +2137,15 @@
       const productoNombreEl = document.getElementById('modal-producto-nombre-manual');
       const productoIdInput = document.getElementById('modal-producto-id-manual');
       const thankedUserIdInput = document.getElementById('modal-thanked-user-id');
+      
       const searchInput = document.getElementById('friend-search-input');
       const searchResultsEl = document.getElementById('friend-search-results');
-      const searchContainer = document.getElementById('friend-search-container');
-      const selectedUserDisplay = document.getElementById('selected-user-display');
-      const selectedUserInfo = document.getElementById('selected-user-info');
-      const btnChangeUser = document.getElementById('btn-change-thanked-user');
+      const searchContainer = document.getElementById('friend-search-container'); // <-- Nuevo
+      
+      const selectedUserDisplay = document.getElementById('selected-user-display'); // <-- Es el "chip"
+      const selectedUserInfo = document.getElementById('selected-user-info'); // <-- El span dentro del chip
+      const btnChangeUser = document.getElementById('btn-change-thanked-user'); // <-- El botón "X"
+      
       const privateMessageContainer = document.getElementById('private-message-container');
       const privateMessageText = document.getElementById('private-message-text');
       const btnEnviar = document.getElementById('btn-enviar-agradecimiento-manual');
@@ -2247,9 +2245,9 @@
 
         thankedUserIdInput.value = selectedItem.dataset.userId;
         
-        // Actualiza el span de info
-        selectedUserInfo.innerHTML = `<img src="${selectedItem.dataset.userAvatar}" width="32" height="32" class="rounded-circle"> <strong>${selectedItem.dataset.userName}</strong>`;
-        // Muestra el display del seleccionado
+        // Actualiza el span de info dentro del chip
+        selectedUserInfo.innerHTML = `<img src="${selectedItem.dataset.userAvatar}" class="rounded-circle"> <strong>${selectedItem.dataset.userName}</strong>`;
+        // Muestra el display del chip
         selectedUserDisplay.style.display = 'flex';
         
         // Oculta el buscador
@@ -2259,7 +2257,7 @@
         btnEnviar.disabled = false;
       });
 
-      // 6. LÓGICA DEL NUEVO BOTÓN "CAMBIAR"
+      // 6. LÓGICA DEL NUEVO BOTÓN "X" (CAMBIAR)
       btnChangeUser.addEventListener('click', () => {
         // Resetea el estado de selección
         thankedUserIdInput.value = '';
@@ -2349,7 +2347,7 @@
         }
       });
     }
-    {# #}
+
 
 
   });

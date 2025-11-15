@@ -45,13 +45,17 @@ async def scrape_falabella(url):
                 continue
 
             url_abs = urljoin(base, href)
-            card = a  # ya es ElementHandle
+            card = a  
 
-            # imagen
+            # ---- IMAGEN ----
             img = await card.query_selector("img")
             img_src = await img.get_attribute("src") if img else None
 
-            # precio => primer '$'
+            # 🔥 1. DESCARTAR PRODUCTOS SIN IMAGEN REAL
+            if not img_src or not img_src.startswith("http"):
+                continue
+
+            # ---- PRECIO ----
             price_el = await card.query_selector("text=$")
             price = None
             if price_el:
@@ -61,10 +65,11 @@ async def scrape_falabella(url):
             if not price:
                 continue
 
-            # nombre “limpio”
+            # ---- NOMBRE LIMPIO ----
             parts = full_text.split("$", 1)
             name_clean = parts[0].strip()
 
+            # ---- GUARDAR ----
             products.append(
                 {
                     "name": name_clean,
@@ -72,8 +77,7 @@ async def scrape_falabella(url):
                     "brand": "Sony",
                     "category": "Consolas",
                     "url": url_abs,
-                    # 👇 AQUÍ EL CAMBIO IMPORTANTE
-                    "image": img_src or "",
+                    "image": img_src,   # ya validado
                 }
             )
 
@@ -94,8 +98,7 @@ def guardar_en_bd(productos):
                 "precio": p["price"],
                 "marca": p["brand"],
                 "categoria": p["category"],
-                # 👇 SEGUNDO CAMBIO: fallback a string vacía
-                "imagen": p.get("image") or "",
+                "imagen": p["image"],  # imagen real
                 "fuente": "Falabella",
             },
         )
@@ -110,7 +113,7 @@ def guardar_en_bd(productos):
 if __name__ == "__main__":
     url = "https://www.falabella.com/falabella-cl/category/cat202303/Consolas?f.product.brandName=sony"
     data = asyncio.run(scrape_falabella(url))
-    print(f"\n✅ Encontrados {len(data)} productos\n")
+    print(f"\n✅ Encontrados {len(data)} productos válidos (con imagen)\n")
     print(json.dumps(data, ensure_ascii=False, indent=2))
 
     guardar_en_bd(data)

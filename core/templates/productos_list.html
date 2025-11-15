@@ -308,141 +308,108 @@
     {% if productos %}
     <div class="products-grid">
         {% for producto in productos %}
-        <div class="product-card">
-            <!-- Imagen del producto -->
-            <div class="product-image">
-                {% if producto.imagen and producto.imagen.url %}
-                <img src="{{ producto.imagen.url }}" alt="{{ producto.nombre_producto }}">
-                {% else %}
-                <img src="{% static 'img/Gifters/favicongift.png' %}" alt="{{ producto.nombre_producto }}">
-                {% endif %}
-            </div>
+<div class="product-card">
 
-            <!-- Información del producto -->
-            <div class="product-info">
-                <h3 class="product-title">{{ producto.nombre_producto }}</h3>
-                <p class="product-brand">{{ producto.id_marca.nombre_marca }}</p>
-
-                {% if producto.precio %}
-
-                {% endif %}
-
-                <p class="product-description">
-                    {{ producto.descripcion|truncatechars:100 }}
-                </p>
-
-                <!-- Acciones -->
-                <div class="product-actions">
-                    <!-- Ver detalles -->
-                    <a href="{% url 'producto_detalle' producto.id_producto %}" class="btn-action" title="Ver detalles">
-                        <i class="bi bi-eye"></i>
-                    </a>
-
-                    <!-- Agregar a wishlist -->
-                    <!-- Agregar/Quitar de wishlist -->
-                    <a href="#"
-                        class="btn-action wishlist-btn {% if producto.id_producto in favoritos_ids %}is-fav{% endif %}"
-                        title="{% if producto.id_producto in favoritos_ids %}Quitar de wishlist{% else %}Agregar a wishlist{% endif %}"
-                        data-product-id="{{ producto.id_producto }}"
-                        aria-pressed="{% if producto.id_producto in favoritos_ids %}true{% else %}false{% endif %}">
-                        {% if producto.id_producto in favoritos_ids %}
-                        <i class="bi bi-heart-fill text-danger"></i>
-                        {% else %}
-                        <i class="bi bi-heart"></i>
-                        {% endif %}
-                    </a>
-
-
-                    <!-- Link a tienda externa -->
-                    {% with producto.urls_tienda_activas.first as url_tienda %}
-                    {% if url_tienda %}
-                    <a href="{{ url_tienda.url }}" target="_blank" rel="noopener" class="btn-action"
-                        title="Ver en tienda">
-                        <i class="bi bi-link-45deg"></i>
-                    </a>
-                    {% endif %}
-                    {% endwith %}
-                </div>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-
-    {% if productos_externos %}
-    <hr class="my-5">
-
-    <div class="results-header">
-        <div>
-            <h2 class="mb-2">Productos de otras tiendas</h2>
-            <p class="results-count">
-                Mostrando {{ productos_externos|length }} productos de tiendas externas
-            </p>
-        </div>
-    </div>
-
-<div class="products-grid">
-    {% for producto in productos_externos %}
-    <div class="product-card">
-        <div class="product-image">
-            {% if producto.imagen %}
-            <img src="{{ producto.imagen }}" alt="{{ producto.nombre }}">
-            {% else %}
-            <img src="{% static 'img/Gifters/favicongift.png' %}" alt="{{ producto.nombre }}">
-            {% endif %}
-        </div>
-
-        <div class="product-info">
-            <h3 class="product-title">{{ producto.nombre }}</h3>
-
-            {% if producto.marca %}
-            <p class="product-brand">{{ producto.marca }}</p>
-            {% endif %}
-
-            {% if producto.precio %}
-            <p class="product-price">$ {{ producto.precio }}</p>
-            {% endif %}
-
-            <p class="product-description">
-                {{ producto.categoria }} · {{ producto.fuente }}
-            </p>
-
-            <div class="product-actions">
-
-    {# 👁️ Ver detalle dentro de Gifter's (redirige al clon interno) #}
-    <a href="{% url 'producto_externo_detalle' producto.id_producto_externo %}"
-       class="btn-action"
-       title="Ver detalles en Gifter’s">
-        <i class="bi bi-eye"></i>
-    </a>
-
-    {# ❤️ Wishlist (usa el toggle_externo y pinta según favoritos_externos_ids) #}
-    <a href="#"
-       class="btn-action wishlist-btn
-              {% if producto.id_producto_externo in favoritos_externos_ids %}is-fav{% endif %}"
-       data-external-id="{{ producto.id_producto_externo }}"
-       aria-pressed="{% if producto.id_producto_externo in favoritos_externos_ids %}true{% else %}false{% endif %}"
-       title="{% if producto.id_producto_externo in favoritos_externos_ids %}Quitar de wishlist{% else %}Agregar a wishlist{% endif %}">
-        {% if producto.id_producto_externo in favoritos_externos_ids %}
-            <i class="bi bi-heart-fill text-danger"></i>
+    <!-- Imagen -->
+    <div class="product-image">
+        {% if producto.imagen %}
+            <img src="{{ producto.imagen.url|default:producto.imagen }}"
+                 alt="{% if producto.nombre_producto %}{{ producto.nombre_producto }}{% else %}{{ producto.nombre }}{% endif %}">
         {% else %}
-            <i class="bi bi-heart"></i>
+            <img src="{% static 'img/Gifters/favicongift.png' %}">
         {% endif %}
-    </a>
-
-    {# 🔗 Link directo a la tienda externa #}
-    <a href="{{ producto.url }}" target="_blank" rel="noopener"
-       class="btn-action"
-       title="Ver en tienda externa">
-        <i class="bi bi-link-45deg"></i>
-    </a>
-
-</div>
-        </div>
     </div>
-    {% endfor %}
-</div>
 
-    {% endif %}
+    <div class="product-info">
+
+        <!-- Nombre -->
+        <h3 class="product-title">
+            {% if producto.nombre_producto %}
+                {{ producto.nombre_producto }}
+            {% else %}
+                {{ producto.nombre }}
+            {% endif %}
+        </h3>
+
+        <!-- Marca -->
+        <p class="product-brand">
+            {% if producto.id_marca %}
+                {{ producto.id_marca.nombre_marca }}
+            {% else %}
+                {{ producto.marca }}
+            {% endif %}
+        </p>
+
+        <!-- Precio -->
+        {% if producto.precio %}
+        <p class="product-price">$ {{ producto.precio }}</p>
+        {% endif %}
+
+        <!-- Descripción o categoría -->
+        <p class="product-description">
+            {% if producto.descripcion %}
+                {{ producto.descripcion|truncatechars:100 }}
+            {% else %}
+                {{ producto.categoria|truncatechars:100 }}
+            {% endif %}
+        </p>
+
+        <!-- Acciones -->
+        <div class="product-actions">
+
+            {% if producto.id_producto %}
+                <a href="{% url 'producto_detalle' producto.id_producto %}" 
+                   class="btn-action" title="Ver detalles">
+                    <i class="bi bi-eye"></i>
+                </a>
+            {% else %}
+                <a href="{% url 'producto_externo_detalle' producto.id_producto_externo %}" 
+                   class="btn-action" title="Ver detalles">
+                    <i class="bi bi-eye"></i>
+                </a>
+            {% endif %}
+
+            {% if producto.id_producto %}
+                <a href="#"
+                   class="btn-action wishlist-btn {% if producto.id_producto in favoritos_ids %}is-fav{% endif %}"
+                   data-product-id="{{ producto.id_producto }}"
+                   aria-pressed="{% if producto.id_producto in favoritos_ids %}true{% else %}false{% endif %}">
+                    {% if producto.id_producto in favoritos_ids %}
+                        <i class="bi bi-heart-fill text-danger"></i>
+                    {% else %}
+                        <i class="bi bi-heart"></i>
+                    {% endif %}
+                </a>
+            {% else %}
+                <a href="#"
+                   class="btn-action wishlist-btn {% if producto.id_producto_externo in favoritos_externos_ids %}is-fav{% endif %}"
+                   data-external-id="{{ producto.id_producto_externo }}"
+                   aria-pressed="{% if producto.id_producto_externo in favoritos_externos_ids %}true{% else %}false{% endif %}">
+                    {% if producto.id_producto_externo in favoritos_externos_ids %}
+                        <i class="bi bi-heart-fill text-danger"></i>
+                    {% else %}
+                        <i class="bi bi-heart"></i>
+                    {% endif %}
+                </a>
+            {% endif %}
+
+            {% if producto.url %}
+            <a href="{{ producto.url }}" target="_blank" rel="noopener"
+               class="btn-action" title="Ver en tienda">
+                <i class="bi bi-link-45deg"></i>
+            </a>
+            {% endif %}
+
+        </div>
+
+    </div>
+
+</div>
+{% endfor %}
+
+
+    </div>
+
 
 
     <!-- Paginación -->
