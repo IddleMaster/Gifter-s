@@ -1,41 +1,62 @@
+
 import re
 import hashlib
 import logging
+import json
 from typing import List, Dict
 
 from django.conf import settings
 from django.core.cache import cache
 
-# Intenta importar tu helper del cliente; si no existe/rompe, seguimos con fallback.
-try:
-    from core.services.openai_client import get_openai_client  # type: ignore
-except Exception:  # pragma: no cover
-    get_openai_client = None  # type: ignore
-
+# === IA LOCAL (OLLAMA) ===
+from core.services.ollama_client import ollama_chat
 
 logger = logging.getLogger(__name__)
 
 # ==============================
 # Config
 # ==============================
+CACHE_TTL = getattr(settings, "GIFTER_AI_CACHE_TTL", 60 * 30)
+OLLAMA_MODEL = getattr(settings, "GIFTER_AI_MODEL", "llama3.2:1b")
+
 BULLET_RE = re.compile(r"^\s*[-•]\s*(.+)$")
-CACHE_TTL = getattr(settings, "GIFTER_AI_CACHE_TTL", 60 * 30)  # 30 min por defecto
-OPENAI_MODEL = getattr(settings, "GIFTER_AI_MODEL", "gpt-4o-mini")
 
 
 # ==============================
-# Utilidades
+# Helpers
 # ==============================
 def _sanitize(texto: str) -> str:
     return re.sub(r"\s+", " ", (texto or "").strip())
 
 
+def _clean_json_block(raw: str) -> str:
+    """
+    Limpia casos donde Ollama devuelve:
+    ```json
+    { ... }
+    ```
+    """
+    raw = raw.strip()
+
+    # quitar bloques tipo ```json ... ```
+    raw = re.sub(r"^```json", "", raw, flags=re.IGNORECASE).strip()
+    raw = re.sub(r"```$", "", raw).strip()
+
+    # si viene texto antes del JSON -> intentar recortar
+    first_brace = raw.find("{")
+    if first_brace > 0:
+        raw = raw[first_brace:]
+
+    # si termina después del JSON -> recortar
+    last_brace = raw.rfind("}")
+    if last_brace != -1:
+        raw = raw[:last_brace + 1]
+
+    return raw.strip()
+
+
 def _parse_bullets(texto: str) -> List[Dict[str, str]]:
-    """
-    Extrae pares {idea, explicacion} desde líneas tipo:
-    - **Idea:** Explicación
-    """
-    out: List[Dict[str, str]] = []
+    out = []
     for raw in texto.splitlines():
         m = BULLET_RE.match(raw.strip())
         if not m:
@@ -50,135 +71,102 @@ def _parse_bullets(texto: str) -> List[Dict[str, str]]:
 
 
 def _cache_key(nombre: str, datos: str) -> str:
-    """
-    Llave de caché depende del usuario + hash de datos (para invalidar cuando cambien).
-    """
-    h = hashlib.sha1(_sanitize(datos).encode("utf-8")).hexdigest()  # no sensible
+    h = hashlib.sha1(_sanitize(datos).encode("utf-8")).hexdigest()
     return f"gifter_ai:sug:{nombre}:{h}"
 
 
 # ==============================
-# Fallback local (sin usar OpenAI)
+# Fallback local
 # ==============================
 def _fallback_sugerencias(nombre: str, datos: str) -> List[Dict[str, str]]:
-    """
-    Genera 3 ideas simples usando heurísticas a partir de 'datos' (wishlist/recibidos/bio).
-    Está pensado para funcionar cuando no hay API key o la llamada falla.
-    """
     base = _sanitize(datos).lower()
-    ideas: List[Dict[str, str]] = []
+    ideas = []
 
-    def add(idea: str, explic: str):
-        if idea and len(ideas) < 3:
+    def add(idea, explic):
+        if len(ideas) < 3:
             ideas.append({"idea": idea, "explicacion": explic})
 
-    # Pistas básicas por palabras clave
-    if any(k in base for k in ("zapat", "deport", "nike", "gym", "correr", "running")):
-        add("Kit deportivo básico",
-            f"Medias técnicas o sandalias deportivas; útil para el día a día de {nombre}.")
+    if any(k in base for k in ("zapat", "deport", "nike", "gym", "running")):
+        add("Kit deportivo básico", f"Accesorios deportivos útiles para {nombre}.")
     if any(k in base for k in ("billetera", "cartera", "cuero", "tarjetas")):
-        add("Porta-tarjetas slim",
-            "Complementa su billetera con un organizador compacto y práctico.")
-    if any(k in base for k in ("gato", "mascota", "cat", "aren", "rascador")):
-        add("Accesorios para su gato",
-            "Rascador compacto o snacks premium; encaja con sus gustos.")
-    if any(k in base for k in ("café", "cafetera", "espresso", "bialetti")):
-        add("Set de café en casa",
-            "Filtros, jarra medidora o café de especialidad para potenciar su rutina.")
-    if any(k in base for k in ("gaming", "videojuego", "steam", "xbox", "play")):
-        add("Tarjeta regalo gaming",
-            "Crédito digital para que elija justo el juego/contenido que quiere.")
-    if any(k in base for k in ("fortnite", "chocolate", "nestle", "dulce", "snack")):
-        add("Box de snacks personalizados",
-            "Selección de dulces/barras que vaya con sus preferencias.")
+        add("Porta-tarjetas slim", "Compacto y elegante para uso diario.")
+    if any(k in base for k in ("gato", "mascota", "rascador", "arena")):
+        add("Accesorios para su gato", "Snacks o rascador pequeño.")
+    if any(k in base for k in ("café", "cafetera", "espresso")):
+        add("Set de café en casa", "Filtros o café de especialidad.")
+    if any(k in base for k in ("gaming", "videojuego", "steam", "play")):
+        add("Tarjeta regalo gaming", "Crédito digital para juegos.")
 
-    # Relleno por si no se detectó nada
     while len(ideas) < 3:
-        if not any("tarjeta regalo" in i["idea"].lower() for i in ideas):
-            add("Tarjeta regalo de su tienda favorita",
-                "Flexible y sin margen de error: elige exactamente lo que quiere.")
-        elif not any("experiencia" in i["idea"].lower() for i in ideas):
-            add("Experiencia corta",
-                "Cine, café o streaming por un mes; un detalle que siempre suma.")
-        else:
-            add("Detalle personalizable",
-                "Taza/llavero con su nombre o hobby; pequeño pero significativo.")
+        add("Tarjeta regalo general", "Sirve para cualquier ocasión.")
 
     return ideas[:3]
 
 
 # ==============================
-# Llamada a OpenAI (si disponible)
+# IA con OLLAMA
 # ==============================
-def _usar_openai(nombre_usuario: str, datos_para_ia: str, max_tokens: int) -> List[Dict[str, str]]:
-    """
-    Llama a OpenAI si hay API key y cliente disponible. Devuelve lista [{idea, explicacion}] (<=3).
-    Si algo falla, retorna [] y el caller hace fallback.
-    """
-    if not getattr(settings, "OPENAI_API_KEY", None):
-        logger.info("[GifterAI] OPENAI_API_KEY no configurada; se usará fallback local.")
-        return []
-
-    if get_openai_client is None:
-        logger.info("[GifterAI] get_openai_client no disponible; se usará fallback local.")
-        return []
-
-    try:
-        client = get_openai_client()
-    except Exception as e:  # pragma: no cover
-        logger.exception("[GifterAI] Error creando cliente OpenAI: %s", e)
-        return []
-
-    prompt_user = (
-        "Eres GifterAI, un asistente simpático y experto en regalos.\n"
-        f"Tu tarea es proponer 3 ideas de regalos creativas y útiles para {nombre_usuario}, "
-        f"basándote en:\n{datos_para_ia}\n"
-        "Responde SOLO con 3 líneas, cada una en el formato EXACTO:\n"
-        "- **[Idea]:** [Explicación breve]\n"
-        "Evita enumeraciones fuera de ese formato y no añadas texto extra."
+def _usar_ollama(nombre_usuario: str, datos_para_ia: str, max_tokens: int) -> List[Dict[str, str]]:
+    prompt = (
+        "Eres GifterAI, experto en regalos.\n"
+        f"Crea EXACTAMENTE 3 ideas de regalo para {nombre_usuario} basadas en:\n"
+        f"{datos_para_ia}\n\n"
+        "Responde en JSON válido:\n"
+        "{\n"
+        "  \"ideas\": [\n"
+        "    {\"idea\": \"Texto\", \"explicacion\": \"Texto\"},\n"
+        "    ... 3 ítems ...\n"
+        "  ]\n"
+        "}\n"
+        "No agregues nada antes ni después del JSON."
     )
 
     try:
-        resp = client.chat.completions.create(
-            model=OPENAI_MODEL,
+        raw = ollama_chat(
             messages=[
-                {"role": "system", "content": "Eres GifterAI, un asistente experto en regalos."},
-                {"role": "user", "content": prompt_user},
+                {"role": "system", "content": "Eres GifterAI, experto en regalos."},
+                {"role": "user", "content": prompt},
             ],
-            max_tokens=max_tokens,
-            temperature=0.7,
-            n=1,
+            model=OLLAMA_MODEL,
+            temperature=0.5,
         )
-        content = _sanitize(resp.choices[0].message.content or "")
-        ideas = _parse_bullets(content)[:3]
-        if not ideas:
-            logger.info("[GifterAI] OpenAI respondió sin bullets válidos; se usará fallback local.")
-        return ideas
+
+        if not raw:
+            return []
+
+        # 1) Intentar JSON primero
+        cleaned = _clean_json_block(raw)
+        try:
+            data = json.loads(cleaned)
+            ideas_json = data.get("ideas", [])
+
+            ideas_validas = [
+                {"idea": i.get("idea", "").strip(), "explicacion": i.get("explicacion", "").strip()}
+                for i in ideas_json
+                if i.get("idea")
+            ]
+
+            if ideas_validas:
+                return ideas_validas[:3]
+
+        except Exception:
+            pass  # no era JSON → fallback bullets
+
+        # 2) Fallback bullets
+        ideas = _parse_bullets(raw)
+        return ideas[:3]
+
     except Exception as e:
-        logger.exception("[GifterAI] Error llamando a OpenAI: %s", e)
+        logger.error("[GifterAI] Error usando OLLAMA: %s", e)
         return []
 
 
 # ==============================
-# API pública (usada por la vista)
+# API pública
 # ==============================
-def generar_sugerencias_regalo(
-    nombre_usuario: str,
-    datos_para_ia: str,
-    max_tokens: int = 180
-) -> List[Dict[str, str]]:
-    """
-    Devuelve hasta 3 ideas de regalo con su explicación.
-
-    Flujo:
-      1) Si hay caché -> retorna.
-      2) Intenta OpenAI.
-      3) Si falla, fallback local.
-      4) Guarda en caché el resultado final (para no recalcular en cada request).
-    """
+def generar_sugerencias_regalo(nombre_usuario: str, datos_para_ia: str, max_tokens: int = 180) -> List[Dict[str, str]]:
     datos = _sanitize(datos_para_ia)
     if not datos:
-        logger.info("[GifterAI] Sin datos; no se generan sugerencias.")
         return []
 
     key = _cache_key(nombre_usuario, datos)
@@ -186,16 +174,10 @@ def generar_sugerencias_regalo(
     if cached:
         return cached
 
-    # 1) Intenta OpenAI
-    ideas = _usar_openai(nombre_usuario, datos, max_tokens)
+    ideas = _usar_ollama(nombre_usuario, datos, max_tokens)
+
     if not ideas:
-        # 2) Fallback local
         ideas = _fallback_sugerencias(nombre_usuario, datos)
 
-    # 3) Cachear siempre el resultado final (sea IA o fallback)
-    try:
-        cache.set(key, ideas, CACHE_TTL)
-    except Exception:  # cache puede fallar en algunos backends
-        pass
-
+    cache.set(key, ideas, CACHE_TTL)
     return ideas

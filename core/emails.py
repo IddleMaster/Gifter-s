@@ -1,10 +1,14 @@
 from django.conf import settings
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
-from django.core.mail import EmailMultiAlternatives
-
+from django.core.mail import EmailMultiAlternatives,send_mail
+from django.contrib.auth import get_user_model
 from django.urls import reverse
+import logging
+from .models import User  
 
+
+User = get_user_model()
 
 def send_verification_email(user, request):
     verification_url = f"{settings.SITE_URL}/verify-email/{user.verification_token}/"
@@ -100,3 +104,91 @@ def send_report_email(reporter, post, motivo=None, request=None):
     except Exception:
         # No queremos que esto rompa la UX; quien llame puede capturar la excepción
         raise
+def send_temporary_password_email(user: User, temporary_password: str):
+    """
+    Envía el correo al usuario con su contraseña temporal y la instrucción de cambio.
+    """
+    subject = "Tu contraseña temporal para Gifter's"
+    
+    context = {
+        'user': user,
+        'temporary_password': temporary_password,
+        'site_url': settings.SITE_URL 
+    }
+    
+    html_message = render_to_string('emails/temporary_password_email.html', context)
+    
+    try:
+        send_mail(
+            subject=subject,
+            message=f"Tu contraseña temporal es: {temporary_password}. Debes cambiarla al iniciar sesión.",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.correo],
+            fail_silently=False,
+            html_message=html_message
+        )
+        logging.info(f"Contraseña temporal enviada a {user.correo}.")
+    except Exception as e:
+        logging.error(f"FALLO CRÍTICO al enviar temp password a {user.correo}: {e}")
+        raise e
+    
+def send_admin_reset_notification(user_to_reset: User, temporary_password: str):
+    """
+    [NUEVO] Envía la contraseña temporal al correo del administrador 
+    y notifica al usuario sobre el siguiente paso.
+    """
+    admin_email = "giftersg4@gmail.com"  # El correo de destino
+    
+    subject = f"⚠️ [ACCIÓN REQUERIDA] Restablecimiento de Contraseña para {user_to_reset.nombre_usuario}"
+    
+    context = {
+        'user': user_to_reset,
+        'temporary_password': temporary_password,
+        'admin_email': admin_email,
+        'site_url': settings.SITE_URL 
+    }
+    
+    # Este template debe ser muy claro para el admin
+    html_message = render_to_string('emails/admin_reset_notification.html', context)
+    
+    try:
+        send_mail(
+            subject=subject,
+            message=f"El usuario {user_to_reset.correo} olvidó su contraseña. Contraseña Temporal: {temporary_password}. Favor contactar al usuario para proporcionarla.",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[admin_email],
+            fail_silently=False,
+            html_message=html_message
+        )
+        logging.info(f"Notificación de contraseña temporal enviada a ADMIN para {user_to_reset.correo}.")
+    except Exception as e:
+        logging.error(f"FALLO CRÍTICO al enviar notificación de restablecimiento a ADMIN: {e}")
+        raise e # Relanzamos el error para que la vista lo capture
+    
+def send_warning_email(user: User, motivo: str, admin_user: User):
+    """
+    Envía un correo de advertencia a un usuario de parte de un admin.
+    """
+    subject = "Has recibido una advertencia de moderación - Gifter's"
+    
+    context = {
+        'user': user,
+        'motivo': motivo,
+        'admin_user': admin_user
+    }
+    
+    html_message = render_to_string('emails/warning_email.html', context)
+    
+    try:
+        send_mail(
+            subject=subject,
+            message='', # El mensaje de texto plano se ignora si se usa html_message
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.correo],
+            fail_silently=False,
+            html_message=html_message
+        )
+        logging.info(f"Admin '{admin_user.nombre_usuario}' envió advertencia a '{user.nombre_usuario}' por: {motivo}")
+    except Exception as e:
+        logging.error(f"FALLO al enviar correo de advertencia a {user.correo}: {e}")
+        raise e # Relanzamos el error para que la API pueda reportarlo

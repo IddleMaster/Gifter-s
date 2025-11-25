@@ -14,18 +14,18 @@ class Command(BaseCommand):
         images_dir = os.path.join(settings.BASE_DIR, 'core', 'static', 'img', 'Gifters')
         available_images = []
         
-        self.stdout.write(f"🔍 Buscando imágenes en: {images_dir}")
+        self.stdout.write(f" Buscando imágenes en: {images_dir}")
         
         if os.path.exists(images_dir):
             for filename in os.listdir(images_dir):
                 if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
                     available_images.append(filename)
-                    self.stdout.write(f"   ✅ Encontrada: {filename}")
+                    self.stdout.write(f"Encontrada: {filename}")
         else:
-            self.stdout.write(f"❌ No se encontró la carpeta: {images_dir}")
+            self.stdout.write(f" No se encontró la carpeta: {images_dir}")
             return []
             
-        self.stdout.write(f"📸 Total de imágenes encontradas: {len(available_images)}")
+        self.stdout.write(f" Total de imágenes encontradas: {len(available_images)}")
         return available_images
 
     def get_image_for_product(self, product_name, available_images):
@@ -80,13 +80,13 @@ class Command(BaseCommand):
         # VERIFICAR Y CREAR CARPETA MEDIA SI NO EXISTE
         media_dir = os.path.join(settings.BASE_DIR, 'media', 'productos')
         os.makedirs(media_dir, exist_ok=True)
-        self.stdout.write(f"📁 Carpeta media verificada/creada: {media_dir}")
+        self.stdout.write(f" Carpeta media verificada/creada: {media_dir}")
         
         # Obtener imágenes disponibles
         available_images = self.get_available_images()
         
         if not available_images:
-            self.stdout.write(self.style.ERROR("❌ No se encontraron imágenes disponibles"))
+            self.stdout.write(self.style.ERROR(" No se encontraron imágenes disponibles"))
             return
 
         # ENCONTRAR PRODUCTOS QUE REALMENTE NECESITAN IMAGEN
@@ -97,25 +97,25 @@ class Command(BaseCommand):
             
             if not producto.imagen:  # No tiene referencia en BD
                 necesita_imagen = True
-                self.stdout.write(f"🔍 {producto.nombre_producto}: Sin referencia en BD")
+                self.stdout.write(f" {producto.nombre_producto}: Sin referencia en BD")
             else:  # Tiene referencia, verificar si el archivo existe
                 try:
                     if not producto.imagen.storage.exists(producto.imagen.name):
                         necesita_imagen = True
-                        self.stdout.write(f"🔍 {producto.nombre_producto}: Referencia existe pero archivo NO - {producto.imagen.name}")
+                        self.stdout.write(f" {producto.nombre_producto}: Referencia existe pero archivo NO - {producto.imagen.name}")
                     else:
-                        self.stdout.write(f"✅ {producto.nombre_producto}: Tiene imagen válida")
+                        self.stdout.write(f" {producto.nombre_producto}: Tiene imagen válida")
                 except Exception as e:
                     necesita_imagen = True
-                    self.stdout.write(f"⚠️ {producto.nombre_producto}: Error verificando archivo - {e}")
+                    self.stdout.write(f" {producto.nombre_producto}: Error verificando archivo - {e}")
             
             if necesita_imagen:
                 productos_reales_sin_imagen.append(producto)
         
-        self.stdout.write(f"📦 Productos que necesitan imagen: {len(productos_reales_sin_imagen)}")
+        self.stdout.write(f"Productos que necesitan imagen: {len(productos_reales_sin_imagen)}")
         
         if len(productos_reales_sin_imagen) == 0:
-            self.stdout.write(self.style.SUCCESS("✅ Todos los productos ya tienen imagen válida"))
+            self.stdout.write(self.style.SUCCESS("Todos los productos ya tienen imagen válida"))
             return
 
         # ASIGNAR IMÁGENES A LOS PRODUCTOS QUE LAS NECESITAN
@@ -125,7 +125,7 @@ class Command(BaseCommand):
                 image_name = self.get_image_for_product(producto.nombre_producto, available_images)
                 image_path = os.path.join(settings.BASE_DIR, 'core', 'static', 'img', 'Gifters', image_name)
                 
-                self.stdout.write(f"🖼️ Asignando '{image_name}' a: {producto.nombre_producto}")
+                self.stdout.write(f"Asignando '{image_name}' a: {producto.nombre_producto}")
                 
                 if os.path.exists(image_path):
                     # Si ya tiene una referencia corrupta, limpiarla primero
@@ -141,14 +141,14 @@ class Command(BaseCommand):
                     
                     # Verificar que se creó correctamente
                     if producto.imagen and producto.imagen.storage.exists(producto.imagen.name):
-                        self.stdout.write(f"   ✅ Imagen asignada y verificada: {producto.imagen.name}")
+                        self.stdout.write(f"Imagen asignada y verificada: {producto.imagen.name}")
                     else:
-                        self.stdout.write(f"   ❌ Error: Imagen no se guardó correctamente")
+                        self.stdout.write(f"Error: Imagen no se guardó correctamente")
                 else:
-                    self.stdout.write(f"   ❌ Imagen no encontrada: {image_path}")
+                    self.stdout.write(f"Imagen no encontrada: {image_path}")
                     
             except Exception as e:
-                self.stdout.write(f"❌ Error con {producto.nombre_producto}: {e}")
+                self.stdout.write(f"Error con {producto.nombre_producto}: {e}")
 
         # VERIFICACIÓN FINAL
         productos_con_imagen_valida = 0
@@ -157,6 +157,6 @@ class Command(BaseCommand):
                 productos_con_imagen_valida += 1
         
         self.stdout.write(self.style.SUCCESS(
-            f"🎉 Proceso completado. {len(productos_reales_sin_imagen)} productos actualizados"
+            f" Proceso completado. {len(productos_reales_sin_imagen)} productos actualizados"
         ))
-        self.stdout.write(f"📊 Resumen final: {productos_con_imagen_valida}/{Producto.objects.count()} productos con imagen válida")
+        self.stdout.write(f" Resumen final: {productos_con_imagen_valida}/{Producto.objects.count()} productos con imagen válida")

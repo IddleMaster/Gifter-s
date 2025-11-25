@@ -310,15 +310,34 @@
         {% for producto in productos %}
 <div class="product-card">
 
-    <!-- Imagen -->
-    <div class="product-image">
-        {% if producto.imagen %}
-            <img src="{{ producto.imagen.url|default:producto.imagen }}"
-                 alt="{% if producto.nombre_producto %}{{ producto.nombre_producto }}{% else %}{{ producto.nombre }}{% endif %}">
+<div class="product-image">
+
+    {% if producto.imagen %}
+
+        {# Caso 1: producto.imagen es un ImageField (tiene .url) #}
+        {% if producto.imagen.url %}
+            <img src="{{ producto.imagen.url }}" alt="{{ producto.nombre_producto }}">
+
+        {# Caso 2: es una URL externa (http...) #}
+        {% elif producto.imagen|slice:":4" == "http" %}
+            <img src="{{ producto.imagen }}" alt="{{ producto.nombre_producto }}">
+
+        {# Caso 3: es un archivo guardado como string en MEDIA (productos/loquesea.jpg) #}
         {% else %}
-            <img src="{% static 'img/Gifters/favicongift.png' %}">
+            <img src="/media/{{ producto.imagen }}" alt="{{ producto.nombre_producto }}">
         {% endif %}
-    </div>
+
+    {% elif producto.urls_tienda.first and producto.urls_tienda.first.imagen %}
+        {# Caso 4: imagen de tienda externa guardada #}
+        <img src="{{ producto.urls_tienda.first.imagen }}" alt="{{ producto.nombre_producto }}">
+
+    {% else %}
+        {# Caso 5: no hay imagen → mostrar icono Gifter’s #}
+        <img src="{% static 'img/Gifters/favicongift.png' %}">
+    {% endif %}
+
+</div>
+
 
     <div class="product-info">
 
@@ -381,17 +400,18 @@
                     {% endif %}
                 </a>
             {% else %}
-                <a href="#"
-                   class="btn-action wishlist-btn {% if producto.id_producto_externo in favoritos_externos_ids %}is-fav{% endif %}"
-                   data-external-id="{{ producto.id_producto_externo }}"
-                   aria-pressed="{% if producto.id_producto_externo in favoritos_externos_ids %}true{% else %}false{% endif %}">
-                    {% if producto.id_producto_externo in favoritos_externos_ids %}
-                        <i class="bi bi-heart-fill text-danger"></i>
-                    {% else %}
-                        <i class="bi bi-heart"></i>
-                    {% endif %}
-                </a>
-            {% endif %}
+    <a href="#"
+       class="btn-action wishlist-btn wishlist-btn-externo {% if producto.id_producto_externo in favoritos_externos_ids %}is-fav{% endif %}"
+       data-external-id="{{ producto.id_producto_externo }}"
+       title="{% if producto.id_producto_externo in favoritos_externos_ids %}Quitar de wishlist{% else %}Agregar a wishlist{% endif %}">
+        {% if producto.id_producto_externo in favoritos_externos_ids %}
+            <i class="bi bi-heart-fill text-danger"></i>
+        {% else %}
+            <i class="bi bi-heart"></i>
+        {% endif %}
+    </a>
+{% endif %}
+
 
             {% if producto.url %}
             <a href="{{ producto.url }}" target="_blank" rel="noopener"
@@ -508,19 +528,21 @@
         e.preventDefault();
 
         // 🔹 Diferenciar producto interno vs externo
-        const productId = btn.getAttribute('data-product-id');        // internos
-        const externalId = btn.getAttribute('data-external-id');      // externos
+        const productId = btn.getAttribute('data-product-id');        // interno
+        const externalId = btn.getAttribute('data-external-id');      // externo
 
-        let url;
-        if (externalId) {
-    // /favoritos/externo/0/toggle/  ->  /favoritos/externo/<id>/toggle/
-    const baseExt = "{% url 'favoritos_toggle_externo' 0 %}";
-    url = baseExt.replace('/0/toggle/', `/${externalId}/toggle/`);
+let url = `{% url 'favoritos_toggle' 0 %}`;
+let formData = new FormData();
+
+if (externalId) {
+    url = url.replace('/0/', `/${externalId}/`);
+    formData.append('externo', '1');
 } else if (productId) {
-    // /favoritos/toggle/0/ -> /favoritos/toggle/<id>/
-    const baseInt = "{% url 'favoritos_toggle' 0 %}";
-    url = baseInt.replace('/0/', `/${productId}/`);
+    url = url.replace('/0/', `/${productId}/`);
+    formData.append('externo', '0');
 }
+
+
 
 
         const icon = btn.querySelector('i');
@@ -537,12 +559,14 @@
 
         try {
             const resp = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': csrftoken,
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            });
+    method: 'POST',
+    headers: {
+        'X-CSRFToken': csrftoken,
+        'X-Requested-With': 'XMLHttpRequest'
+    },
+    body: formData
+});
+
 
             // Si no está logueado → redirige a login
             if (resp.redirected || resp.url.includes('{% url "login" %}')) {

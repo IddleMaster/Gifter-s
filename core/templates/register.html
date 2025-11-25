@@ -6,17 +6,19 @@
 {% block body_class %}register-page{% endblock %}
 
 {% block content %}
+<!-- reCAPTCHA v2 -->
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
 
 <section id="register-details" class="register-details section">
   <div class="container" data-aos="fade-up" data-aos-delay="100">
 
     {# Mensajes flash (éxito / error) #}
     {% if messages %}
-      <div class="mb-3">
-        {% for message in messages %}
-          <div class="alert alert-{{ message.tags }}">{{ message }}</div>
-        {% endfor %}
-      </div>
+    <div class="mb-3">
+      {% for message in messages %}
+      <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+      {% endfor %}
+    </div>
     {% endif %}
 
     <div class="register-header">
@@ -31,9 +33,9 @@
 
       {# Errores no asociados a un campo (p.ej. contraseñas no coinciden) #}
       {% if form.non_field_errors %}
-        <div class="alert alert-danger">
-          {% for err in form.non_field_errors %}{{ err }}{% endfor %}
-        </div>
+      <div class="alert alert-danger">
+        {% for err in form.non_field_errors %}{{ err }}{% endfor %}
+      </div>
       {% endif %}
 
       <div class="form-group">
@@ -79,6 +81,11 @@
           Acepto los <a href="#" style="color:#6c63ff;">términos y condiciones</a>
         </label>
         {{ form.terms.errors }}
+      </div>
+
+      <!-- Widget reCAPTCHA v2 -->
+      <div class="form-group mb-3">
+        <div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div>
       </div>
 
       <button type="submit" class="btn btn-register">Crear Cuenta</button>

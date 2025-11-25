@@ -55,8 +55,7 @@ class Command(BaseCommand):
                 'nombre': 'Aficiones y Estilo de Vida',
                 'descripcion': 'Todo lo que tenga que ver con Aficiones y Estilo de Vida'
             },
-            
-            # Agrega más según necesites
+             
         }
 
         for cat_id, cat_data in categorias_reales.items():
@@ -74,11 +73,11 @@ class Command(BaseCommand):
                     categoria.nombre_categoria = cat_data['nombre']
                     categoria.descripcion = cat_data['descripcion']
                     categoria.save()
-                    self.stdout.write(f"✅ Actualizada: {cat_data['nombre']}")
+                    self.stdout.write(f" Actualizada: {cat_data['nombre']}")
                 else:
-                    self.stdout.write(f"✅ Creada: {cat_data['nombre']}")
+                    self.stdout.write(f" Creada: {cat_data['nombre']}")
                     
             except Exception as e:
-                self.stdout.write(self.style.ERROR(f"❌ Error con categoría {cat_id}: {e}"))
+                self.stdout.write(self.style.ERROR(f" Error con categoría {cat_id}: {e}"))
 
-        self.stdout.write(self.style.SUCCESS("🎉 Categorías actualizadas correctamente"))
+        self.stdout.write(self.style.SUCCESS(" Categorías actualizadas correctamente"))

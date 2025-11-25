@@ -8,17 +8,17 @@
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/perfil.css' %}">
 <style>
-  /* Grid layout responsivo para wishlist y recibidos */
+ /* Grid layout responsivo para wishlist y recibidos */
   .gift-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 260px));
-    justify-content: flex-start;
+    /* CAMBIO: 1fr permite que las tarjetas crezcan. justify-content: center centra si hay pocas. */
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    justify-content: center; 
     gap: clamp(10px, 2vw, 20px);
     padding: 0;
     margin: 0;
     list-style: none;
     align-items: stretch;
-    /* NUEVO: que todos los items se estiren */
   }
 
 
@@ -70,14 +70,18 @@
 
   /* Imágenes responsivas */
   /* Imágenes con alto fijo para que no crezcan a todo el alto del contenedor */
+  /* Imágenes responsivas mejoradas */
   .gift-card img,
   .recibido-item img {
     display: block;
     width: 100%;
     height: 220px;
-    /* puedes subirlo a 240–250 si quieres un poco más alta */
-    object-fit: cover;
+    /* CAMBIO: contain para ver el producto entero + fondo blanco + padding */
+    object-fit: contain; 
+    background-color: #fff; 
+    padding: 12px;
     border-radius: 12px 12px 0 0;
+    border-bottom: 1px solid #f0f0f0; /* Sutil separación con la info */
   }
 
 
@@ -316,13 +320,15 @@
 
   @media (max-width: 640px) {
     .gift-grid {
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      /* CAMBIO: auto-fit para que la tarjeta ocupe el ancho disponible */
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      justify-content: center;
       gap: 12px;
     }
 
     .gift-card img,
     .recibido-item img {
-      height: 140px;
+      height: 160px; /* Un poco más alto para que se vea bien el producto */
     }
 
     .gift-info {
@@ -353,21 +359,43 @@
   }
 
   @media (max-width: 480px) {
+    /* CORRECCIÓN DE PESTAÑAS (TABS) */
     .profile-nav ul {
-      flex-wrap: nowrap;
-      overflow-x: auto;
-      padding-bottom: 8px;
-      -webkit-overflow-scrolling: touch;
+      /* CAMBIO: wrap para que bajen a otra línea en vez de cortarse */
+      flex-wrap: wrap; 
+      justify-content: center;
+      overflow-x: visible;
+      padding-bottom: 0;
+      gap: 6px; /* Espacio entre botones */
+    }
+
+    .profile-nav li {
+      flex: 1 1 auto; /* Permite que los botones se ajusten */
+      text-align: center;
     }
 
     .profile-nav a {
       padding: 8px 12px;
       white-space: nowrap;
+      display: block;
+      font-size: 0.85rem;
+      border-radius: 20px;
+      background-color: #f8f9fa; /* Fondo claro */
+      color: #333 !important;    /* <--- NUEVO: Fuerza la letra oscura (gris oscuro) */
+      text-decoration: none;
+    }
+    
+    .profile-nav a.active {
+      background-color: #0d6efd;
+      color: white !important;   /* Mantiene letra blanca solo si está activo */
+      font-weight: 600;
     }
 
     .gift-grid {
       grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     }
+
+    
 
     .gift-card,
     .recibido-item {
@@ -833,45 +861,80 @@
     </p>
     <br><br>
     <div id="wishlist-container" class="gift-grid">
-      {% if wishlist_items %}
-      {% for it in wishlist_items %}
-      {% with p=it.id_producto url_tienda=p.urls_tienda_activas.first %}
-      <div class="gift-card" id="wl-item-{{ it.id_item }}" data-product-id="{{ p.id_producto }}" data-is-fav="1"
-        data-shop-url="{% if url_tienda %}{{ url_tienda.url }}{% endif %}">
-        <a href="{% url 'producto_detalle' p.id_producto %}" class="gift-link"
-          style="text-decoration:none;color:inherit;">
-          <img
-            src="{% if p.imagen and p.imagen.url %}{{ p.imagen.url }}{% else %}{% static 'img/Gifters/favicongift.png' %}{% endif %}"
-            alt="{{ p.nombre_producto }}">
+
+  {% if wishlist_total %}
+    {% for item in wishlist_total %}
+
+      {% with p=item.id_producto url_tienda=p.urls_tienda_activas.first %}
+      <div class="gift-card"
+           id="wl-item-{{ item.id_item }}"
+           data-product-id="{{ p.id_producto }}"
+           data-is-fav="1"
+           data-item-id="{{ item.id_item }}"
+           data-shop-url="{% if url_tienda %}{{ url_tienda.url }}{% endif %}">
+
+        <a href="{% url 'producto_detalle' p.id_producto %}" class="gift-link">
+          <img 
+    src="
+      {% if p.imagen %}
+          {% if p.imagen.url %}
+              {{ p.imagen.url }}
+          {% elif p.imagen|slice:':4' == 'http' %}
+              {{ p.imagen }}
+          {% else %}
+              /media/{{ p.imagen }}
+          {% endif %}
+      {% else %}
+          {% static 'img/Gifters/favicongift.png' %}
+      {% endif %}
+    "
+    alt="{{ p.nombre_producto }}"
+>
+
+
           <div class="gift-info">
-            <h4 class="gift-title">{{ p.nombre_producto }}</h4>
+            <h4>{{ p.nombre_producto }}</h4>
             <p>{{ p.id_marca.nombre_marca }}</p>
           </div>
         </a>
 
         <div class="gift-actions">
-          <a href="#" class="wishlist-btn {% if p.id_producto in favoritos_ids %}is-fav{% endif %}"
-            data-product-id="{{ p.id_producto }}" title="Quitar de wishlist" aria-pressed="true">
-            <i
-              class="bi {% if p.id_producto in favoritos_ids %}bi-heart-fill text-danger{% else %}bi-heart{% endif %}"></i>
+
+          <!-- ♥ Toggle favorito -->
+          <a href="#"
+             class="wishlist-btn is-fav"
+             data-product-id="{{ p.id_producto }}"
+             title="Quitar de wishlist">
+            <i class="bi bi-heart-fill text-danger"></i>
           </a>
 
-          <a href="#" class="mark-received" data-item-id="{{ it.id_item }}"
-            data-url="{% url 'wishlist_marcar_recibido' it.id_item %}" title="Marcar como recibido">
+          <!-- ✔ Marcar como recibido -->
+          <a href="#"
+             class="mark-received"
+             data-item-id="{{ item.id_item }}"
+             data-url="{% url 'wishlist_marcar_recibido' item.id_item %}"
+             title="Marcar como recibido">
             <i class="bi bi-bag-check-fill text-success"></i>
           </a>
 
+          <!-- 🔗 Ver tienda -->
           {% if url_tienda %}
           <a href="{{ url_tienda.url }}" target="_blank" rel="noopener" title="Ver en tienda">
             <i class="bi bi-link-45deg"></i>
           </a>
           {% endif %}
+
         </div>
+
       </div>
       {% endwith %}
-      {% endfor %}
-      {% endif %}
-    </div>
+
+    {% endfor %}
+  {% endif %}
+
+</div>
+
+
   </section>
   <section id="Intereses" class="tab-content active">
     <h3>Tus intereses</h3>
@@ -1771,66 +1834,83 @@
     const csrftoken = getCookie('csrftoken');
 
     document.addEventListener('click', async function (e) {
-      const btn = e.target.closest('.wishlist-btn');
-      if (!btn) return;
+  const btn = e.target.closest('.wishlist-btn');
+  if (!btn) return;
 
-      e.preventDefault();
-      const id = btn.getAttribute('data-product-id');
-      const icon = btn.querySelector('i');
-      const wasFav = btn.classList.contains('is-fav');
-      const prevTitle = btn.title;
+  e.preventDefault();
 
-      // animación corta
-      if (icon) icon.classList.add('heart-pop');
-      btn.classList.add('pop-bg');
-      setTimeout(() => { icon && icon.classList.remove('heart-pop'); btn.classList.remove('pop-bg'); }, 420);
+  const internalId = btn.getAttribute('data-product-id');     // interno
+  const externalId = btn.getAttribute('data-external-id');    // externo
 
-      try {
-        const url = `{% url 'favoritos_toggle' 0 %}`.replace('/0/', `/${id}/`);
-        const resp = await fetch(url, {
-          method: 'POST',
-          headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }
-        });
+  const icon = btn.querySelector('i');
+  const wasFav = btn.classList.contains('is-fav');
+  const prevTitle = btn.title;
 
-        if (resp.redirected || resp.url.includes('{% url "login" %}')) {
-          window.location.href = "{% url 'login' %}?next={{ request.get_full_path|urlencode }}";
-          return;
-        }
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  // animación corazón
+  if (icon) icon.classList.add('heart-pop');
+  btn.classList.add('pop-bg');
+  setTimeout(() => {
+    icon && icon.classList.remove('heart-pop');
+    btn.classList.remove('pop-bg');
+  }, 400);
 
-        const data = await resp.json();
-        const isFav = data.state === 'added';
+  // --- Construir URL correcta ---
+  let url = `{% url 'favoritos_toggle' 0 %}`;
+  url = url.replace('/0/', `/${externalId || internalId}/`);
 
-        // 1) Actualiza icono/estado del botón
-        btn.classList.toggle('is-fav', isFav);
-        btn.setAttribute('aria-pressed', isFav ? 'true' : 'false');
-        btn.title = isFav ? 'Quitar de wishlist' : 'Agregar a wishlist';
-        if (icon) icon.className = isFav ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
+  // --- Crear formData ---
+  const formData = new FormData();
+  formData.append('externo', externalId ? '1' : '0');
 
-        // 2) Si fue REMOVED y estamos en el grid de wishlist del perfil → quitar tarjeta
-        const wlGrid = document.getElementById('wishlist-container');
-        const card = btn.closest('.gift-card, .product-card');
-        if (!isFav && wlGrid && card && wlGrid.contains(card)) {
-          card.classList.add('card-fade-out');      // tienes la animación en tu CSS
-          setTimeout(() => {
-            card.remove();
-            updateEmptyStates();                     // ya definida arriba
-          }, 280);
-        }
-
-        // 3) Toast
-        Toast.fire({ icon: isFav ? 'success' : 'info', title: isFav ? 'Agregado a tu wishlist' : 'Quitado de tu wishlist' });
-
-      } catch (err) {
-        console.error(err);
-        // revertir UI si falla
-        btn.classList.toggle('is-fav', wasFav);
-        btn.setAttribute('aria-pressed', wasFav ? 'true' : 'false');
-        btn.title = prevTitle;
-        if (icon) icon.className = wasFav ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
-        Toast.fire({ icon: 'error', title: 'Ups, no pudimos actualizar' });
-      }
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrftoken,
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: formData
     });
+
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+
+    const isFav = data.state === 'added';
+
+    // actualizar iconos
+    btn.classList.toggle('is-fav', isFav);
+    btn.setAttribute('aria-pressed', isFav ? 'true' : 'false');
+    btn.title = isFav ? 'Quitar de wishlist' : 'Agregar a wishlist';
+    if (icon) icon.className = isFav ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
+
+    // si estamos en wishlist y se quitó → eliminar card
+    const wlGrid = document.getElementById('wishlist-container');
+    const card = btn.closest('.gift-card');
+    if (!isFav && wlGrid && card) {
+      card.classList.add('card-fade-out');
+      setTimeout(() => {
+        card.remove();
+        updateEmptyStates();
+      }, 280);
+    }
+
+    Toast.fire({
+      icon: isFav ? 'success' : 'info',
+      title: isFav ? 'Agregado a tu wishlist' : 'Quitado de tu wishlist'
+    });
+
+  } catch (err) {
+    console.error(err);
+    // revertir
+    btn.classList.toggle('is-fav', wasFav);
+    btn.title = prevTitle;
+    if (icon)
+      icon.className = wasFav ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
+
+    Toast.fire({ icon: 'error', title: 'Error al actualizar' });
+  }
+});
+
 
     /* ===== Marcar como recibido ===== */
     document.body.addEventListener("click", async function (e) {

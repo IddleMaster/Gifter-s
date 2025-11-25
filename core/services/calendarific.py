@@ -45,7 +45,7 @@ OCASIONES_PRIORITARIAS = {
 
 
 # ===============================================================
-# 1️⃣ Calendarific (principal)
+#  Calendarific (principal)
 # ===============================================================
 def _fetch_calendarific(year: int, country: str):
     try:
@@ -105,7 +105,7 @@ def _normalize_calendarific(raw, country: str):
 
 
 # ===============================================================
-# 2️⃣ API OFICIAL DE CHILE (fallback)
+#  API OFICIAL DE CHILE (fallback)
 # ===============================================================
 def _fetch_chile_api():
     try:

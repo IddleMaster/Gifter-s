@@ -6,6 +6,12 @@ from django.db.models import Q
 from django.template.loader import render_to_string 
 # Importa tu modelo de usuario
 from core.models import User
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
+import logging
+import re
+
+logger = logging.getLogger(__name__)
 
 
 def ensure_unique_username(base: str, max_len: int = 50) -> str:
@@ -60,6 +66,75 @@ class CustomAccountAdapter(DefaultAccountAdapter):
     def generate_unique_username(self, txts, regex=None):
         base = "-".join([t for t in txts if t]) or "user"
         return ensure_unique_username(base)
+    
+    def set_password(self, user, password):
+        """
+        Sobrescribe el método de allauth para validar la contraseña
+        con los validadores de Django antes de asignarla.
+        """
+        # Lanza ValidationError si no cumple los validadores
+        try:
+            validate_password(password, user=user)
+        except ValidationError as e:
+            # Registrar el fallo sin incluir la contraseña en texto claro
+            logger.warning("Password validation failed for user id=%s: %s", getattr(user, 'pk', 'unknown'), e.messages)
+            # Re-emitir para que el flujo que llamó al adaptador pueda manejarlo
+            raise
+        user.set_password(password)
+        user.save()
+
+    def clean_password(self, password, user=None):
+        """
+        Extiende la validación de contraseña de allauth/Django con las
+        mismas reglas que usamos en el formulario de registro: mínimo 8
+        caracteres, al menos una mayúscula, una minúscula y un número.
+        """
+        # Primero aplicar validadores estándar de Django (longitud, comunes, etc.)
+        try:
+            # DefaultAccountAdapter.clean_password llama a validate_password
+            super_clean = getattr(super(), 'clean_password', None)
+            if callable(super_clean):
+                password = super_clean(password, user=user)
+            else:
+                validate_password(password, user=user)
+        except ValidationError as e:
+            # Traducir mensajes de los validadores de Django al español
+            translated = []
+            for err in getattr(e, 'error_list', []) or []:
+                code = getattr(err, 'code', None)
+                params = getattr(err, 'params', {}) or {}
+                if code == 'password_too_short':
+                    min_len = params.get('min_length') or params.get('limit_value') or 8
+                    translated.append(f"La contraseña es demasiado corta. Debe tener al menos {min_len} caracteres.")
+                elif code == 'password_too_common':
+                    translated.append("La contraseña es demasiado común. Elige otra más segura.")
+                elif code == 'password_entirely_numeric':
+                    translated.append("La contraseña no puede estar formada solo por números.")
+                elif code == 'password_too_similar':
+                    translated.append("La contraseña es demasiado similar a tus datos personales.")
+                else:
+                    # Si no conocemos el código, usamos el mensaje original pero en español genérico
+                    translated.append(str(err))
+
+            if not translated:
+                # Fallback simple
+                translated = e.messages
+
+            raise ValidationError(translated)
+
+        # Validaciones adicionales (coincidentes con core/forms.RegisterForm)
+        if not password:
+            raise ValidationError("La contraseña es obligatoria")
+        if len(password) < 8:
+            raise ValidationError("La contraseña debe tener al menos 8 caracteres")
+        if not re.search(r"[A-Z]", password):
+            raise ValidationError("La contraseña debe contener al menos una letra mayúscula")
+        if not re.search(r"[a-z]", password):
+            raise ValidationError("La contraseña debe contener al menos una letra minúscula")
+        if not re.search(r"[0-9]", password):
+            raise ValidationError("La contraseña debe contener al menos un número")
+
+        return password
     
 
 

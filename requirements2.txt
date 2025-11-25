@@ -24,7 +24,6 @@ daphne
 meilisearch==0.31.5
 django-environ
 djangorestframework-simplejwt
-openai>=1.46.0
 pyinstaller
 pandas
 openpyxl
@@ -33,3 +32,5 @@ pycairo
 gunicorn
 requests
 matplotlib
+playwright
+quickchart.io

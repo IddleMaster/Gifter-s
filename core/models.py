@@ -9,8 +9,6 @@ from datetime import timedelta, date
 from django.utils.crypto import get_random_string
 
 
-
-
 def get_default_category():
     """
     Obtiene o crea la categoría por defecto 'Sin Categoría'.
@@ -132,6 +130,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_verified = models.BooleanField(default=False)
 
     is_private = models.BooleanField(default=False, verbose_name="Perfil Privado")
+    must_change_password = models.BooleanField(default=False, verbose_name="Debe Cambiar Contraseña")
 
     # --- 👇 CAMPOS NUEVOS PARA INTERESES 👇 ---
     intereses_categorias = models.ManyToManyField(
@@ -600,9 +599,8 @@ class Post(models.Model):
         
 
 class ItemEnWishlist(models.Model):
-    # PK
     id_item = models.AutoField(primary_key=True, verbose_name='ID Item')
-    
+
     # FK a Wishlist
     id_wishlist = models.ForeignKey(
         'Wishlist',
@@ -611,107 +609,111 @@ class ItemEnWishlist(models.Model):
         verbose_name='Wishlist',
         related_name='items'
     )
-    
-    # FK a Producto
+
+    # 🔹 Producto interno (puede ser NULL si es un externo)
     id_producto = models.ForeignKey(
         'Producto',
         on_delete=models.CASCADE,
+        null=True, blank=True,
         db_column='id_producto',
-        verbose_name='Producto',
+        verbose_name='Producto interno',
         related_name='en_wishlists'
     )
-    
+
+    # 🔹 Producto externo (nuevo)
+    producto_externo = models.ForeignKey(
+        'ProductoExterno',
+        on_delete=models.CASCADE,
+        null=True, blank=True,
+        db_column='id_producto_externo',
+        verbose_name='Producto externo',
+        related_name='en_wishlists_externos'
+    )
+
     # Cantidad deseada
     cantidad = models.PositiveIntegerField(
         default=1,
         verbose_name='Cantidad deseada',
         validators=[MinValueValidator(1)]
     )
-    
-    # Prioridad - usando TextChoices
+
+    # Prioridad
     class Prioridad(models.TextChoices):
         ALTA = 'alta', 'Alta'
         MEDIA = 'media', 'Media'
         BAJA = 'baja', 'Baja'
-    
+
     prioridad = models.CharField(
         max_length=10,
         choices=Prioridad.choices,
         default=Prioridad.MEDIA,
         verbose_name='Prioridad'
     )
-    
+
     # Notas del usuario
-    notas = models.TextField(
-        blank=True,
-        null=True,
-        verbose_name='Notas del usuario'
-    )
-    
+    notas = models.TextField(blank=True, null=True)
+
     # Fechas
-    fecha_agregado = models.DateTimeField(
-        auto_now_add=True,
-        verbose_name='Fecha de agregado'
-    )
-    
-    fecha_comprado = models.DateTimeField(
-        blank=True,
-        null=True,
-        verbose_name='Fecha de comprado'
-    )
-    
+    fecha_agregado = models.DateTimeField(auto_now_add=True)
+    fecha_comprado = models.DateTimeField(blank=True, null=True)
+
     class Meta:
         db_table = 'item_en_wishlist'
         verbose_name = 'Item en Wishlist'
         verbose_name_plural = 'Items en Wishlist'
         ordering = ['-fecha_agregado']
-        # Evitar duplicados del mismo producto en la misma wishlist
+
+        # Evitar duplicados en la base de datos: una wishlist sólo puede tener
+        # un registro por (wishlist, producto interno) y por (wishlist, producto externo).
+        # Usamos UniqueConstraint sin condition para máxima compatibilidad entre DBs.
         constraints = [
             models.UniqueConstraint(
-                fields=['id_wishlist', 'id_producto'], 
-                name='uniq_producto_por_wishlist'
-            )
+                fields=['id_wishlist', 'id_producto'],
+                name='uniq_producto_interno_por_wishlist'
+            ),
+            models.UniqueConstraint(
+                fields=['id_wishlist', 'producto_externo'],
+                name='uniq_producto_externo_por_wishlist'
+            ),
         ]
-        indexes = [
-            models.Index(fields=['id_wishlist'], name='idx_item_wishlist'),
-            models.Index(fields=['id_producto'], name='idx_item_producto'),
-            models.Index(fields=['prioridad'], name='idx_item_prioridad'),
-            models.Index(fields=['fecha_agregado'], name='idx_item_fecha_agregado'),
-        ]
-    
+
     def __str__(self):
-        return f"Item {self.id_item} - {self.id_producto.nombre_producto} en {self.id_wishlist.nombre_wishlist}"
-    
+        if self.id_producto:
+            return f"Item {self.id_item} - {self.id_producto.nombre_producto}"
+        else:
+            return f"Item {self.id_item} - {self.producto_externo.nombre}"
+
     @property
     def fue_comprado(self):
-        """Propiedad para verificar si el item fue comprado"""
         return self.fecha_comprado is not None
-    
+
     def marcar_como_comprado(self):
-        """Método para marcar el item como comprado"""
         if not self.fecha_comprado:
             self.fecha_comprado = timezone.now()
             self.save()
-    
+
     def desmarcar_como_comprado(self):
-        """Método para desmarcar el item como comprado"""
         if self.fecha_comprado:
             self.fecha_comprado = None
             self.save()
-    
+
     def clean(self):
-        """Validaciones personalizadas"""
-        # La cantidad debe ser al menos 1
         if self.cantidad < 1:
             raise ValidationError("La cantidad debe ser al menos 1")
-        
-        # No permitir fecha_comprado anterior a fecha_agregado
+
+        # 🔥 Validación: DEBE tener interno O externo, no ambos
+        if not self.id_producto and not self.producto_externo:
+            raise ValidationError("Debe seleccionar un producto interno o externo")
+        if self.id_producto and self.producto_externo:
+            raise ValidationError("Un item no puede tener producto interno y externo a la vez")
+
         if self.fecha_comprado and self.fecha_comprado < self.fecha_agregado:
             raise ValidationError("La fecha de comprado no puede ser anterior a la fecha de agregado")
-    
+
     def save(self, *args, **kwargs):
         self.clean()
         super().save(*args, **kwargs)
+
 
 class RegistroActividad(models.Model):
     id_actividad = models.AutoField(
@@ -1040,7 +1042,7 @@ class Producto(models.Model):
     id_producto = models.AutoField(primary_key=True)
     nombre_producto = models.CharField(max_length=255)
     descripcion = models.CharField(max_length=255)
-    imagen = models.ImageField(upload_to="productos/", blank=True, null=True)
+    imagen = models.URLField(max_length=5000, null=True, blank=True)
     
     id_categoria = models.ForeignKey(
         Categoria, 
@@ -1124,7 +1126,7 @@ class UrlTienda(models.Model):
         on_delete=models.CASCADE, 
         related_name='urls_tienda'
     )
-    url = models.URLField(max_length=500, verbose_name='URL de la tienda')
+    url = models.URLField(max_length=5000)
     nombre_tienda = models.CharField(max_length=100, verbose_name='Nombre de la tienda')
     es_principal = models.BooleanField(default=False, verbose_name='¿URL principal?')
     activo = models.BooleanField(default=True, verbose_name='¿Activa?')
@@ -1976,6 +1978,8 @@ class ConversationEvent(models.Model):
     tipo = models.CharField(max_length=40, choices=TIPO_CHOICES)
     creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='eventos_creados')
     titulo = models.CharField(max_length=120, blank=True, default='')
+    # ✅ NUEVO CAMPO AQUÍ:
+    fecha_intercambio = models.DateField(null=True, blank=True, verbose_name="Fecha del intercambio")
     presupuesto_fijo = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     estado = models.CharField(max_length=20, default='borrador')  # borrador | sorteado | cerrado
     creado_en = models.DateTimeField(auto_now_add=True)
@@ -2042,12 +2046,12 @@ class ProductoExterno(models.Model):
     precio = models.PositiveIntegerField(null=True, blank=True)
     marca = models.CharField(max_length=100, blank=True, null=True)
     categoria = models.CharField(max_length=100, blank=True, null=True)
-    url = models.URLField(max_length=1000)
-    imagen = models.URLField(max_length=1000, blank=True, null=True)
+    url = models.URLField(max_length=4000)
+    imagen = models.URLField(max_length=4000, blank=True, null=True) 
     fuente = models.CharField(max_length=50, default="Falabella")
     fecha_extraccion = models.DateTimeField(auto_now_add=True)
 
-    # 🔹 Producto interno asociado (opcional)
+    # Producto interno asociado
     producto_interno = models.ForeignKey(
         'Producto',
         on_delete=models.SET_NULL,
@@ -2069,10 +2073,9 @@ class ProductoExterno(models.Model):
     def __str__(self):
         return f"{self.nombre} ({self.fuente})"
 
-    # ✅ MÉTODO FINAL CORREGIDO — NO DUPLICA, NO COPIA IMÁGENES
     def ensure_producto_interno(self):
 
-        # Si ya existe y está activo → devolverlo
+        # Si YA existe un interno asociado y está activo → devolverlo
         if self.producto_interno and self.producto_interno.activo:
             return self.producto_interno
 
@@ -2094,7 +2097,7 @@ class ProductoExterno(models.Model):
         else:
             marca_obj, _ = Marca.objects.get_or_create(nombre_marca='Genérico')
 
-        # --- Crear producto interno (SIN IMAGEN) ---
+        # --- Crear producto interno base ---
         p = Producto.objects.create(
             nombre_producto=self.nombre[:255],
             descripcion=f"[{self.fuente}] {self.nombre}",
@@ -2102,22 +2105,30 @@ class ProductoExterno(models.Model):
             id_marca=marca_obj,
             precio=self.precio,
             activo=True,
+            url=self.url,
         )
+
+        # --- Copiar la imagen externa si existe ---
+        if self.imagen:
+            # Guardar la URL externa directamente (válido en ImageField si usas media remota)
+            p.imagen = self.imagen
+            p.save(update_fields=['imagen'])
 
         # --- Crear URL principal ---
         UrlTienda.objects.create(
             producto=p,
             url=self.url,
-            nombre_tienda=self.fuente or "Tienda externa",
+            nombre_tienda=self.fuente,
             es_principal=True,
             activo=True,
         )
 
-        # Asociar
+        # Asociar externo → interno
         self.producto_interno = p
         self.save(update_fields=['producto_interno'])
 
         return p
+
 
 class ProductoExternoFavorito(models.Model):
     user = models.ForeignKey(

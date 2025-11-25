@@ -81,7 +81,7 @@
     btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Generando...';
     hint.textContent = 'Puede tardar unos segundos la primera vez.';
 
-    // 🕒 Nuevo: cancelamos si tarda más de 40 segundos
+    // cancelamos si tarda más de 40 segundos
     const controller = new AbortController();
     const t = setTimeout(() => controller.abort(), 1000 * 40);
 

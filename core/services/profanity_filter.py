@@ -1,152 +1,98 @@
-# core/services/profanity_filter.py
-from django.conf import settings
-from openai import OpenAI, AuthenticationError, APIError
 import re
+import logging
 
-# === Config OpenAI ===
-api_key = getattr(settings, "OPENAI_API_KEY", "") or ""
-client = OpenAI(api_key=api_key, timeout=5) if api_key else None
+logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = (
-    "Eres un filtro de malas palabras para una red social en español e inglés. "
-    "Tu trabajo es devolver el MISMO texto que recibes, pero con las "
-    "malas palabras, garabatos e insultos fuertes censurados.\n\n"
-    "Reglas:\n"
-    "- Mantén el texto igual (mismos espacios, emojis y signos).\n"
-    "- Cuando detectes una mala palabra, reemplaza sus letras centrales "
-    "por asteriscos, dejando la primera y la última.\n"
-    "  Ejemplos:\n"
-    '  \"weon\" -> \"w**n\"\n'
-    '  \"qlo\" -> \"q*o\"\n'
-    '  \"culiao\" -> \"c****o\"\n'
-    '  \"fuck\" -> \"f*ck\"\n'
-    "- No agregues comentarios, explicaciones ni texto extra. "
-    "Solo devuelve el texto censurado."
-)
-
-# === Fallback local (blindado) ===
+# ============================================================
+# 1. LISTA BASE DE INSULTOS (forma simple, sin símbolos leet)
+# ============================================================
 BAD_WORDS = [
-    # --- Español ---
-    "weon","weón","weona","weonas","wn","qlo","qliao","qlia","culiao","culiá","ql","qla","klo","kliao",
-    "conchetumadre","conchetumare","conchatumadre","conchatumare","ctm","ctmr","ctmre","csm","csmr","csmre",
-    "mierda","mierd@","mierd#","mierd0","mrd","maricón","maricon","marikon","marika","marikón",
-    "perra","perro","zorra","puta","puto","putos","putas","putazo","putaza","putita",
-    "huevon","huevón","huevona","gueon","gueona","wea","weás","wna","weno",
-    "ctmrd","ctmrq","ctmq","csmq","pico","pene","verga","vergazo","vergaso","coño","coñazo",
-    "chingar","chingado","chingada","chingón","chingona","pinche","pinches",
-    "hijo de puta","hija de puta","hdp",
-    "carepoto","careverga","caremonda","careculo","carechimba",
-    "cabrón","cabron","pelotudo","boludo",
-    "imbecil","imbécil","idiota","estupido","estúpido","estupida","estúpida",
-    "retrasado","subnormal","mongólico","mongolico","maraco","maraka","mariquita",
-    "tarado","tarada","pajero","pajera",
-    "hijo de perra","perra ctm","zorra culiá","zorra ql","wea ql","mierda ql",
-    "puta madre","negro ql","negra ql","mariconazo","malparido","maldito",
-    "sapoperro","qlon","aweonao", 
-
-    # --- Inglés ---
-    "fuck","fucks","fucking","fucker","motherfucker","motherfuckers",
-    "shit","shits","shitty","bullshit","bastard","bitch","bitches",
-    "asshole","ass","dick","dicks","dickhead","cock","cocksucker",
-    "pussy","pussies","slut","whore","cum","cumshot","jerkoff","jerking",
-    "nigger","nigga","retard","retarded","dumbass","jackass","loser",
-    "niggers","niggas",
+    "weon","weón","weona","weonas","wn","qlo","qliao","qlia","culiao","culiá",
+    "conchetumadre","conchetumare","conchatumadre","conchatumare",
+    "ctm","ctmr","ctmre","csm","csmr","mierda","mrd",
+    "maricón","maricon","marikon","marika","hijo del ñato","tula",
+    "perra","perro","zorra","puta","puto","putos","putas",
+    "huevon","huevón","huevona","gueon","gueona","wea","aweonao","awueonao",
+    "pico","pene","verga","coño",
+    "chingar","chingado","chingada","chingón","pinche",
+    "hdp","hijo de puta","hija de puta",
+    "pelotudo","boludo","imbecil","idiota","estupido","estúpido",
+    "retrasado","subnormal","mongolico","maraco","mariquita",
+    "pajero","pajera",
+    "negro ql","negra ql","zorra culiá","zorra ql",
+    "puta madre","malparido","qlon",
+    "fuck","fucking","motherfucker",
+    "shit","bullshit","bitch","asshole","dick","cock","pussy","whore","slut",
+    "nigger","nigga",
     "fml","wtf","stfu","gtfo",
-    "fck","fcking","fcker","fckr","f@ck",
-    "b!tch","b1tch","sh!t","a$$","a$$hole","d!ck","d1ck",
-    "suckmydick","eatshit",
-
-    # --- Portugués ---
-    "merda","porra","caralho","putinha","vadia",
-    "vagabunda","vagabundo","otário","otario","burro","arrombado",
-    "foda","fodase","fuder","fdp","filhodaputa","filho da puta",
-    "corno","cornudo","viado","viadinho","bosta",
-    "cuzão","cuzona","desgraçado","pqp","pau","pau no cu","pauzudo",
-
-    # --- Francés ---
-    "merde","putain","salope","connard","con","batard","nique","nique ta mere",
-    "ta gueule","fils de pute","enfoiré","bordel","cul","bite","chienne",
-    "enculé","encule","pute",
-
-    # --- Italiano ---
-    "cazzo","stronzo","puttana","troia","merda","bastardo",
-    "culo","vaffanculo","porca","minchia","testa di cazzo",
-
-    # --- Alemán ---
-    "scheisse","arschloch","fotze","hurensohn","wichser","miststück",
-
-    # --- Variaciones con símbolos ---
-    "f*ck","f@ck","sh!t","b!tch","b1tch","a$$","a$$hole","d1ck","d!ck",
-    "n1gga","p3rra","cabr0n","m!erda","m13rda",
-    "pvt@","pvt0","put@","ql@","q1o","q10","cul1o","cul1@","cvli@",
-
-    # --- Abreviaciones de internet ---
-    "wtf","stfu","gtfo","omfg","lmfao","lmao","fml","smh","idgaf",
-    "smd","btch","mf","mfer","fuq","fuk","fuken","fkn",
-    "nibba","bish","biatch","thot","hoe","skank","simp",
+    "merda","caralho","otario","viado","bosta",
+    "merde","putain","connard","fil de pute","enculé",
+    "cazzo","stronzo","puttana","troia",
+    "scheisse","arschloch","fotze","hurensohn","wichser",
 ]
 
-# Compilamos el patrón
-_pattern = re.compile(
-    r"\b(" + "|".join(re.escape(w) for w in BAD_WORDS) + r")\b",
-    flags=re.IGNORECASE,
+
+def _leetify(word: str) -> str:
+    """Convierte una palabra en una expresión que detecta variantes leet."""
+    leet_map = {
+        "a": "[a4@Λ∆]",    "e": "[e3€£ɛ]", "i": "[i1!|íìî]", "o": "[o0°øðóòô]",
+        "u": "[uúùûüv]",   "c": "[c(¢]",   "l": "[l1|]",     "s": "[s5$z]",
+        "t": "[t7+†]",     "g": "[g69]",   "b": "[b8]",      "p": "[pρ]",
+        "n": "[nñńη]",     "m": "[mµ]"
+    }
+
+    regex = ""
+    for ch in word.lower():
+        if ch in leet_map:
+            regex += leet_map[ch]
+        else:
+            # cualquier letra admite símbolos antes/después
+            regex += f"[{ch}]+"
+    return regex
+
+# Construir expresiones leet para TODAS las palabras
+LEET_BADWORDS = [ _leetify(w) for w in BAD_WORDS ]
+
+# Construimos un patrón gigante, ultra flexible:
+LEET_PATTERN = re.compile(
+    r"(" + "|".join(LEET_BADWORDS) + r")",
+    flags=re.IGNORECASE
 )
 
+# ============================================================
+# 3. FUNCIÓN PARA ENMASCARAR PALABRAS
+# ============================================================
 
-def _enmascarar_palabra(palabra: str) -> str:
+def _mask(word: str) -> str:
+    """Reemplaza letras interiores por * (weon → w**n)."""
+    core = re.sub(r'[^a-zA-ZñÑáéíóúÁÉÍÓÚ]', "", word)  # quitar símbolos, dejar letras
+    if len(core) <= 2:
+        return "*" * len(core)
+    return core[0] + "*" * (len(core) - 2) + core[-1]
+
+# ============================================================
+# 4. FUNCIÓN PRINCIPAL (CENSURA PERFECTA)
+# ============================================================
+
+def censurar(texto: str) -> str:
     """
-    Reemplaza letras internas de la palabra por asteriscos
-    dejando primera y última letra.
-    """
-    if len(palabra) <= 2:
-        return "*" * len(palabra)
-    return palabra[0] + "*" * (len(palabra) - 2) + palabra[-1]
-
-
-def _censurar_basico(texto: str) -> str:
-    """Filtro rápido local sin IA."""
-
-    def _repl(match: re.Match) -> str:
-        original = match.group(0)
-        # Si es una frase con espacios ("hijo de puta"), censuramos cada palabra.
-        if " " in original:
-            partes = original.split(" ")
-            return " ".join(_enmascarar_palabra(p) for p in partes)
-        return _enmascarar_palabra(original)
-
-    return _pattern.sub(_repl, texto)
-
-
-def censurar_con_openai(texto: str) -> str:
-    """
-    Devuelve el texto con malas palabras censuradas.
-    - Intenta primero con OpenAI (GPT).
-    - Si falla o no detecta nada, usa el filtro local.
+    Censura insultos en español/inglés, detecta versiones leet,
+    variantes con símbolos, números y deformaciones.
+    Mantiene espacios, emojis y signos.
     """
     if not texto:
         return texto
 
-    resultado = None
+    def _replace(match):
+        palabra = match.group(0)
+        return _mask(palabra)
 
-    # 1) Intento con OpenAI
-    if client is not None:
-        try:
-            resp = client.chat.completions.create(
-                model="gpt-4.1-mini",
-                temperature=0,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": texto},
-                ],
-            )
-            contenido = resp.choices[0].message.content
-            resultado = (contenido or "").strip()
-        except (AuthenticationError, APIError, Exception) as e:
-            print("[OpenAI] Error en censurar_con_openai:", e)
-            resultado = None
+    try:
+        return LEET_PATTERN.sub(_replace, texto)
+    except Exception as e:
+        logger.error("[Profanity] Error censurando: %s", e)
+        return texto
 
-    # 2) Fallback local
-    if not resultado or resultado == texto:
-        return _censurar_basico(texto)
-
-    return resultado
+# Compatibilidad con código viejo
+censurar_con_openai = censurar
+censurar_con_ollama = censurar

@@ -15,10 +15,10 @@ from .models import Mensaje, ParticipanteConversacion, Conversacion
 from .services.recommendations import invalidate_user_reco_cache
 from urllib.parse import unquote
 from collections import deque
-from core.services.profanity_filter import censurar_con_openai
+from core.services.profanity_filter import censurar
 from core.services.recommendations import recommend_products_for_user as ai_recommend_products
 from core.services.social import amigos_qs, sugerencias_qs
-from .emails import send_verification_email, send_welcome_email, send_report_email
+from .emails import send_verification_email, send_welcome_email, send_report_email,send_warning_email
 from django.core.paginator import Paginator
 from django.db.models import Q, Avg
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -29,14 +29,15 @@ from django.urls import reverse
 from django.db import IntegrityError, transaction, models
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-
+from core.services.ollama_client import ollama_chat
+from core.services.gifter_ai_productos import generar_reco_productos
 
 import uuid, base64
 import requests
 from django.shortcuts import get_object_or_404
 from core.forms import ProfileEditForm
 from .utils import get_default_wishlist, _push_inbox
-import openai
+
 
 from core.utils import get_default_wishlist
 from rest_framework import generics, permissions, status
@@ -139,7 +140,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.files.base import ContentFile
 
 # Importa explícitamente el modelo (evita depender de import *)
-from core.models import GeneratedCard, ProductoExterno, ProductoExternoFavorito
+from core.models import GeneratedCard, ProductoExterno, ProductoExternoFavorito, Producto
 
 from django.http import Http404 
 import traceback
@@ -153,11 +154,13 @@ from allauth.account.models import EmailAddress
 
 
 
+from django.utils.dateparse import parse_date
 
-
-
+from .models import ItemEnWishlist
 
 from .models import Conversacion, ConversationEvent, SecretSantaAssignment
+from quickchart import QuickChart
+import urllib.parse
 
 # Mínimo de participantes para que el sorteo sea interesante y aleatorio
 # Se puede sobreescribir desde settings.py con SECRET_SANTA_MIN_PARTICIPANTS
@@ -191,20 +194,8 @@ def _field_exists(model, name: str) -> bool:
 
 # === Helper: derangement (nadie se asigna a sí mismo) ===
 import random
+
 def _derangement(users):
-    """
-    Genera una permutación donde nadie queda asignado a sí mismo (derangement).
-    Usa el algoritmo de mezcla y verificación con múltiples intentos para garantizar 
-    una buena aleatorización. Si falla después de muchos intentos, usa un método 
-    determinístico de rotación que garantiza un resultado válido.
-    
-    Args:
-        users: Lista de usuarios a permutar
-        
-    Returns:
-        Lista permutada donde nadie queda en su posición original.
-        None si hay menos de 2 usuarios.
-    """
     n = len(users)
     if n < MIN_SECRET_SANTA_PARTICIPANTS:
         return None
@@ -223,7 +214,6 @@ def _derangement(users):
             return [users[i] for i in perm]
     
     # Fallback determinístico: rotación que garantiza que nadie queda en su posición
-    # Solo se usa si los 2000 intentos aleatorios fallan (muy improbable con n>=4)
     rotated = [users[(i + 1) % n] for i in idx]
     return rotated
 
@@ -234,21 +224,6 @@ try:
 except Exception:
     EventParticipant = None
     HAS_EVENT_PARTICIPANT = False
-
-if hasattr(settings, 'OPENAI_API_KEY') and settings.OPENAI_API_KEY:
-    # Intenta inicializar el cliente aquí para detectar errores de clave temprano
-    try:
-        openai_client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
-        # Podrías hacer una llamada de prueba simple aquí si quieres verificar la clave
-        print("[OpenAI] Cliente inicializado correctamente.")
-    except Exception as e:
-        print(f"¡ADVERTENCIA! Error al inicializar cliente OpenAI: {e}")
-        openai_client = None # Define como None si falla
-        openai.api_key = None # Mantén api_key compatible si usas código viejo
-else:
-    print("¡ADVERTENCIA! La variable OPENAI_API_KEY no está configurada.")
-    openai_client = None
-    openai.api_key = None
 
 def usuarios_list(request):
     """
@@ -633,8 +608,46 @@ def home(request):
 
 
 
+
 def register_view(request):
     if request.method == 'POST':
+        
+        # ============================================================
+        # 🤖 INICIO RECAPTCHA (NUEVO)
+        # ============================================================
+        recaptcha_response = request.POST.get('g-recaptcha-response')
+        data = {
+            'secret': settings.RECAPTCHA_SECRET_KEY,
+            'response': recaptcha_response
+        }
+        
+        try:
+            r = requests.post('https://www.google.com/recaptcha/api/siteverify', data=data)
+            result = r.json()
+            
+            # Si Google dice que falló o no se marcó la casilla
+            if not result.get('success'):
+                messages.error(request, 'Por favor completa el "No soy un robot".')
+                form = RegisterForm(request.POST)
+                # Devolvemos el form con los datos ingresados para no perderlos
+                return render(request, 'register.html', {
+                    'form': form,
+                    'recaptcha_site_key': settings.RECAPTCHA_SITE_KEY
+                })
+                
+        except Exception as e:
+            # Si falla la conexión con Google, logueamos pero no dejamos pasar por seguridad
+            print(f"Error validando Recaptcha: {e}")
+            messages.error(request, 'Error de conexión al validar seguridad. Intenta de nuevo.')
+            form = RegisterForm(request.POST)
+            return render(request, 'register.html', {
+                'form': form,
+                'recaptcha_site_key': settings.RECAPTCHA_SITE_KEY
+            })
+        # ============================================================
+        # 🤖 FIN RECAPTCHA (A partir de aquí sigue tu código original)
+        # ============================================================
+
         form = RegisterForm(request.POST)
         if form.is_valid():
             try:
@@ -693,7 +706,12 @@ def register_view(request):
     else:
         form = RegisterForm()
 
-    return render(request, 'register.html', {'form': form})
+    # ✅ MODIFICADO: Pasamos la site_key al contexto para que el HTML la lea
+    context = {
+        'form': form,
+        'recaptcha_site_key': settings.RECAPTCHA_SITE_KEY
+    }
+    return render(request, 'register.html', context)
 
 def verification_sent_view(request):
     return render(request, 'verification_sent.html')
@@ -752,36 +770,88 @@ def obtener_info_likes_post(request, post_id):
     
 ###PRODUCTOS
 @login_required
-@require_POST
 def toggle_favorito(request, product_id):
-    producto = get_object_or_404(Producto, pk=product_id, activo=True)
-    wl = get_default_wishlist(request.user)
+    """Alterna favorito de producto interno o externo."""
 
-    item = ItemEnWishlist.objects.filter(id_wishlist=wl, id_producto=producto).first()
-    if item:
-        item.delete()
-        state = "removed"
-        # No registramos actividad al quitar de favoritos (puedes cambiar esto si quieres)
-    else:
-        # Requiere que ItemEnWishlist.cantidad use MinValueValidator(1)
-        new_item = ItemEnWishlist.objects.create(id_wishlist=wl, id_producto=producto, cantidad=1) # Create the item
-        state = "added"
+    if request.method != "POST":
+        return JsonResponse(
+            {"error": "Método no permitido"},
+            status=405
+        )
 
-        # --- MOVER EL REGISTRO DE ACTIVIDAD AQUÍ DENTRO ---
+    user = request.user
+    wl = get_default_wishlist(user)
+
+    # Preferir el indicador que envía el front (`externo`) para evitar colisiones
+    is_external_flag = (request.POST.get('externo') or request.POST.get('external') or '').strip()
+
+    # Si el front indicó explícitamente que es externo, lo tratamos como tal primero
+    if is_external_flag in ('1', 'true', 'True'):
+        producto_externo = ProductoExterno.objects.filter(id_producto_externo=product_id).first()
+        if not producto_externo:
+            return JsonResponse({"error": "Producto externo no encontrado"}, status=404)
+
+        existing_item = ItemEnWishlist.objects.filter(
+            id_wishlist=wl,
+            producto_externo=producto_externo
+        ).first()
+
+        if existing_item:
+            existing_item.delete()
+            return JsonResponse({"state": "removed", "type": "external", "id": product_id})
+
         try:
-            RegistroActividad.objects.create(
-                id_usuario=request.user,
-                # Usamos 'NUEVO_REGALO' como aproximación a "intención de regalo"
-                tipo_actividad=RegistroActividad.TipoActividad.NUEVO_REGALO,
-                id_elemento=new_item.id_item, # Ahora 'new_item' SÍ existe en este scope
-                tabla_elemento='itemenwishlist',
-                contenido_resumen=f"Añadió '{producto.nombre_producto}' a favoritos"
+            obj, created = ItemEnWishlist.objects.get_or_create(
+                id_wishlist=wl,
+                producto_externo=producto_externo,
+                defaults={"cantidad": 1}
             )
-        except Exception as e:
-            print(f"Error al guardar actividad (añadir favorito): {e}")
-        # --- FIN DEL BLOQUE MOVIDO ---
+        except IntegrityError:
+            # Race condition: item may have been created concurrently
+            obj = ItemEnWishlist.objects.filter(id_wishlist=wl, producto_externo=producto_externo).first()
+            created = bool(obj)
 
-    return JsonResponse({"status": "ok", "state": state, "product_id": product_id})
+        return JsonResponse({"state": "added" if created else "exists", "type": "external", "id": product_id})
+
+    # Si no vino flag o vino indicando interno, comprobamos interno primero (comportamiento legacy)
+    producto_interno = Producto.objects.filter(id_producto=product_id).first()
+
+    if producto_interno:
+        existing = ItemEnWishlist.objects.filter(id_wishlist=wl, id_producto=producto_interno).first()
+        if existing:
+            existing.delete()
+            return JsonResponse({"state": "removed", "type": "internal", "id": product_id})
+
+        try:
+            obj, created = ItemEnWishlist.objects.get_or_create(
+                id_wishlist=wl,
+                id_producto=producto_interno,
+                defaults={"cantidad": 1}
+            )
+        except IntegrityError:
+            obj = ItemEnWishlist.objects.filter(id_wishlist=wl, id_producto=producto_interno).first()
+            created = bool(obj)
+
+        return JsonResponse({"state": "added" if created else "exists", "type": "internal", "id": product_id})
+
+    # Finalmente, como fallback intentamos externo (por seguridad)
+    producto_externo = ProductoExterno.objects.filter(id_producto_externo=product_id).first()
+    if producto_externo:
+        existing_item = ItemEnWishlist.objects.filter(id_wishlist=wl, producto_externo=producto_externo).first()
+        if existing_item:
+            existing_item.delete()
+            return JsonResponse({"state": "removed", "type": "external", "id": product_id})
+        ItemEnWishlist.objects.create(id_wishlist=wl, producto_externo=producto_externo)
+        return JsonResponse({"state": "added", "type": "external", "id": product_id})
+
+    # ============================================================
+    # 3) SI NO EXISTE NI INTERNO NI EXTERNO
+    # ============================================================
+    return JsonResponse(
+        {"error": "Producto no encontrado"},
+        status=404
+    )
+
 
     
 from django.db.models import Q
@@ -798,7 +868,6 @@ def productos_list(request):
     # === PRODUCTOS INTERNOS ===
     productos_internos = Producto.objects.filter(activo=True)
 
-    # Filtros internos
     if query:
         productos_internos = productos_internos.filter(
             Q(nombre_producto__icontains=query) |
@@ -810,7 +879,6 @@ def productos_list(request):
     if marca_id:
         productos_internos = productos_internos.filter(id_marca_id=marca_id)
 
-    # Orden internos
     if orden == 'precio_asc':
         productos_internos = productos_internos.order_by('precio')
     elif orden == 'precio_desc':
@@ -823,22 +891,26 @@ def productos_list(request):
     categorias = Categoria.objects.all()
     marcas = Marca.objects.all()
 
-    # === WISHLIST ===
+    # === FAVORITOS (INTERNOS + EXTERNOS) ===
     favoritos_ids = set()
     favoritos_externos_ids = set()
 
     if request.user.is_authenticated:
+        # Wishlist interna del usuario
         wl = get_default_wishlist(request.user)
+
         wishlist_items = ItemEnWishlist.objects.filter(id_wishlist=wl)
 
+        # Internos
         favoritos_ids = set(
             wishlist_items.values_list('id_producto_id', flat=True)
         )
 
+        # Externos: buscamos ItemEnWishlist que referencian producto_externo
         favoritos_externos_ids = set(
-            ProductoExterno.objects
-            .filter(producto_interno_id__in=favoritos_ids)
-            .values_list('id_producto_externo', flat=True)
+            ItemEnWishlist.objects
+            .filter(id_wishlist=wl, producto_externo__isnull=False)
+            .values_list('producto_externo_id', flat=True)
         )
 
     # === PRODUCTOS EXTERNOS ===
@@ -856,21 +928,18 @@ def productos_list(request):
             Q(categoria__icontains=query)
         )
 
-    # Convertimos a lista
     productos_externos = list(externos_qs)
 
     # === UNIFICAR INTERNOS + EXTERNOS ===
     from itertools import chain
-
-    # Los internos vienen como queryset → los externos como dict-like
     todos = list(chain(productos_internos, productos_externos))
 
-    # === PAGINACIÓN COMBINADA ===
+    # === PAGINACIÓN ===
     paginator = Paginator(todos, 12)
     page_number = request.GET.get('page')
     productos = paginator.get_page(page_number)
 
-    # === MATCH PERSONAS (no tocado) ===
+    # === MATCH PERSONAS ===
     personas_amigos, personas_otros = _people_matches(request, query)
 
     # === HISTORIAL DE BÚSQUEDAS ===
@@ -894,7 +963,7 @@ def productos_list(request):
 
     # === CONTEXT FINAL ===
     context = {
-        'productos': productos,  # ← YA VIENE INTERNOS + EXTERNOS JUNTOS
+        'productos': productos,
         'categorias': categorias,
         'marcas': marcas,
         'query': query,
@@ -905,12 +974,9 @@ def productos_list(request):
         'favoritos_externos_ids': favoritos_externos_ids,
         'personas_amigos': personas_amigos,
         'personas_otros': personas_otros,
-        # YA NO SE USA productos_externos EN EL TEMPLATE
     }
 
     return render(request, 'productos_list.html', context)
-
-
 
 
 
@@ -937,24 +1003,19 @@ def producto_detalle(request, producto_id):
 ## TODO LO QUE TENGA QUE VER CON EL FEED AQUI
 @login_required
 def feed_view(request):
-    """
-    Feed con soporte para posts de Texto / Imagen / GIF (GIPHY).
-    """
+
     form = PostForm()
 
     if request.method == 'POST':
-        # importante: incluir FILES para la imagen
         form = PostForm(request.POST, request.FILES)
         if form.is_valid():
             nuevo_post = form.save(commit=False)
             nuevo_post.id_usuario = request.user
 
-            # --- decidir tipo de post de forma segura ---
             gif_url = (request.POST.get('gif_url') or '').strip()
             has_image = bool(nuevo_post.imagen)
             has_text = bool((nuevo_post.contenido or '').strip())
 
-            # prioridad: si hay GIF, es GIF (y anulamos imagen)
             if gif_url:
                 nuevo_post.gif_url = gif_url
                 nuevo_post.imagen = None
@@ -966,20 +1027,18 @@ def feed_view(request):
                 nuevo_post.gif_url = None
                 nuevo_post.tipo_post = Post.TipoPost.TEXTO
             else:
-                # nada válido: vuelve con el form y un error simple
                 form.add_error(None, "Debes escribir algo, subir una imagen o elegir un GIF.")
-                # caerá al render de abajo con el error agregado
 
             if not form.errors:
                 nuevo_post.save()
                 return redirect('feed')
 
-    # 1) Posts + likes optimizados
     try:
         ids_yo_sigo = set(Seguidor.objects.filter(seguidor=request.user).values_list('seguido_id', flat=True))
         ids_me_siguen = set(Seguidor.objects.filter(seguido=request.user).values_list('seguidor_id', flat=True))
         amigos_ids = ids_yo_sigo.intersection(ids_me_siguen)
         amigos_ids.add(request.user.id)
+
         all_posts = (
             Post.objects.filter(id_usuario_id__in=amigos_ids)
             .select_related('id_usuario')
@@ -994,43 +1053,36 @@ def feed_view(request):
             .order_by('-fecha_publicacion')
         )
 
-    # 2) IDs con like del usuario
     liked_post_ids = set(
         Like.objects.filter(id_usuario=request.user, id_post__in=all_posts)
         .values_list('id_post_id', flat=True)
     )
 
-    # 3) Flag para el template
     for post in all_posts:
         post.user_has_liked = post.id_post in liked_post_ids
 
-    # 4) Leer toggle del filtro de malas palabras (?filtro_malas_palabras=1)
     usar_filtro = request.GET.get("filtro_malas_palabras") == "1"
 
-    # 5) Generar versión censurada del contenido si aplica (POSTS)
-    MAX_POSTS_AI = 15  # para no matar la API ni el tiempo de respuesta
+    MAX_POSTS_AI = 15
 
     if usar_filtro:
         for idx, post in enumerate(all_posts):
             if idx < MAX_POSTS_AI:
-                # asumimos que el texto está en post.contenido
-                post.contenido_censurado = censurar_con_openai(post.contenido or "")
+                post.contenido_censurado = censurar(post.contenido or "")
             else:
-                # a partir del post 16, dejamos el contenido tal cual
                 post.contenido_censurado = post.contenido
     else:
         for post in all_posts:
             post.contenido_censurado = None
 
-    # 6) Generar versión censurada del contenido si aplica (COMENTARIOS DEL FEED)
-    MAX_COMMENTS_AI = 40  # límite global
+    MAX_COMMENTS_AI = 40
 
     if usar_filtro:
         censurados = 0
         for post in all_posts:
             for c in post.comentarios.all():
                 if censurados < MAX_COMMENTS_AI:
-                    c.contenido_censurado = censurar_con_openai(c.contenido or "")
+                    c.contenido_censurado = censurar(c.contenido or "")
                     censurados += 1
                 else:
                     c.contenido_censurado = c.contenido
@@ -1042,11 +1094,10 @@ def feed_view(request):
     context = {
         'posts': all_posts,
         'form': form,
-        'GIPHY_API_KEY': getattr(settings, 'GIPHY_API_KEY', ''),  # <-- para el buscador
+        'GIPHY_API_KEY': getattr(settings, 'GIPHY_API_KEY', ''),
         'usar_filtro': usar_filtro,
     }
     return render(request, 'feed.html', context)
-
 
 
 
@@ -1935,6 +1986,7 @@ def profile_view(request):
     )
 
     # ================== WISHLIST + RECIBIDOS ==================
+    from itertools import chain
     wl = get_default_wishlist(request.user)
 
     # Solo items NO recibidos (wishlist)
@@ -1942,32 +1994,48 @@ def profile_view(request):
         ItemEnWishlist.objects
         .filter(
             id_wishlist=wl,
-            fecha_comprado__isnull=True,   # en wishlist
+            fecha_comprado__isnull=True,
         )
         .select_related('id_producto', 'id_producto__id_marca')
-        # si tu related_name es distinto, ajusta esto
         .prefetch_related('id_producto__urls_tienda')
         .order_by('-id_item')
     )
 
-    # Items ya recibidos (para pestaña "Regalos recibidos")
+    # Items ya recibidos
     recibidos_items = (
         ItemEnWishlist.objects
         .filter(
             id_wishlist=wl,
-            fecha_comprado__isnull=False   # recibidos
+            fecha_comprado__isnull=False
         )
         .select_related('id_producto', 'id_producto__id_marca')
         .prefetch_related('id_producto__urls_tienda')
         .order_by('-fecha_comprado', '-id_item')
     )
 
-    # IDs de productos que están en la wishlist (para pintar corazones)
+    # ================== FAVORITOS EXTERNOS (desde ItemEnWishlist) ==================
+    favoritos_externos = (
+        ItemEnWishlist.objects
+        .filter(id_wishlist=wl, producto_externo__isnull=False)
+        .select_related('producto_externo')
+        .order_by('-id_item')
+    )
+
+    # ================== MIX TOTAL ==================
+    # Internos + externos → UNA sola lista para wishlist
+    wishlist_total = list(chain(wishlist_items, favoritos_externos))
+
+    # IDs de productos internos (para pintar corazones)
     favoritos_ids = set(
         wishlist_items.values_list('id_producto_id', flat=True)
     )
 
-    # ================== SOLICITUDES DE AMISTAD ==================
+    # IDs externos (para pintar corazones)
+    favoritos_externos_ids = set(
+        favoritos_externos.values_list('producto_externo_id', flat=True)
+    )
+
+    # ================== SOLICITUDES ==================
     solicitudes_recibidas = (
         SolicitudAmistad.objects
         .filter(
@@ -1990,26 +2058,31 @@ def profile_view(request):
 
     sol_pendientes_count = solicitudes_recibidas.count()
 
+    # ================== CONTEXT ==================
     context = {
         'perfil': perfil,
         'prefs': prefs,
         'eventos': eventos,
         'evento_form': evento_form,
 
-        # Amigos
         'amigos': amigos,
 
-        # Wishlist / recibidos
-        'wishlist_items': wishlist_items,
+        # Wishlist mezclada
+        'wishlist_total': wishlist_total,
+        'wishlist_items': wishlist_items,   # internos (para recibidos)
         'recibidos_items': recibidos_items,
-        'favoritos_ids': favoritos_ids,
 
-        # Solicitudes (nombres iguales a los que usa el template)
+        # Corazones
+        'favoritos_ids': favoritos_ids,
+        'favoritos_externos_ids': favoritos_externos_ids,
+
+        # Solicitudes
         'solicitudes_recibidas': solicitudes_recibidas,
         'solicitudes_enviadas': solicitudes_enviadas,
         'sol_pendientes_count': sol_pendientes_count,
     }
     return render(request, 'perfil.html', context)
+
 
 
 
@@ -2355,7 +2428,7 @@ class MensajesListCreate(APIView):
     authentication_classes = (SessionAuthentication, BasicAuthentication)
     permission_classes = [IsAuthenticated]
     pagination_class = SmallPagination
-    parser_classes = [JSONParser, MultiPartParser, FormParser]   # <-- importante
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get_conv(self, request, conv_id):
         try:
@@ -2380,7 +2453,6 @@ class MensajesListCreate(APIView):
         ser = MensajeSerializer(page, many=True)
         return paginator.get_paginated_response(ser.data)
 
-
     def post(self, request, conv_id):
         conv = self.get_conv(request, conv_id)
         if not conv:
@@ -2389,6 +2461,7 @@ class MensajesListCreate(APIView):
         tipo = (request.data.get("tipo") or "texto").strip()
         contenido = (request.data.get("contenido") or "").strip()
 
+        # --- 1. GUARDAR EL MENSAJE DEL USUARIO ---
         if tipo == Mensaje.Tipo.IMAGEN:
             up = request.FILES.get("archivo")
             if not up:
@@ -2417,17 +2490,19 @@ class MensajesListCreate(APIView):
                 contenido=contenido,
             )
 
-        # puntero conversación
+        # Actualizar puntero conversación
         conv.ultimo_mensaje = msg
         conv.save(update_fields=["ultimo_mensaje", "actualizada_en"])
 
-        # entregas ENTREGADO (no el remitente)
+        # Destinatarios para Websocket
         dest_ids = list(
             ParticipanteConversacion.objects
             .filter(conversacion=conv)
             .exclude(usuario=request.user)
             .values_list("usuario_id", flat=True)
         )
+
+        # Notificar mensaje del usuario
         if dest_ids:
             EntregaMensaje.objects.bulk_create([
                 EntregaMensaje(mensaje=msg, usuario_id=uid, estado=EntregaMensaje.Estado.ENTREGADO)
@@ -2438,6 +2513,82 @@ class MensajesListCreate(APIView):
                 "conversacion_id": conv.conversacion_id,
                 "mensaje_id": msg.mensaje_id,
             })
+
+        # ===========================================================
+        # 📊 2. BOT DE GRÁFICOS (Versión URL Manual - Estable)
+        # ===========================================================
+        if tipo == Mensaje.Tipo.TEXTO and contenido.lower().startswith('/grafico '):
+            try:
+                # Parsear: "/grafico Pizza 5, Sushi 10"
+                raw_data = contenido[9:].strip()
+                items = raw_data.split(',')
+                
+                labels = []
+                values = []
+                valid_data = False
+
+                for item in items:
+                    parts = item.strip().rsplit(' ', 1)
+                    if len(parts) == 2 and parts[1].isdigit():
+                        labels.append(parts[0])
+                        values.append(int(parts[1]))
+                        valid_data = True
+                
+                if valid_data:
+                    # Configuración del gráfico
+                    chart_config = {
+                        "type": "pie",
+                        "data": {
+                            "labels": labels,
+                            "datasets": [{
+                                "data": values,
+                                "backgroundColor": ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF", "#FF9F40"],
+                                "borderWidth": 0
+                            }]
+                        },
+                        "options": {
+                            "plugins": {
+                                "legend": {"position": "right", "labels": {"fontColor": "black", "fontSize": 14}},
+                                "datalabels": {"color": "white", "font": {"weight": "bold", "size": 16}}
+                            }
+                        }
+                    }
+                    
+                    # Generación de URL MANUAL
+                    json_str = json.dumps(chart_config)
+                    # quote_plus es vital para que los espacios y caracteres se codifiquen bien
+                    encoded_config = urllib.parse.quote_plus(json_str)
+                    
+                    # URL Final con fondo blanco explícito
+                    chart_url = f"https://quickchart.io/chart?c={encoded_config}&w=500&h=300&bkg=white"
+
+                    # Mensaje del Bot
+                    bot_msg = Mensaje.objects.create(
+                        conversacion=conv,
+                        remitente=request.user,
+                        tipo=Mensaje.Tipo.SISTEMA,
+                        contenido="📊 Resultados de la votación:",
+                        metadatos={'tipo': 'chart_card', 'chart_url': chart_url}
+                    )
+
+                    # Notificar Bot a TODOS (incluido yo)
+                    all_ids = dest_ids + [request.user.id]
+                    
+                    # Crear entregas para el bot (Evita errores futuros de queries)
+                    if all_ids:
+                        EntregaMensaje.objects.bulk_create([
+                            EntregaMensaje(mensaje=bot_msg, usuario_id=uid, estado=EntregaMensaje.Estado.ENTREGADO)
+                            for uid in all_ids
+                        ])
+
+                    _push_inbox(all_ids, {
+                        "kind": "new_message",
+                        "conversacion_id": conv.conversacion_id,
+                        "mensaje_id": bot_msg.mensaje_id,
+                    })
+            except Exception as e:
+                print(f"Error QuickChart Manual: {e}")
+        # ===========================================================
 
         return Response(MensajeSerializer(msg).data, status=201)
 
@@ -2793,9 +2944,9 @@ def comentario_crear(request):
         contenido=contenido,
     )
 
-    # Versión censurada
+    # Versión censurada (usando IA local + fallback)
     try:
-        contenido_censurado = censurar_con_openai(contenido)
+        contenido_censurado = censurar(contenido)
     except Exception as e:
         print("[comentario_crear] Error al censurar:", e)
         contenido_censurado = contenido
@@ -2837,6 +2988,7 @@ def comentario_crear(request):
 
     # Petición normal → redirect (con next)
     return redirect(_next_url(request))
+
 
 
 
@@ -3687,92 +3839,104 @@ def _is_group_admin(user: User, conv: Conversacion) -> bool:
 @login_required
 def sugerencias_regalo_ia(request, amigo_username):
     """
-    Genera sugerencias de regalo para un amigo usando OpenAI GPT.
+    Genera sugerencias de regalo para un amigo usando IA local (Ollama).
     """
     amigo = get_object_or_404(User, nombre_usuario=amigo_username)
     perfil_amigo = getattr(amigo, 'perfil', None)
 
-    # 1. Recolectar datos del amigo (¡Puedes mejorar esto!)
+    # 1. Recolectar datos del amigo
     datos_amigo = f"Nombre: {amigo.nombre} {amigo.apellido}\n"
     if perfil_amigo and perfil_amigo.bio:
         datos_amigo += f"Biografía: {perfil_amigo.bio}\n"
 
     try:
-        # Asume una wishlist por usuario
         wl = Wishlist.objects.get(usuario=amigo)
         items = ItemEnWishlist.objects.filter(
             id_wishlist=wl,
-            fecha_comprado__isnull=True # Solo items no comprados
-        ).select_related('id_producto')[:5] # Limita a 5 items para no exceder tokens
+            fecha_comprado__isnull=True
+        ).select_related('id_producto')[:5]
 
         nombres_items = [item.id_producto.nombre_producto for item in items]
         if nombres_items:
             datos_amigo += f"Algunos items que quiere: {', '.join(nombres_items)}\n"
         else:
-             datos_amigo += "No tiene items visibles en su wishlist.\n"
+            datos_amigo += "No tiene items visibles en su wishlist.\n"
+
     except Wishlist.DoesNotExist:
         datos_amigo += "No tiene items visibles en su wishlist.\n"
 
-    # Podrías añadir intereses, posts recientes, etc. si los tienes modelados
-
-    # 2. Diseñar el Prompt para GPT
+    # ============================================
+    # 2. PROMPT PARA OLLAMA — ahora usando IA LOCAL
+    # ============================================
     prompt = (
-        f"Eres GifterAI, un experto en encontrar el regalo perfecto.\n"
-        f"Mi amigo se llama {amigo.nombre}. Aquí hay algo de información sobre él/ella:\n{datos_amigo}\n"
-        f"Basado en esto, sugiere 5 ideas de regalos creativas y personalizadas. "
-        f"Para cada idea, explica brevemente por qué sería un buen regalo para {amigo.nombre}. "
-        f"Formato deseado:\n"
-        f"- **[Idea de Regalo]:** [Explicación breve]."
+        "Eres GifterAI, un experto en encontrar el regalo perfecto.\n"
+        f"Mi amigo se llama {amigo.nombre}. Aquí hay información sobre él:\n{datos_amigo}\n"
+        "Necesito EXACTAMENTE 5 ideas de regalo creativas y personalizadas.\n"
+        "Responde SOLAMENTE en formato JSON:\n"
+        "{\n"
+        "  \"ideas\": [\n"
+        "    {\"idea\": \"texto\", \"explicacion\": \"texto\"},\n"
+        "    ... 5 items\n"
+        "  ]\n"
+        "}\n"
+        "No escribas nada fuera del JSON."
     )
 
-    sugerencias_texto = "Lo siento, no pude generar sugerencias en este momento. Intenta más tarde."
     sugerencias_lista = []
+    sugerencias_texto = ""
 
-    
-    if openai.api_key:
+    # =======================
+    # 3. Llamar a OLLAMA
+    # =======================
+    try:
+        raw = ollama_chat(
+            messages=[
+                {"role": "system", "content": "Eres GifterAI, un experto en ideas de regalo."},
+                {"role": "user", "content": prompt},
+            ],
+            model=getattr(settings, "GIFTER_AI_MODEL", "llama3.2:1b"),
+            temperature=0.6,
+        )
+
+        if not raw:
+            raise ValueError("Ollama no devolvió texto")
+
+        # ---- Intentar decodificar JSON ----
         try:
-            print(f"Enviando prompt a OpenAI para {amigo_username}...") 
-            # Usa la nueva forma de llamar a la API v1.x.x
-            client = openai.OpenAI(api_key=settings.OPENAI_API_KEY) # Crea un cliente
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo", # Modelo económico y rápido
-                messages=[
-                    {"role": "system", "content": "Eres GifterAI, un asistente experto en regalos."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=200, # Ajusta según necesites más o menos texto
-                n=1, # Solo queremos una respuesta
-                stop=None, # No necesitamos parar la generación antes
-                temperature=0.7, # Un poco creativo pero no demasiado loco
-            )
+            data = json.loads(raw)
+            ideas = data.get("ideas", [])
 
-            print("Respuesta recibida de OpenAI.") # Log para depurar
-            # 4. Procesar la respuesta
-            if response.choices:
-                sugerencias_texto = response.choices[0].message.content.strip()
-                # Intenta separar las sugerencias en una lista para el template
-                sugerencias_lista = [s.strip() for s in sugerencias_texto.split('\n') if s.strip().startswith('-')]
-            else:
-                sugerencias_texto = "OpenAI no devolvió sugerencias."
+            sugerencias_lista = [
+                f"- **{i.get('idea','')}**: {i.get('explicacion','')}"
+                for i in ideas if i.get("idea")
+            ]
 
-        except openai.APIError as e:
-            print(f"Error de API OpenAI: {e.status_code} - {e.response}")
-            sugerencias_texto = f"Error al contactar OpenAI ({e.status_code}). Intenta más tarde."
-        except Exception as e:
-            print(f"Error inesperado llamando a OpenAI: {e}")
-            sugerencias_texto = "Ocurrió un error inesperado al generar sugerencias."
-    else:
-         sugerencias_texto = "La API Key de OpenAI no está configurada en el servidor."
+            sugerencias_texto = "\n".join(sugerencias_lista)
 
+        except Exception:
+            # fallback si falla el JSON
+            sugerencias_lista = [
+                s.strip()
+                for s in raw.split("\n")
+                if s.strip().startswith("-")
+            ]
+            sugerencias_texto = raw
 
-    # 5. Mostrar al usuario en una plantilla
+    except Exception as e:
+        print("[IA OLLAMA Error] sugerencias_regalo_ia:", e)
+        sugerencias_texto = "No pude generar sugerencias en este momento."
+        sugerencias_lista = []
+
+    # =======================
+    # 4. Render al template
+    # =======================
     context = {
         'amigo': amigo,
-        'sugerencias_raw': sugerencias_texto, # El texto completo por si falla el split
-        'sugerencias_lista': sugerencias_lista # La lista para el template
+        'sugerencias_raw': sugerencias_texto,
+        'sugerencias_lista': sugerencias_lista,
     }
-    # Asegúrate que la ruta a tu plantilla sea correcta
     return render(request, 'core/sugerencias_regalo_ia.html', context)
+
 
 
 @login_required
@@ -4816,11 +4980,10 @@ def notificacion_click(request, notificacion_id):
 def event_create_with_chat(request):
     """
     Crea:
-      1) Conversación tipo EVENTO (nombre = título, creador = request.user)
-      2) ParticipanteConversacion para cada usuario (incluye al creador)
-      3) ConversationEvent (tipo='secret_santa', presupuesto opcional)
-      4) EventParticipant por cada usuario seleccionado
-    Recibe JSON: { "titulo": str, "presupuesto_fijo": number|null, "miembros": [user_id, ...] }
+      1) Conversación tipo EVENTO
+      2) ParticipanteConversacion
+      3) ConversationEvent (con fecha y presupuesto)
+      4) EventParticipant
     """
     try:
         try:
@@ -4831,8 +4994,10 @@ def event_create_with_chat(request):
         titulo = (payload.get("titulo") or "").strip() or "Amigo Secreto"
         presupuesto_raw = payload.get("presupuesto_fijo", None)
         miembros_ids = payload.get("miembros") or []
+        
+        # ✅ 1. OBTENER LA FECHA DEL PAYLOAD
+        fecha_str = payload.get("fecha_intercambio") 
 
-       
         # Comprueba si el usuario ya tiene un evento con el mismo título
         evento_existente = ConversationEvent.objects.filter(
             creado_por=request.user,
@@ -4840,14 +5005,12 @@ def event_create_with_chat(request):
         ).exists()
     
         if evento_existente:
-            # Devuelve 409 Conflict para indicar que es un duplicado
             return JsonResponse({
                 "ok": False, 
                 "error": "Ya tienes un evento registrado con ese mismo nombre."
             }, status=409)
 
-
-        # normaliza participantes (incluye siempre al creador)
+        # normaliza participantes
         try:
             miembros_ids = [int(x) for x in miembros_ids if int(x) > 0]
         except Exception:
@@ -4857,7 +5020,7 @@ def event_create_with_chat(request):
         if len(miembros_ids) < 2:
             return JsonResponse({"ok": False, "error": "Debes elegir al menos 1 amigo."}, status=400)
 
-        # presupuesto (opcional, decimal positivo)
+        # presupuesto
         presupuesto = None
         if presupuesto_raw not in (None, ""):
             try:
@@ -4866,6 +5029,9 @@ def event_create_with_chat(request):
                     return JsonResponse({"ok": False, "error": "El monto no puede ser negativo."}, status=400)
             except Exception:
                 return JsonResponse({"ok": False, "error": "Monto inválido."}, status=400)
+        
+        # ✅ 2. PARSEAR LA FECHA (String -> Date Object)
+        fecha_obj = parse_date(fecha_str) if fecha_str else None
 
         User = get_user_model()
         users = list(User.objects.filter(id__in=miembros_ids))
@@ -4877,7 +5043,7 @@ def event_create_with_chat(request):
             creador=request.user,
         )
 
-        # 2) Participantes de conversación (through)
+        # 2) Participantes de conversación
         pcs = []
         for u in users:
             pc, _ = ParticipanteConversacion.objects.get_or_create(
@@ -4887,17 +5053,18 @@ def event_create_with_chat(request):
             )
             pcs.append(pc)
 
-        # 3) ConversationEvent (tu modelo de evento real)
+        # 3) ConversationEvent (Guardamos fecha y presupuesto)
         ce = ConversationEvent.objects.create(
             conversacion=conv,
             tipo='secret_santa',
             creado_por=request.user,
             titulo=titulo,
             presupuesto_fijo=presupuesto if presupuesto is not None else None,
+            fecha_intercambio=fecha_obj,  # 👈 ✅ GUARDAMOS LA FECHA EN LA BD
             estado='borrador'
         )
 
-        # 4) EventParticipant (participantes del evento; aquí van **User**)
+        # 4) EventParticipant
         for u in users:
             EventParticipant.objects.get_or_create(
                 evento=ce,
@@ -4905,13 +5072,24 @@ def event_create_with_chat(request):
                 defaults={"estado": "inscrito"}
             )
 
-        # (opcional) Mensaje de sistema en el chat del evento
+        # ✅ 5. MENSAJE DE SISTEMA MEJORADO
+        # Formateamos datos para el mensaje
+        fecha_txt = fecha_obj.strftime('%d/%m/%Y') if fecha_obj else "Por definir"
+        monto_txt = f"${presupuesto:,.0f}" if presupuesto else "Libre"
+        
+        texto_bienvenida = (
+            f"🎉 Se creó el evento “{titulo}”\n\n"
+            f"📅 Fecha del intercambio: {fecha_txt}\n"
+            f"💰 Presupuesto: {monto_txt}\n\n"
+            "¡Preparen sus wishlists! 🎁"
+        )
+
         try:
             Mensaje.objects.create(
                 conversacion=conv,
                 remitente=request.user,
                 tipo=Mensaje.Tipo.SISTEMA,
-                contenido=f"🎉 Se creó el evento “{titulo}”."
+                contenido=texto_bienvenida  # 👈 Usamos el texto enriquecido
             )
         except Exception:
             pass
@@ -5193,8 +5371,6 @@ def _get_or_create_direct(u1, u2):
 
 
 
-
-
 @login_required
 @require_POST
 def api_event_draw(request, event_id: int):
@@ -5226,101 +5402,97 @@ def api_event_draw(request, event_id: int):
                 log.error(f"api_event_draw: error al obtener evento {event_id}: {str(e)}")
                 return JsonResponse({"ok": False, "error": "Error al obtener el evento", "debug": {"error": str(e)}}, status=500)
 
-            # permiso: solo el creador puede sortear
+            # Permiso: solo el creador puede sortear
             if getattr(ev, 'creado_por_id', None) != request.user.id:
                 log.warning("api_event_draw: user %s not creator of event %s", request.user.id, event_id)
                 return JsonResponse({"ok": False, "error": "No tienes permiso para sortear este evento", "debug": {"creator": getattr(ev, 'creado_por_id', None)}}, status=403)
 
-            # evitar re-sorteos
+            # Evitar re-sorteos
             if getattr(ev, 'estado', '') == 'sorteado' or getattr(ev, 'ejecutado_en', None):
                 return JsonResponse({"ok": False, "error": "Este evento ya fue sorteado", "debug": {"estado": getattr(ev, 'estado', None)}}, status=400)
 
-            # obtener participantes desde el modelo EventParticipant
+            # --- OBTENCIÓN DE PARTICIPANTES ---
             try:
                 # Obtener participantes registrados para el evento
                 participantes = list(EventParticipant.objects.filter(
                     evento=ev,
-                    estado='inscrito'  # Solo participantes activos
+                    estado='inscrito'
                 ).select_related('usuario'))
-                users = [p.usuario for p in participantes]
                 
-                print(f"DEBUG: Encontrados {len(users)} participantes")
+                # Lista inicial de usuarios
+                all_users = [p.usuario for p in participantes]
+                
+                # Filtrar al creador (NO participa)
+                creator_id = ev.creado_por_id
+                users = [u for u in all_users if u.id != creator_id]
+                
+                print(f"DEBUG: {len(all_users)} inscritos. {len(users)} participantes finales (creador excluido).")
                 
             except Exception as e:
                 log.error(f"Error al obtener participantes: {e}")
                 return JsonResponse({"ok": False, "error": "Error al obtener participantes", "debug": {"error": str(e)}}, status=500)
 
-            # Asegurar que el creador forma parte del sorteo
-            creator = ev.creado_por  # Usamos el campo directo que sabemos que existe
-
-            # Asegurar que el creador esté en la lista
-            if creator and all(u.id != creator.id for u in users):
-                print(f"DEBUG: Agregando creador {creator.id} a la lista")
-                # Añadir el creador a los participantes
-                try:
-                    EventParticipant.objects.get_or_create(
-                        evento=ev, 
-                        usuario=creator,
-                        defaults={'estado': 'inscrito'}
-                    )
-                    users.append(creator)
-                except Exception as e:
-                    log.error(f"Error al agregar creador como participante: {e}")
-                    # Continuamos de todas formas, no es crítico
-
-            # Validar mínimo de participantes para que el sorteo sea interesante
+            # Validar mínimo de participantes
             count = len(users)
             valid, error_msg = _validate_participants_count(count)
             if not valid:
-                return JsonResponse({"ok": False, "error": error_msg, "debug": {"count": count}}, status=400)
+                return JsonResponse({"ok": False, "error": error_msg + " (sin contar al organizador)", "debug": {"count": count}}, status=400)
 
-            # Eliminar duplicados por ID (por si acaso hay participantes repetidos en la tabla)
+            # Eliminar duplicados por ID
             seen_ids = set()
             unique_users = []
             for u in users:
                 uid = getattr(u, 'id', None)
-                if uid is None:
-                    continue
-                if uid in seen_ids:
-                    continue
+                if uid is None: continue
+                if uid in seen_ids: continue
                 seen_ids.add(uid)
                 unique_users.append(u)
             users = unique_users
 
             if len(users) < 2:
-                return JsonResponse({"ok": False, "error": "Se necesitan al menos 2 participantes después de deduplicar", "debug": {"count": len(users)}}, status=400)
+                return JsonResponse({"ok": False, "error": "Se necesitan al menos 2 participantes (sin contar al organizador)", "debug": {"count": len(users)}}, status=400)
 
-            # generar derangement (ningún usuario se asigna a sí mismo y todos los receptores son únicos)
+            # Generar derangement
             asignados = _derangement(users)
             if not asignados:
                 log.error("api_event_draw: derangement failed for event %s (n=%s)", event_id, len(users))
                 return JsonResponse({"ok": False, "error": "No se pudo generar el sorteo", "debug": {"count": len(users)}}, status=500)
 
-            # persistir asignaciones
+            # Persistir asignaciones
             SecretSantaAssignment.objects.filter(evento=ev).delete()
             rows = [SecretSantaAssignment(evento=ev, da=g, recibe=r) for g, r in zip(users, asignados)]
             SecretSantaAssignment.objects.bulk_create(rows)
 
-            # Notificar por privado a cada participante
+            # --- NOTIFICACIONES ---
             created = 0
+            sistema = request.user 
+            
+            # Lista para guardar IDs de usuarios a refrescar (dadores + grupo)
+            users_to_refresh = [] 
+            
             for giver, receiver in zip(users, asignados):
                 try:
-                    print(f"DEBUG: Notificando a giver={giver.id} sobre receiver={receiver.id}")
-                    
-                    # Verificación de seguridad contra auto-asignación
-                    if giver.id == receiver.id:
-                        log.error(f"api_event_draw: auto-asignación detectada para usuario {giver.id}")
-                        continue
+                    if giver.id == receiver.id: continue
 
-                    # Crear conversación privada entre sistema y giver
+                    # Conversación privada
                     conv = obtener_o_crear_conv_directa(request.user, giver)
-                    if not conv:
-                        # Fallback: crear conversación directo
-                        conv = Conversacion.objects.create(tipo='privado', nombre='')
-                        ParticipanteConversacion.objects.get_or_create(conversacion=conv, usuario=request.user)
-                        ParticipanteConversacion.objects.get_or_create(conversacion=conv, usuario=giver)
+                    
+                    # --- NUEVO: Generar enlace al perfil público ---
+                    # Usamos la misma lógica que en tu feed.html ({% url 'perfil_detalle' ... %})
+                    try:
+                        target_username = getattr(receiver, 'nombre_usuario', '')
+                        if target_username:
+                            # Genera la URL relativa (ej: /u/juan/)
+                            path = reverse('perfil_detalle', args=[target_username])
+                            # La convierte en absoluta (ej: https://gifters.cl/u/juan/) para que funcione bien en el chat
+                            profile_link = request.build_absolute_uri(path)
+                        else:
+                            # Fallback por si no tiene username (raro)
+                            profile_link = "#"
+                    except Exception:
+                        profile_link = "#"
 
-                    # Crear mensaje para el receptor actual del giver (no del creador)
+                    # Mensaje personalizado
                     mensaje = f"""🎁 *Amigo Secreto - Asignación*
 
 ¡Hola {getattr(giver, 'nombre', getattr(giver, 'first_name', ''))}! 
@@ -5329,167 +5501,87 @@ En el evento "{getattr(ev, 'titulo', '')}", te ha tocado regalar a:
 
 👤 {getattr(receiver, 'nombre', getattr(receiver, 'first_name', str(receiver)))} {getattr(receiver, 'apellido', getattr(receiver, 'last_name', ''))}
 
+🔗 Ver perfil y wishlist: {profile_link}
+
 {"💰 Presupuesto: $" + str(ev.presupuesto_fijo) if getattr(ev, 'presupuesto_fijo', None) else ""}
 
 💝 Recuerda mantener el secreto hasta el día del intercambio.
 📝 Puedes revisar los detalles del evento en el chat grupal."""
-                    # Importante: enviar como sistema para evitar confusión sobre quién envía el mensaje
-                    Mensaje.objects.create(
-                        conversacion=conv_priv,
-                        remitente=None,  # Mensaje de sistema
-                        tipo='sistema',   # Tipo sistema para claridad
+
+                    # Enviar mensaje
+                    msg = Mensaje.objects.create(
+                        conversacion=conv,
+                        remitente=sistema, 
+                        tipo='sistema',
                         contenido=mensaje
                     )
+                    
+                    # Crear EntregaMensaje (para que salga puntito rojo)
+                    EntregaMensaje.objects.create(
+                        mensaje=msg,
+                        usuario=giver,
+                        estado=EntregaMensaje.Estado.ENTREGADO
+                    )
+                    
+                    # Actualizar la conversación privada (para que suba en la bandeja)
+                    conv.ultimo_mensaje = msg
+                    conv.actualizada_en = timezone.now()
+                    conv.save(update_fields=['ultimo_mensaje', 'actualizada_en'])
+                    
                     created += 1
+                    users_to_refresh.append(giver.id) 
+                    
                 except Exception as e:
-                    log.exception("api_event_draw: failed to notify %s for event %s: %s", giver.id if hasattr(giver, 'id') else str(giver), event_id, e)
-                    continue
+                    log.exception("api_event_draw: failed to notify %s: %s", giver.id, e)
+                    continue 
 
-            # mensaje al grupo
+            # Mensaje público al grupo
             try:
-                Mensaje.objects.create(conversacion=ev.conversacion, remitente=request.user, tipo='texto', contenido="🎉 ¡El sorteo se ha realizado con éxito! 🎯\n\nCada participante ha recibido un mensaje privado con su asignación. Por favor, revisen sus mensajes privados para ver a quién deben regalar. 🤫\n\n¡Que empiece la diversión del Amigo Secreto! 🎁")
-            except Exception:
-                log.exception("api_event_draw: failed to post group message for event %s", event_id)
+                m_group = Mensaje.objects.create(
+                    conversacion=ev.conversacion, 
+                    remitente=request.user, 
+                    tipo='texto', 
+                    contenido="🎉 ¡El sorteo se ha realizado con éxito! 🎯\n\nEl organizador (yo) no participa en el intercambio.\nCada participante ha recibido un mensaje privado con su asignación. 🤫\n\n¡Que empiece la diversión! 🎁"
+                )
+                
+                # Actualizar la conversación grupal
+                ev.conversacion.ultimo_mensaje = m_group
+                ev.conversacion.actualizada_en = timezone.now()
+                ev.conversacion.save(update_fields=['ultimo_mensaje', 'actualizada_en'])
 
-            # marcar evento como sorteado
+                # Refrescar también a todos los del grupo
+                group_members = _conversation_member_ids(ev.conversacion)
+                users_to_refresh.extend(group_members)
+            except Exception:
+                pass
+
+            # Marcar evento como sorteado
             ev.estado = 'sorteado'
             if hasattr(ev, 'ejecutado_en'):
                 ev.ejecutado_en = timezone.now()
             ev.save()
+
+            # --- ENVIAR SEÑAL DE REFRESCO (WEBSOCKETS) ---
+            if users_to_refresh:
+                unique_ids = list(set(users_to_refresh))
+                _push_inbox(unique_ids, {
+                    "kind": "inbox_refresh",
+                    "reason": "new_message"
+                })
+                for uid in unique_ids:
+                     _push_inbox([uid], {
+                        "kind": "new_message",
+                        "conversacion_id": None 
+                    })
 
             return JsonResponse({"ok": True, "count": len(users), "notified": created})
 
     except Exception as e:
         import traceback
         tb = traceback.format_exc()
-        log.error("api_event_draw: unexpected error for event %s: %s", event_id, e)
-        log.error(tb)
-        return JsonResponse({"ok": False, "error": "Error al realizar el sorteo", "debug": {"error_type": e.__class__.__name__, "error_details": str(e), "trace": tb.split('\n')[-6:]}}, status=500)
-
-        with transaction.atomic():
-            step = 'participants-qry'
-        # Detecta el nombre del FK hacia el evento en EventParticipant
-        fk_event_field = 'evento' if _field_exists(EventParticipant, 'evento') else (
-                         'event'  if _field_exists(EventParticipant, 'event')  else None)
-        fk_user_field  = 'usuario' if _field_exists(EventParticipant, 'usuario') else (
-                         'user'    if _field_exists(EventParticipant, 'user')    else None)
-        if not fk_event_field or not fk_user_field:
-            return JsonResponse({"ok": False, "step": step, "msg": "Campos FK en EventParticipant no coinciden"}, status=500)
-
-        user_ids = list(
-            EventParticipant.objects.filter(**{fk_event_field: ev}).values_list(fk_user_field + '_id', flat=True)
-        )
-        user_ids = sorted({int(x) for x in user_ids if x})
-        if len(user_ids) < 2:
-            return JsonResponse({"ok": False, "step": step, "msg": "Se requieren al menos 2 participantes"}, status=400)
-
-        step = 'load-users'
-        User = get_user_model()
-        users = list(User.objects.filter(id__in=user_ids).order_by('id'))
-        if len(users) < 2:
-            return JsonResponse({"ok": False, "step": step, "msg": "No se pudieron cargar usuarios"}, status=400)
-
-        step = 'derangement'
-        asignados = _derangement(users)
-        if not asignados:
-            return JsonResponse({"ok": False, "step": step, "msg": "No fue posible generar el sorteo"}, status=500)
-
-        step = 'persist-assignments'
-        # Detecta nombres de campos en SecretSantaAssignment
-        fk_ev_field = 'evento' if _field_exists(SecretSantaAssignment, 'evento') else (
-                      'event'  if _field_exists(SecretSantaAssignment, 'event')  else None)
-        giver_field = 'giver' if _field_exists(SecretSantaAssignment, 'giver') else (
-                      'emisor' if _field_exists(SecretSantaAssignment, 'emisor') else (
-                      'da'     if _field_exists(SecretSantaAssignment, 'da')     else None))
-        recv_field  = 'receiver' if _field_exists(SecretSantaAssignment, 'receiver') else (
-                      'receptor' if _field_exists(SecretSantaAssignment, 'receptor') else (
-                      'recibe'   if _field_exists(SecretSantaAssignment, 'recibe')   else None))
-        if not fk_ev_field or not giver_field or not recv_field:
-            return JsonResponse({"ok": False, "step": step, "msg": "Campos en SecretSantaAssignment no coinciden"}, status=500)
-
-        # Borra asignaciones previas
-        SecretSantaAssignment.objects.filter(**{fk_ev_field: ev}).delete()
-
-        rows = []
-        for giver, receiver in zip(users, asignados):
-            rows.append(SecretSantaAssignment(**{
-                fk_ev_field: ev,
-                f"{giver_field}_id": giver.id,
-                f"{recv_field}_id": receiver.id
-            }))
-        SecretSantaAssignment.objects.bulk_create(rows)
-
-        step = 'send-private-messages'
-        # Enviar mensaje privado a cada participante
-        for giver in users:
-            receiver = asignados[users.index(giver)]
-            
-            try:
-                # Intentar encontrar una conversación privada existente primero
-                conv_privada = Conversacion.objects.filter(
-                    participantes__usuario__in=[giver, request.user],
-                    tipo=_tipo_privado_value()
-                ).annotate(
-                    num_participantes=models.Count('participantes')
-                ).filter(
-                    num_participantes=2
-                ).first()
-                
-                if not conv_privada:
-                    # Crear nueva conversación privada si no existe
-                    conv_privada = Conversacion.objects.create(
-                        tipo=_tipo_privado_value(),
-                        nombre=''  # los mensajes privados no necesitan nombre
-                    )
-                    
-                    # Crear participantes de la conversación
-                    ParticipanteConversacion.objects.bulk_create([
-                        ParticipanteConversacion(conversacion=conv_privada, usuario=giver),
-                        ParticipanteConversacion(conversacion=conv_privada, usuario=request.user)
-                    ])
-                
-                # Crear mensaje privado
-                mensaje_privado = f"""🎁 *Sorteo Amigo Secreto*
-¡Te ha tocado regalar a *{receiver.nombre} {receiver.apellido}*!
-Evento: {ev.titulo}
-{f'Presupuesto: ${ev.presupuesto_fijo}' if ev.presupuesto_fijo else ''}
-
-¡Recuerda mantener el secreto! 🤫"""
-                
-                Mensaje.objects.create(
-                    conversacion=conv_privada,
-                    remitente=request.user,
-                    tipo='texto',
-                    contenido=mensaje_privado
-                )
-            except Exception as e:
-                print(f"Error al enviar mensaje a {giver.nombre}: {str(e)}")
-                continue  # Continuar con el siguiente usuario aunque falle uno
-
-        # Enviar mensaje al grupo del evento
-        Mensaje.objects.create(
-            conversacion=ev.conversacion,
-            remitente=request.user,
-            tipo='texto',
-            contenido="🎉 ¡El sorteo se ha realizado! Cada participante ha recibido su asignación por mensaje privado. ¡Que empiece el Amigo Secreto! 🎁"
-        )
-
-        step = 'mark-event'
-        if hasattr(ev, 'estado'):
-            ev.estado = 'sorteado'
-        if hasattr(ev, 'sorteado_at'):
-            ev.sorteado_at = timezone.now()
-        ev.save()
-
-        return JsonResponse({"ok": True, "count": len(users)}, status=200)
-
-    except Http404:
-        return JsonResponse({"ok": False, "step": 'load-event', "msg": "Evento no existe"}, status=404)
-    except Exception as e:
-        return JsonResponse({"ok": False, "step": step, "msg": f"{e.__class__.__name__}: {e}",
-                             "trace": traceback.format_exc()}, status=500)
-
-
+        log.error("api_event_draw: unexpected error: %s", e)
+        return JsonResponse({"ok": False, "error": "Error al realizar el sorteo", "debug": {"error": str(e)}}, status=500)
+    
 @login_required
 @require_POST
 @transaction.atomic
@@ -5775,14 +5867,14 @@ def api_post_comments(request, post_id):
     )
 
     usar_filtro = request.GET.get("filtro_malas_palabras") == "1"
-    MAX_COMMENTS_AI = 40  # límite global para no matar la API
+    MAX_COMMENTS_AI = 40
 
     comentarios_list = list(comentarios)
 
     if usar_filtro:
         for idx, c in enumerate(comentarios_list):
             if idx < MAX_COMMENTS_AI:
-                visible = censurar_con_openai(c.contenido or "")
+                visible = censurar(c.contenido or "")   # ← SOLO ESTO
             else:
                 visible = c.contenido
             c._contenido_visible = visible
@@ -5795,7 +5887,7 @@ def api_post_comments(request, post_id):
             {
                 "id": c.id_comentario,
                 "autor": c.usuario.nombre_usuario,
-                "contenido": c._contenido_visible,  # 👈 ya viene censurado si corresponde
+                "contenido": c._contenido_visible,
                 "fecha": c.fecha_comentario.strftime("%d %b, %Y %H:%M"),
                 "autor_foto": (
                     c.usuario.perfil.profile_picture.url
@@ -5808,10 +5900,6 @@ def api_post_comments(request, post_id):
         ]
     }
     return JsonResponse(data)
-
-
-def _model_has_field(model, name: str) -> bool:
-    return any(f.name == name for f in model._meta.get_fields())
 
 @require_http_methods(["GET", "POST"])
 def resend_verification_view(request):
@@ -5882,30 +5970,6 @@ def producto_externo_detalle(request, pk):
     return render(request, "producto_externo_detalle.html", context)
 
 
-@login_required
-@require_POST
-def favoritos_toggle_externo(request, producto_externo_id):
-    from core.models import ProductoExterno, ProductoExternoFavorito
-
-    try:
-        producto = ProductoExterno.objects.get(pk=producto_externo_id)
-    except ProductoExterno.DoesNotExist:
-        return JsonResponse({"error": "Producto externo no encontrado"}, status=404)
-
-    fav, created = ProductoExternoFavorito.objects.get_or_create(
-        user=request.user,
-        producto_externo=producto
-    )
-
-    if not created:
-        # Ya existía → eliminarlo
-        fav.delete()
-        return JsonResponse({"state": "removed"})
-
-    # Si se agregó → devolver respuesta
-    return JsonResponse({"state": "added"})
-
-
 
 
 def producto_externo_detalle(request, id_externo):
@@ -5917,3 +5981,227 @@ def producto_externo_detalle(request, id_externo):
     producto = externo.ensure_producto_interno()
     return redirect("producto_detalle", id_producto=producto.id_producto)
 
+
+@login_required
+@require_POST
+def wishlist_marcar_recibido_externo(request, id_externo):
+    try:
+        # Buscar el artículo en la wishlist con el ID recibido
+        item = get_object_or_404(ItemEnWishlist, id=id_externo)
+
+        # Verificar si el artículo ya está marcado como "recibido"
+        if item.fecha_comprado is not None:
+            return JsonResponse({"ok": False, "error": "El artículo ya está marcado como recibido."}, status=400)
+
+        # Marcar el artículo como "recibido"
+        item.fecha_comprado = timezone.now()  # Usamos la fecha actual para marcarlo como recibido
+        item.save()
+
+        # Devolver respuesta positiva
+        return JsonResponse({"ok": True, "message": "Artículo marcado como recibido."})
+
+    except Exception as e:
+        # En caso de error, devolver un mensaje de error
+        return JsonResponse({"ok": False, "error": str(e)}, status=500)    
+
+
+@login_required
+@require_POST
+def favoritos_toggle(request, pk):
+    """
+    Activa/desactiva favoritos para:
+    - Producto interno (Producto)
+    - Producto externo (ProductoExterno)
+    """
+    user = request.user
+    wishlist = get_default_wishlist(user)
+
+    # Detectar si el producto es interno o externo
+    is_externo = request.POST.get('externo') == '1'
+
+    if is_externo:
+        # Producto EXTERNO
+        producto_ext = get_object_or_404(ProductoExterno, id_producto_externo=pk)
+        # Operación atómica para evitar duplicados en caso de solicitudes concurrentes
+        try:
+            with transaction.atomic():
+                # Bloquea filas relacionadas para evitar races (si existen)
+                existing = ItemEnWishlist.objects.select_for_update().filter(
+                    id_wishlist=wishlist,
+                    producto_externo=producto_ext
+                ).first()
+
+                if existing:
+                    # Si ya existe, lo eliminamos (toggle)
+                    existing.delete()
+                    return JsonResponse({"state": "removed"})
+
+                # Intentamos crear; si otro request crea simultáneamente, IntegrityError será lanzado
+                new_item = ItemEnWishlist.objects.create(
+                    id_wishlist=wishlist,
+                    producto_externo=producto_ext,
+                    cantidad=1
+                )
+                created = True
+
+        except IntegrityError:
+            # Otro proceso creó el item en paralelo — recuperarlo
+            new_item = ItemEnWishlist.objects.filter(id_wishlist=wishlist, producto_externo=producto_ext).first()
+            created = bool(new_item)
+
+        return JsonResponse({"state": "added" if created else "exists", "item_id": new_item.id_item if new_item else None})
+
+    else:
+        # Producto INTERNO
+        producto_int = get_object_or_404(Producto, id_producto=pk)
+
+        try:
+            with transaction.atomic():
+                existing = ItemEnWishlist.objects.select_for_update().filter(
+                    id_wishlist=wishlist,
+                    id_producto=producto_int
+                ).first()
+
+                if existing:
+                    existing.delete()
+                    return JsonResponse({"state": "removed"})
+
+                new_item = ItemEnWishlist.objects.create(
+                    id_wishlist=wishlist,
+                    id_producto=producto_int,
+                    cantidad=1
+                )
+                created = True
+
+        except IntegrityError:
+            new_item = ItemEnWishlist.objects.filter(id_wishlist=wishlist, id_producto=producto_int).first()
+            created = bool(new_item)
+
+        return JsonResponse({"state": "added" if created else "exists", "item_id": new_item.id_item if new_item else None})
+    
+    
+    
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def send_warning_email_api(request):
+    """
+    Endpoint para que un admin envíe un correo de advertencia a un usuario.
+    Recibe: {'user_id': <int>, 'motivo': <str>}
+    """
+    user_id = request.data.get('user_id')
+    motivo = request.data.get('motivo')
+
+    if not user_id or not motivo:
+        return Response(
+            {"detail": "Se requieren 'user_id' y 'motivo'."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        user_to_warn = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        return Response(
+            {"detail": "El usuario a advertir no existe."},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # Regla de negocio: Un admin no puede advertir a otro admin
+    if user_to_warn.is_staff or getattr(user_to_warn, 'es_admin', False):
+        return Response(
+            {"detail": "No puedes enviar una advertencia a otro administrador."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    try:
+        # Enviamos el correo
+        send_warning_email(user_to_warn, motivo, request.user)
+        return Response(
+            {"message": f"Advertencia enviada exitosamente a {user_to_warn.nombre_usuario}."},
+            status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        return Response(
+            {"detail": f"Error al enviar el correo: {e}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+        
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated]) # Solo el usuario logueado puede cambiarla
+def change_password_forced_api(request, pk):
+    """
+    Permite al usuario cambiar su contraseña si la bandera must_change_password está activa.
+    Resetea la bandera al éxito.
+    """
+    if str(pk) != str(request.user.id):
+        return Response({"detail": "No tienes permiso para modificar este usuario."}, status=status.HTTP_403_FORBIDDEN)
+
+    user = request.user
+    new_password = request.data.get('new_password')
+    
+    # 1. Validación de la bandera
+    if not getattr(user, 'must_change_password', False):
+        return Response({"detail": "El cambio de contraseña no es obligatorio para este usuario."}, status=status.HTTP_400_BAD_REQUEST)
+
+    # 2. Validación de contraseña (puedes añadir lógica de seguridad aquí)
+    if not new_password or len(new_password) < 8: # O usa tus validadores de AUTH_PASSWORD_VALIDATORS
+        return Response({"detail": "La nueva contraseña debe tener al menos 8 caracteres."}, status=status.HTTP_400_BAD_REQUEST)
+
+    # 3. Asignar y resetear la bandera
+    try:
+        user.set_password(new_password)
+        user.must_change_password = False
+        user.save(update_fields=['password', 'must_change_password'])
+        
+        # Opcional: registrar actividad o notificar al admin que el usuario completó el cambio
+        
+        return Response({"message": "Contraseña actualizada exitosamente. El acceso ya no está restringido."}, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({"detail": f"Error interno al cambiar la contraseña: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+# core/views.py
+# ... (imports: send_mail, logging, User, etc.) ...
+
+# --- 👇 AÑADE ESTA VISTA NUEVA 👇 ---
+@api_view(['POST'])
+@permission_classes([AllowAny]) 
+@transaction.atomic
+def admin_password_reset_request(request):
+    """
+    [SOBREESCRITO] Genera una contraseña temporal segura, la asigna al usuario y 
+    envía la contraseña temporal al correo del ADMINISTRADOR (giftersg4@gmail.com).
+    """
+    email = request.data.get('email', '').strip()
+    if not email:
+        return Response({"detail": "Falta el campo email."}, status=status.HTTP_400_BAD_REQUEST)
+        
+    try:
+        # Buscamos al usuario activo
+        user_to_reset = User.objects.get(correo=email, is_active=True) 
+    except User.DoesNotExist:
+        # Seguridad: Mensaje de éxito genérico para no revelar si el correo existe
+        return Response({"message": "Si tu correo es válido, la solicitud ha sido procesada."}, status=status.HTTP_200_OK)
+
+    # 1. Generar Contraseña Temporal (8 caracteres)
+    temporary_password = User.objects.make_random_password(length=8)
+
+    # 2. Asignar nueva contraseña y setear la bandera de cambio forzado
+    user_to_reset.set_password(temporary_password)
+    user_to_reset.must_change_password = True # <- La bandera
+    user_to_reset.save(update_fields=['password', 'must_change_password'])
+    
+    # 3. Enviar el correo al ADMINISTRADOR (giftersg4@gmail.com)
+    try:
+        send_admin_reset_notification(user_to_reset, temporary_password)
+        logging.info(f"Contraseña temporal generada y enviada a ADMIN para user: {email}.")
+    except Exception as e:
+        logging.error(f"FALLO CRÍTICO al enviar notificación a ADMIN sobre {email}: {e}")
+        
+        # <<< --- MODIFICACIÓN CLAVE AQUÍ --- >>>
+        # Si el envío de correo falla, aseguramos que la respuesta SIEMPRE sea JSON y 500
+        return Response({"detail": "La contraseña se restableció, pero falló el envío del correo de notificación al administrador. Revisa la configuración SMTP.", 
+                         "error_code": "EMAIL_FAIL"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+    # 4. Devolvemos mensaje genérico de éxito al cliente de escritorio (Asegura el JSON)
+    return Response({"message": "Solicitud procesada. Se ha notificado al administrador. La contraseña temporal ha sido generada."}, status=status.HTTP_200_OK)

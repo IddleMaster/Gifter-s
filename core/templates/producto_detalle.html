@@ -4,47 +4,102 @@
 {% block title %}{{ producto.nombre_producto }} — Gifter’s{% endblock %}
 
 {% block content %}
+
+<style>
+  .product-detail-image {
+      aspect-ratio: 1/1;
+      background: #fff;
+      overflow: hidden;
+      border-radius: 12px;
+  }
+
+  .product-detail-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+  }
+
+  .similar-card {
+      border-radius: 12px;
+      overflow: hidden;
+      background: #fff;
+      transition: .2s ease;
+      border: 1px solid #e5e7eb;
+  }
+
+  .similar-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.07);
+  }
+
+  .similar-img-wrapper {
+      aspect-ratio: 1/1;
+      overflow: hidden;
+      background: #fff;
+  }
+
+  .similar-img-wrapper img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+  }
+</style>
+
 <div class="container py-4">
+
+  <!-- Breadcrumb -->
   <nav class="mb-3 small">
     <a href="{% url 'home' %}">Inicio</a> /
-    {% if producto.id_categoria %}<span>{{ producto.id_categoria.nombre_categoria }}</span> /{% endif %}
+    {% if producto.id_categoria %}
+      <span>{{ producto.id_categoria.nombre_categoria }}</span> /
+    {% endif %}
     <strong>{{ producto.nombre_producto }}</strong>
   </nav>
 
+  <!-- Producto -->
   <div class="row g-4">
-    <!-- IMAGEN -->
+
+    <!-- Imagen principal -->
     <div class="col-lg-5">
-      <div class="border rounded overflow-hidden" style="aspect-ratio: 1/1; background:#fff">
-        {% if producto.imagen and producto.imagen.url %}
-          <img src="{{ producto.imagen.url }}" alt="{{ producto.nombre_producto }}"
-               style="width:100%;height:100%;object-fit:contain;">
+      <div class="product-detail-image">
+
+        {% if producto.imagen %}
+            {% if producto.imagen.url %}
+              <img src="{{ producto.imagen.url }}">
+
+            {% elif producto.imagen|slice:":4" == "http" %}
+              <img src="{{ producto.imagen }}">
+
+            {% else %}
+              <img src="/media/{{ producto.imagen }}">
+            {% endif %}
         {% else %}
-          <img src="{% static 'img/Gifters/favicongift.png' %}" alt="{{ producto.nombre_producto }}"
-               style="width:100%;height:100%;object-fit:contain;">
+            <img src="{% static 'img/Gifters/favicongift.png' %}">
         {% endif %}
+
       </div>
     </div>
 
-    <!-- INFO -->
+    <!-- Información -->
     <div class="col-lg-7">
       <h1 class="h3 mb-2">{{ producto.nombre_producto }}</h1>
-      {% if producto.id_marca %}<div class="text-primary fw-semibold mb-2">{{ producto.id_marca.nombre_marca }}</div>{% endif %}
 
-      {% if producto.precio %}
-        
+      {% if producto.id_marca %}
+      <div class="text-primary fw-semibold mb-2">{{ producto.id_marca.nombre_marca }}</div>
       {% endif %}
 
       {% if producto.descripcion %}
         <p class="text-muted">{{ producto.descripcion }}</p>
       {% endif %}
 
-      <div class="d-flex gap-2 align-items-center mt-3">
-        <!-- Corazón / wishlist -->
+      <!-- Wishlist + botón tienda -->
+      <div class="d-flex gap-2 mt-3">
+
+        <!-- Wishlist -->
         <a href="#"
            class="btn btn-outline-danger wishlist-btn {% if producto.id_producto in favoritos_ids %}is-fav{% endif %}"
-           title="{% if producto.id_producto in favoritos_ids %}Quitar de wishlist{% else %}Agregar a wishlist{% endif %}"
-           data-product-id="{{ producto.id_producto }}"
-           aria-pressed="{% if producto.id_producto in favoritos_ids %}true{% else %}false{% endif %}">
+           data-product-id="{{ producto.id_producto }}">
+           
           {% if producto.id_producto in favoritos_ids %}
             <i class="bi bi-heart-fill"></i> En tu wishlist
           {% else %}
@@ -52,6 +107,7 @@
           {% endif %}
         </a>
 
+        <!-- Ver en tienda -->
         {% if url_principal %}
           <a href="{{ url_principal }}" target="_blank" rel="noopener"
              class="btn btn-primary">
@@ -60,13 +116,13 @@
         {% endif %}
       </div>
 
-      <!-- Otras URLs de tienda (si existen) -->
+      <!-- Otras URLs -->
       {% if producto.urls_tienda_activas_qs %}
         <div class="mt-3">
-          <div class="small text-muted mb-1">Otros vendedores / enlaces:</div>
+          <div class="small text-muted mb-1">Otros vendedores:</div>
           <div class="d-flex flex-wrap gap-2">
             {% for u in producto.urls_tienda_activas_qs %}
-              <a class="btn btn-sm btn-outline-secondary" href="{{ u.url }}" target="_blank" rel="noopener">
+              <a class="btn btn-sm btn-outline-secondary" href="{{ u.url }}" target="_blank">
                 {{ u.nombre_tienda|default:"Ver tienda" }}
               </a>
             {% endfor %}
@@ -80,81 +136,88 @@
   {% if similares %}
     <hr class="my-5">
     <h2 class="h5 mb-3">Te puede interesar</h2>
+
     <div class="row g-4">
+
       {% for p in similares %}
       <div class="col-12 col-sm-6 col-lg-4">
-        <div class="border rounded h-100 p-2">
-          <a href="{% url 'producto_detalle' p.id_producto %}" class="d-block"
-             style="aspect-ratio:4/3; overflow:hidden;">
-            {% if p.imagen and p.imagen.url %}
-              <img src="{{ p.imagen.url }}" alt="{{ p.nombre_producto }}"
-                   style="width:100%;height:100%;object-fit:cover;">
-            {% else %}
-              <img src="{% static 'img/Gifters/favicongift.png' %}" alt="{{ p.nombre_producto }}"
-                   style="width:100%;height:100%;object-fit:cover;">
-            {% endif %}
+
+        <div class="similar-card">
+
+          <a href="{% url 'producto_detalle' p.id_producto %}">
+            <div class="similar-img-wrapper">
+
+              {% if p.imagen %}
+                  {% if p.imagen.url %}
+                    <img src="{{ p.imagen.url }}">
+                  {% elif p.imagen|slice:":4" == "http" %}
+                    <img src="{{ p.imagen }}">
+                  {% else %}
+                    <img src="/media/{{ p.imagen }}">
+                  {% endif %}
+              {% else %}
+                  <img src="{% static 'img/Gifters/favicongift.png' %}">
+              {% endif %}
+
+            </div>
           </a>
-          <div class="p-2">
-            <a href="{% url 'producto_detalle' p.id_producto %}" class="fw-semibold text-decoration-none">
+
+          <div class="p-3">
+            <a href="{% url 'producto_detalle' p.id_producto %}"
+               class="fw-semibold text-decoration-none d-block">
               {{ p.nombre_producto }}
             </a>
-            {% if p.id_marca %}<div class="small text-primary">{{ p.id_marca.nombre_marca }}</div>{% endif %}
-            
+
+            {% if p.id_marca %}
+              <div class="small text-primary">{{ p.id_marca.nombre_marca }}</div>
+            {% endif %}
           </div>
+
         </div>
+
       </div>
       {% endfor %}
+
     </div>
   {% endif %}
+
 </div>
 
-<!-- === Wishlist toggle (igual que en otras vistas) === -->
+<!-- Wishlist Handler -->
 <script>
   function getCookie(name) {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop().split(';').shift();
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(";").shift();
   }
-  const csrftoken = getCookie('csrftoken');
+  const csrftoken = getCookie("csrftoken");
 
-  document.addEventListener('click', async function (e) {
-    const btn = e.target.closest('.wishlist-btn');
-    if (!btn) return;
+  document.addEventListener("click", async function(e){
+      const btn = e.target.closest(".wishlist-btn");
+      if (!btn) return;
 
-    e.preventDefault();
-    const id = btn.getAttribute('data-product-id');
-    const icon = btn.querySelector('i');
-    const wasFav = btn.classList.contains('is-fav');
-    const prevTitle = btn.title;
+      e.preventDefault();
 
-    try {
-      const url = "{% url 'favoritos_toggle' 0 %}".replace('/0/', `/${id}/`);
-      const resp = await fetch(url, {
-        method: 'POST',
-        headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }
-      });
+      const id = btn.dataset.productId;
 
-      if (resp.redirected || resp.url.includes("{% url 'login' %}")) {
-        window.location.href = "{% url 'login' %}?next={{ request.get_full_path|urlencode }}";
-        return;
-      }
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const resp = await fetch(
+          "{% url 'favoritos_toggle' 0 %}".replace("/0/", `/${id}/`),
+          { method: "POST", headers: { "X-CSRFToken": csrftoken } }
+      );
+
+      if (!resp.ok) return;
 
       const data = await resp.json();
-      const isFav = data.state === 'added';
+      const icon = btn.querySelector("i");
 
-      btn.classList.toggle('is-fav', isFav);
-      btn.setAttribute('aria-pressed', isFav ? 'true' : 'false');
-      btn.title = isFav ? 'Quitar de wishlist' : 'Agregar a wishlist';
-      icon.className = isFav ? 'bi bi-heart-fill' : 'bi bi-heart';
-      btn.innerHTML = isFav ? '<i class="bi bi-heart-fill"></i> En tu wishlist' : '<i class="bi bi-heart"></i> Agregar a wishlist';
-    } catch (err) {
-      // Revertir si falla
-      btn.classList.toggle('is-fav', wasFav);
-      btn.setAttribute('aria-pressed', wasFav ? 'true' : 'false');
-      btn.title = prevTitle;
-      icon.className = wasFav ? 'bi bi-heart-fill' : 'bi bi-heart';
-    }
+      if (data.state === "added") {
+          btn.classList.add("is-fav");
+          btn.innerHTML = '<i class="bi bi-heart-fill"></i> En tu wishlist';
+      } else {
+          btn.classList.remove("is-fav");
+          btn.innerHTML = '<i class="bi bi-heart"></i> Agregar a wishlist';
+      }
   });
 </script>
+
 {% endblock %}

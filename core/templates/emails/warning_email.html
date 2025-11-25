@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Advertencia de Moderación</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6;">
+    <h2 style="color: #d9534f;">Advertencia de Moderación en Gifter's</h2>
+    <p>Hola, {{ user.nombre }},</p>
+    <p>
+        Has recibido una advertencia oficial de un administrador de Gifter's.
+    </p>
+    <p><strong>Motivo de la advertencia:</strong></p>
+    <blockquote style="background-color: #f9f9f9; border-left: 5px solid #d9534f; padding: 10px 15px; margin: 15px 0;">
+        <p style="margin: 0;">{{ motivo|linebreaksbr }}</p>
+    </blockquote>
+    <p>
+        Esta advertencia ha sido registrada. Por favor, revisa nuestros términos de servicio y asegúrate de
+        seguir las reglas de la comunidad para evitar futuras acciones, las cuales podrían incluir
+        la suspensión temporal o permanente de tu cuenta.
+    </p>
+    <p>
+        Atentamente,<br>
+        El equipo de Gifter's
+    </p>
+</body>
+</html>

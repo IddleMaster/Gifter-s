@@ -13,7 +13,7 @@
   <link rel="icon" href="{% static 'img/Gifters/favicongift.png' %}" type="image/png" />
   <link rel="apple-touch-icon" href="{% static 'img/Gifters/logo-sin-letras.png' %}" />
 
-  <!-- Google Fonts --> 
+  <!-- Google Fonts -->
   <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700;900&display=swap" rel="stylesheet" />
 
@@ -157,7 +157,6 @@
       gap: 0;
       height: 100%;
       min-height: 0;
-      /* para que flexbox/grid permitan scroll interno */
     }
 
     .phone-list {
@@ -192,7 +191,6 @@
       background: #fbfbfd;
     }
 
-    /* Lista reusando tu markup existente */
     .chat-list {
       padding: 8px;
     }
@@ -335,31 +333,75 @@
       color: #0d6efd;
     }
 
-    /* Responsivo: en pantallas chicas, lista arriba y chat abajo (tipo app) */
+    #btnMobileBack {
+      display: none;
+    }
+
     @media (max-width: 860px) {
+
+      /* Ajuste general del drawer en móvil */
       .chat-drawer.phone-ui {
-        right: 10px;
-        left: 10px;
-        height: 80vh;
-      }
-
-      .phone-body {
-        grid-template-columns: 1fr;
-      }
-
-      .phone-bottom-nav {
+        width: 100% !important;
+        height: 100% !important;
+        max-width: none !important;
+        bottom: 0 !important;
+        right: 0 !important;
+        border-radius: 0 !important;
         display: flex;
+        flex-direction: column;
       }
 
+      /* Forzamos que el cuerpo ocupe todo el espacio menos el header */
+      .phone-body {
+        flex: 1;
+        display: flex;
+        position: relative;
+        overflow: hidden;
+      }
+
+      /* === ESTADO 1: MODO LISTA (Por defecto) === */
+      /* La lista ocupa todo, el chat está oculto */
       .phone-list {
-        height: 45%;
+        width: 100% !important;
+        display: block !important;
       }
 
       .phone-chat {
-        height: 55%;
-        border-top: 1px solid #eef1f5;
+        display: none !important;
+      }
+
+      #chatDrawer.in-chat .phone-list,
+      #chatDrawer.in-chat .phone-tabs,
+      #chatDrawer.in-chat .phone-bottom-nav {
+        display: none !important;
+      }
+
+      /* Mostramos el chat al 100% */
+      #chatDrawer.in-chat .phone-chat {
+        display: flex !important;
+        width: 100% !important;
+        height: 100% !important;
+      }
+
+      /* === BOTÓN VOLVER === */
+      /* Solo aparece en móvil y cuando estamos dentro de un chat */
+      #chatDrawer.in-chat #btnMobileBack {
+        display: inline-block !important;
+        background: transparent;
+        border: none;
+        color: white;
+        /* Asumiendo fondo azul del header */
+        font-size: 1.2rem;
+        margin-right: 10px;
+        cursor: pointer;
+      }
+
+      /* Ocultamos el logo o texto de marca si falta espacio en móvil al ver chat */
+      #chatDrawer.in-chat .brand img {
+        display: none;
       }
     }
+
 
     /* Avatar arriba para ambos lados */
     .msg {
@@ -375,17 +417,17 @@
       align-self: flex-start;
     }
 
-    /* Cuando NO mostramos avatar, damos margen para que la burbuja no “salte” */
+
     .msg.other.compact .bubble {
       margin-left: 36px;
     }
 
-    /* 28px avatar + 8px gap */
+
     .msg.me.compact .bubble {
       margin-right: 36px;
     }
 
-    /* Separador de día */
+
     .day-sep {
       text-align: center;
       font-size: .85rem;
@@ -441,26 +483,23 @@
       }
     }
 
-    /* Asegura que el área derecha sea una columna con el input al final */
+
     .chat-pane {
       display: flex;
       flex-direction: column;
     }
 
-    /* El listado scrollea, el resto queda debajo */
+
     .chat-messages {
       flex: 1;
       overflow: auto;
     }
 
-    /* El indicador queda justo encima del input, sin scrollearse */
+
     #typingIndicator {
       position: sticky;
-      /* queda “pegado” dentro de su contenedor */
       bottom: 0;
-      /* pegado abajo */
       z-index: 1;
-      /* por encima del fondo */
       margin-top: 0;
       margin-bottom: 6px;
     }
@@ -490,19 +529,15 @@
       overflow-y: auto;
     }
 
-    /* Portal que pintas en <body> (pegado al buscador) */
+
     #sugerenciasPortal {
       position: fixed;
-      /* ya lo usas para evitar recortes */
       border: 1.5px solid #0d6efd;
-      /* mismo color que el pill */
       border-top: none;
-      /* se “funde” con el borde inferior del pill */
       background: #fff;
       border-bottom-left-radius: 14px;
       border-bottom-right-radius: 14px;
       margin-top: -2px !important;
-      /* elimina la grieta de 1–2px */
       box-shadow: 0 12px 22px rgba(0, 0, 0, .08);
       max-height: 360px;
       overflow-y: auto;
@@ -540,14 +575,12 @@
       margin-left: auto;
     }
 
-    /* Evita que contenedores recorten el dropdown */
     .branding,
     .brand-left,
     .search-pill {
       overflow: visible !important;
     }
 
-    /* ——— Pill del buscador ——— */
     .site-search {
       position: relative;
     }
@@ -557,22 +590,18 @@
       outline: none !important;
     }
 
-    /* mata halos nativos dentro del form */
 
     .search-pill {
       display: flex;
       align-items: center;
       height: 44px;
-      /* altura consistente */
       border: 1.5px solid #0d6efd;
       border-radius: 999px;
       overflow: hidden;
-      /* recorta cualquier “desfase” interior */
       background: #fff;
       box-sizing: border-box;
     }
 
-    /* Input sin bordes/sombras/ornamentos nativos */
     .search-pill .search-input {
       flex: 1;
       height: 100%;
@@ -604,7 +633,6 @@
       border: 0;
       background: #fff;
       border-left: 1px solid rgba(13, 110, 253, .22);
-      /* divisor sutil */
       cursor: pointer;
       outline: none;
       box-shadow: none !important;
@@ -621,12 +649,10 @@
       line-height: 1;
     }
 
-    /* Halo de focus bonito aplicado al contenedor (no al hijo) */
     .search-pill:focus-within {
       box-shadow: none !important;
     }
 
-    /* Estado cuando el dropdown está abierto: quita radios inferiores para encajar */
     .search-pill.sug-open {
       border-bottom-left-radius: 0;
       border-bottom-right-radius: 0;
@@ -651,40 +677,27 @@
 
 
   <style>
-    /* Scrollbar minimalista */
-    /* Scrollbar minimalista */
     /* ================== Notificaciones – estilo limpio ================== */
-    /* siempre sobre la barra de búsqueda */
     ul.dropdown-menu[aria-labelledby="notifDropdown"] {
       z-index: 1100;
-      /* sube la capa */
       min-width: min(92vw, 360px) !important;
-      /* que no se pase en móvil */
       max-height: 70vh;
-      /* ya lo usas inline: lo traigo acá */
       overflow: auto;
-      /* ya lo usas inline: lo traigo acá */
       margin-top: .35rem;
-      /* separa un poco de la campanita */
     }
 
-    /* header “Notificaciones | acciones” en varias líneas si no cabe */
     ul.dropdown-menu[aria-labelledby="notifDropdown"] li.px-3.py-2 .d-flex {
       flex-wrap: wrap;
       row-gap: .35rem;
     }
 
-    /* coloca el menú bien pegado a la derecha en pantallas pequeñas */
     @media (max-width: 576px) {
       ul.dropdown-menu[aria-labelledby="notifDropdown"] {
         inset: auto .75rem auto auto !important;
-        /* right: 12px */
         transform: none !important;
-        /* evita correcciones de Popper raras */
       }
     }
 
-    /* Contenedor del menú (tu <ul> actual) */
     ul.dropdown-menu[aria-labelledby="notifDropdown"] {
       --g-blue: #377dff;
       --g-border: #e6eaf2;
@@ -696,7 +709,6 @@
       backdrop-filter: saturate(140%) blur(2px);
     }
 
-    /* Header fijo (primer <li>) */
     ul.dropdown-menu[aria-labelledby="notifDropdown"]>li:first-child {
       position: sticky;
       top: 0;
@@ -705,18 +717,15 @@
       border-bottom: 1px solid var(--g-border);
     }
 
-    /* Divider más sutil */
     ul.dropdown-menu[aria-labelledby="notifDropdown"] .dropdown-divider {
       margin: 0;
       border-color: var(--g-border);
     }
 
-    /* Cada <li> que contiene una notificación */
     ul.dropdown-menu[aria-labelledby="notifDropdown"] li.px-2 {
       padding: .2rem .5rem;
     }
 
-    /* Tarjeta de notificación (tu .dropdown-item.notif-item) */
     ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item {
       gap: .65rem;
       padding: .65rem .75rem;
@@ -729,13 +738,11 @@
       box-shadow: 0 1px 0 rgba(16, 24, 40, .06) inset;
     }
 
-    /* No leída (ya tienes fw-semibold) */
     ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item.fw-semibold {
       background: #eef5ff;
       box-shadow: inset 0 0 0 1px rgba(55, 125, 255, .12);
     }
 
-    /* Icono izquierdo (tu <span class="mt-1"> … </span>) */
     ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item>span.mt-1 {
       display: grid;
       place-items: center;
@@ -748,16 +755,13 @@
       margin-top: 2px;
     }
 
-    /* Bloque de texto principal (link o span con .flex-grow-1) */
     ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item .flex-grow-1 {
       min-width: 0;
-      /* para que el truncado funcione */
       text-decoration: none;
       color: #1c1f23;
       line-height: 1.28;
     }
 
-    /* Título (primer .d-block) */
     ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item .flex-grow-1>.d-block:first-child {
       font-weight: 600;
       margin-bottom: .05rem;
@@ -772,7 +776,6 @@
       text-overflow: ellipsis;
     }
 
-    /* Meta (la última línea “hace X tiempo”) */
     ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item .flex-grow-1 small.text-muted:last-child {
       color: #98a2b3 !important;
       font-size: .8rem;
@@ -798,7 +801,6 @@
       border-color: rgba(55, 125, 255, .18);
     }
 
-    /* Badge “nuevo” en azul del tema */
     #notifBadge {
       background: var(--g-blue) !important;
       box-shadow: 0 1px 0 rgba(0, 0, 0, .06);
@@ -833,7 +835,6 @@
   </style>
 
   <style>
-    /* ======= Ajustes finos de estilo (sobre lo ya pegado) ======= */
 
     /* Más espacio bajo el header y apertura más suave */
     ul.dropdown-menu[aria-labelledby="notifDropdown"] {
@@ -841,7 +842,6 @@
       border-radius: 16px;
     }
 
-    /* Header: botones menos “duros” */
     #markAllBtn,
     #hideReadBtn,
     #hideAllBtn {
@@ -857,28 +857,23 @@
       color: #2b6bff !important;
     }
 
-    /* Cada item: tipografía y respiración */
     ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item {
       padding: .6rem .75rem;
       line-height: 1.28;
     }
 
-    /* Título semibold, resto normal (evita “gritar”) */
     ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item .flex-grow-1>.d-block:first-child {
       font-weight: 600;
     }
 
     ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item {
       font-weight: 400;
-      /* base normal */
     }
 
     /* “No leída”: barra lateral azul en vez de bloque pesado */
     ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item.fw-semibold {
       background: #ffffff;
-      /* quita fondo azulazo */
       box-shadow: none;
-      /* sin borde interno */
       position: relative;
     }
 
@@ -891,7 +886,6 @@
       width: 3px;
       border-radius: 3px;
       background: #377dff;
-      /* acento azul */
     }
 
     ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item.fw-semibold .notif-icon {
@@ -899,7 +893,6 @@
       color: #2b6bff;
     }
 
-    /* Texto: jerarquía más clara */
     ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item .flex-grow-1 small.text-muted {
       color: #667085 !important;
     }
@@ -909,7 +902,6 @@
       letter-spacing: .1px;
     }
 
-    /* Acciones: alineación y sutileza */
     ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item .js-notif-mark-one,
     ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item .js-notif-dismiss {
       width: 28px;
@@ -933,7 +925,6 @@
       border-color: rgba(55, 125, 255, .18);
     }
 
-    /* Icono burbuja igualado a la nueva escala */
     ul.dropdown-menu[aria-labelledby="notifDropdown"] .notif-item>span.mt-1 {
       width: 26px;
       height: 26px;
@@ -942,21 +933,18 @@
       color: #2b6bff;
     }
 
-    /* Badge del contador: un poco más compacto y elegante */
     #notifBadge {
       padding: .28rem .44rem;
       font-weight: 700;
       filter: saturate(115%);
     }
 
-    /* Pequeños ajustes de spacing entre items */
     ul.dropdown-menu[aria-labelledby="notifDropdown"] li.px-2+li.px-2 {
       margin-top: .1rem;
     }
   </style>
 
   <style>
-    /* Fade + slide para el menú de notificaciones */
     ul.dropdown-menu[aria-labelledby="notifDropdown"] {
       opacity: 0;
       transform: translateY(-4px);
@@ -978,7 +966,6 @@
 
 
   <style>
-    /* que nada de la cadena recorte el badge */
     .navbar,
     .navbar * {
       overflow: visible !important;
@@ -989,13 +976,11 @@
       overflow: visible !important;
     }
 
-    /* la campanita será el ancla */
     #notifDropdown {
       position: relative !important;
       z-index: 4000 !important;
     }
 
-    /* el badge por encima de todo */
     #notifBadge {
       position: absolute !important;
       top: -6px !important;
@@ -1013,10 +998,8 @@
       background: #dc3545;
       color: #fff;
       box-shadow: 0 0 0 2px #fff;
-      /* halo para que no lo tape el fondo */
     }
 
-    /* Layout del header: deja al centro ceder ancho, lados fijos */
     .header .brand,
     .header .right {
       flex: 0 0 auto;
@@ -1027,41 +1010,33 @@
       min-width: 0;
     }
 
-    /* Buscador grande: ancho fluido y límite superior */
     .g-search {
       width: 100%;
       max-width: 720px;
     }
 
-    /* ajusta si quieres 680/720 */
     .g-search .g-search__box {
       width: 100%;
     }
 
-    /* Evita que el placeholder empuje el ancho */
     .g-search input {
       text-overflow: ellipsis;
     }
 
-    /* Rango conflictivo: el punto donde se te rompe (ajusta números si hace falta) */
     @media (min-width: 992px) and (max-width: 1240px) {
 
-      /* que el buscador ceda ancho en ese rango */
       .g-search {
         max-width: 52vw;
       }
 
-      /* prueba 50–58vw según tu caso */
       .g-search input {
         padding-right: 40px;
       }
 
-      /* deja espacio al botón de lupa */
     }
   </style>
 
   <style>
-    /* ancla y stacking */
     #notifDropdown,
     #notifDropdown i.bi-bell {
       position: relative !important;
@@ -1069,7 +1044,6 @@
       z-index: 4000 !important;
     }
 
-    /* SOLO PUNTO (sin texto) */
     #notifBadge {
       position: absolute !important;
       top: -7px !important;
@@ -1078,7 +1052,6 @@
       transform: none !important;
 
       display: none;
-      /* oculto cuando hay 0 */
       z-index: 6000 !important;
 
       width: 10px;
@@ -1089,27 +1062,30 @@
 
       border-radius: 999px;
       background-color: #dc3545 !important;
-      /* rojo */
+      /* puntito rojo de las notificaciones */
       border: 2px solid #fff;
-      /* halo blanco */
       text-indent: -9999px;
-      /* oculta números si alguien los pone */
       overflow: hidden;
       pointer-events: none;
     }
   </style>
 
   <style>
-    /* estado por defecto: oculto */
     #notifBadge {
       display: none !important;
     }
 
-    /* visible sólo si tiene esta clase */
     #notifBadge.is-on {
       display: inline-block !important;
     }
   </style>
+
+
+
+
+
+
+
 
 
 
@@ -1122,30 +1098,46 @@
 <body class="{% block body_class %}{% endblock %}">
   <!-- HEADER -->
   <header id="header" class="header sticky-top">
-    <!-- Topbar -->
     <div class="topbar d-flex align-items-center">
       <div class="container d-flex justify-content-center justify-content-md-between">
         <div class="w-100 text-center py-1 bg-primary text-white">
           <i><span>Gifter's® 2025</span></i>
         </div>
         <div class="social-links d-none d-md-flex align-items-center">
-          <a href="#" class="twitter"><i class="bi bi-twitter-x"></i></a>
-          <a href="#" class="facebook"><i class="bi bi-facebook"></i></a>
-          <a href="#" class="instagram"><i class="bi bi-instagram"></i></a>
-          <a href="#" class="linkedin"><i class="bi bi-linkedin"></i></a>
+          <a href="https://x.com/gifterscl" class="twitter"><i class="bi bi-twitter-x"></i></a>
+          <a href="https://www.facebook.com/profile.php?id=61583611932820" class="facebook"><i
+              class="bi bi-facebook"></i></a>
+          <a href="https://www.instagram.com/gifterscl" class="instagram"><i class="bi bi-instagram"></i></a>
         </div>
       </div>
     </div>
 
-    <!-- Barra principal -->
     <div class="branding d-flex align-items-center">
       <div class="container position-relative d-flex align-items-center" style="min-height:84px;">
-        <!-- IZQUIERDA: Marca + buscador (desktop) -->
-        <div class="brand-left d-flex align-items-center gap-3 flex-shrink-0">
-          <a href="{% url 'home' %}" class="logo brand d-flex align-items-center" style="z-index:2;">
-            <span class="brand-text">Gifter’s</span>
-            <img src="{% static 'img/Gifters/favicongift.png' %}" alt="Isotipo Gifter’s" class="brand-mark" />
-          </a>
+
+        <a href="{% url 'home' %}" class="logo brand d-flex align-items-center me-lg-3" style="z-index:2;">
+          <span class="brand-text">Gifter’s</span>
+          <img src="{% static 'img/Gifters/favicongift.png' %}" alt="Isotipo Gifter’s" class="brand-mark" />
+        </a>
+
+        <form class="d-lg-none flex-grow-1 mx-2" action="{% url 'buscar_router' %}" method="get" autocomplete="off">
+          <div class="site-search-mobile">
+            <div class="search-pill d-flex">
+              <input name="q" type="text" placeholder="Buscar..." class="search-input form-control flex-grow-1"
+                value="{{ request.GET.q }}">
+              <button class="btn-search" type="submit" aria-label="Buscar">
+                <i class="bi bi-search"></i>
+              </button>
+            </div>
+          </div>
+        </form>
+
+        <button id="btnMobileNav" class="btn btn-link p-0 ms-2 d-lg-none" type="button" data-bs-toggle="collapse"
+          data-bs-target="#mobileNav" aria-expanded="false" aria-controls="mobileNav" aria-label="Menú">
+          <i class="bi bi-list" style="font-size:1.6rem;"></i>
+        </button>
+
+        <div class="d-none d-lg-flex align-items-center gap-3 w-100">
 
           <form class="g-search" action="{% url 'buscar_router' %}" method="get" autocomplete="off">
             <div class="g-search__box" id="gSearchBox">
@@ -1158,159 +1150,177 @@
             <div id="gSug" class="g-search__sugs" role="listbox" hidden></div>
           </form>
 
-
-
-        </div>
-
-        <!-- CENTRO: Nav (solo desktop) -->
-        <nav id="navmenu" class="navmenu d-none d-lg-block mx-auto">
-          <ul>
-            <li><a href="{% url 'home' %}#clients">Categorías</a></li>
-            <li>
-              {% if user.is_authenticated %}
-              <a href="{% url 'perfil' %}?tab=amigos">Amigos</a>
-              {% else %}
-              <a href="{% url 'account_login' %}?next={% url 'perfil' %}%3Ftab%3Damigos">Amigos</a>
-              {% endif %}
-            </li>
-            <li><a href="{% url 'home' %}#portfolio">Productos</a></li>
-            <li><a href="{% url 'home' %}feed">Feed</a></li>
-          </ul>
-          <i class="mobile-nav-toggle d-none"></i>
-        </nav>
-
-
-
-
-
-        {% if user.is_authenticated %}
-        <!-- 🔔 Campanita de notificaciones -->
-        <div class="nav-item dropdown me-2">
-          <a class="nav-link position-relative" href="#" id="notifDropdown" role="button" data-bs-toggle="dropdown"
-            data-bs-auto-close="outside" aria-expanded="false" aria-label="Notificaciones">
-            <i class="bi bi-bell" style="font-size:1.3rem;"></i>
-            {% if notif_count and notif_count > 0 %}
-            <span id="notifBadge"
-              class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger {% if not notif_count %}d-none{% endif %}"
-              style="font-size:.7rem;">
-              {{ notif_count|default:0 }}
-              <span class="visually-hidden">unread</span>
-            </span>
-            {% endif %}
-          </a>
-
-          <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="notifDropdown"
-            style="min-width:320px;max-height:70vh;overflow:auto;" data-bs-auto-close="outside">
-            <li class="px-3 py-2 d-flex justify-content-between align-items-center">
-              <span class="fw-semibold">Notificaciones</span>
-
-              <div class="d-flex align-items-center gap-1">
-                <button class="btn btn-sm btn-outline-secondary" id="markAllBtn">Marcar todo leído</button>
-                <button class="btn btn-sm btn-outline-secondary" id="hideReadBtn" title="Ocultar solo leídas">Ocultar
-                  leídas</button>
-                <button class="btn btn-sm btn-outline-secondary" id="hideAllBtn" title="Ocultar todas (vista)">Limpiar
-                  lista</button>
-              </div>
-            </li>
-            <li>
-              <hr class="dropdown-divider">
-            </li>
-
-            {% if notif_items %}
-            {% for n in notif_items %}
-            <li class="px-2">
-              <div
-                class="dropdown-item d-flex align-items-center gap-2 notif-item {% if not n.leida %}fw-semibold{% endif %}"
-                data-id="{{ n.notificacion_id|default:n.id }}">
-                <span class="mt-1">
-                  {% if n.tipo == 'alerta' %}<i class="bi bi-exclamation-triangle"></i>
-                  {% elif n.tipo == 'evento' %}<i class="bi bi-calendar-event"></i>
-                  {% else %}<i class="bi bi-info-circle"></i>
-                  {% endif %}
-                </span>
-
-                {% if n.notificacion_id %}
-                <a class="flex-grow-1 text-decoration-none" href="{% url 'notificacion_click' n.notificacion_id %}">
-                  <span class="d-block">{{ n.titulo }}</span>
-                  {% if n.mensaje %}<small class="text-muted">{{ n.mensaje|truncatechars:90 }}</small>{% endif %}
-                  <small class="d-block text-muted">{{ n.creada_en|timesince }} atrás</small>
-                </a>
+          <nav id="navmenu" class="navmenu mx-auto">
+            <ul>
+              <li><a href="{% url 'home' %}#clients">Categorías</a></li>
+              <li>
+                {% if user.is_authenticated %}
+                <a href="{% url 'perfil' %}?tab=amigos">Amigos</a>
                 {% else %}
-                <span class="flex-grow-1">
-                  <span class="d-block">{{ n.titulo }}</span>
-                  {% if n.mensaje %}<small class="text-muted">{{ n.mensaje|truncatechars:90 }}</small>{% endif %}
-                  <small class="d-block text-muted">{{ n.creada_en|timesince }} atrás</small>
-                </span>
+                <a href="{% url 'account_login' %}?next={% url 'perfil' %}%3Ftab%3Damigos">Amigos</a>
                 {% endif %}
+              </li>
+              <li><a href="{% url 'home' %}#portfolio">Productos</a></li>
+              <li><a href="{% url 'home' %}feed">Feed</a></li>
+            </ul>
+            <i class="mobile-nav-toggle d-none"></i>
+          </nav>
 
-                {# Botón siempre visible por ahora #}
-                <button class="btn btn-sm btn-outline-secondary js-notif-mark-one ms-2 flex-shrink-0"
-                  data-id="{{ n.notificacion_id|default:n.id }}" type="button">✓</button>
+          {% if user.is_authenticated %}
+          <div class="nav-item dropdown">
+            <a class="nav-link position-relative" href="#" id="notifDropdown" role="button" data-bs-toggle="dropdown"
+              data-bs-auto-close="outside" aria-expanded="false" aria-label="Notificaciones">
+              <i class="bi bi-bell" style="font-size:1.3rem;"></i>
+              {% if notif_count and notif_count > 0 %}
+              <span id="notifBadge"
+                class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger {% if not notif_count %}d-none{% endif %}"
+                style="font-size:.7rem;">
+                {{ notif_count|default:0 }}
+                <span class="visually-hidden">unread</span>
+              </span>
+              {% endif %}
+            </a>
 
-                {% if not n.leida %}
-                <span class="badge bg-primary rounded-pill ms-1 flex-shrink-0">nuevo</span>
-                {% endif %}
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="notifDropdown"
+              style="min-width:320px;max-height:70vh;overflow:auto;" data-bs-auto-close="outside">
+              <li class="px-3 py-2 d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">Notificaciones</span>
 
-                <button type="button" class="btn btn-sm btn-link text-muted js-notif-dismiss ms-1 flex-shrink-0"
-                  title="Ocultar esta notificación" aria-label="Ocultar" data-id="{{ n.notificacion_id|default:n.id }}">
-                  &times;
-                </button>
+                <div class="d-flex align-items-center gap-1">
+                  <button class="btn btn-sm btn-outline-secondary" id="markAllBtn">Marcar todo leído</button>
+                  <button class="btn btn-sm btn-outline-secondary" id="hideReadBtn" title="Ocultar solo leídas">Ocultar
+                    leídas</button>
+                  <button class="btn btn-sm btn-outline-secondary" id="hideAllBtn" title="Ocultar todas (vista)">Limpiar
+                    lista</button>
+                </div>
+              </li>
+              <li>
+                <hr class="dropdown-divider">
+              </li>
 
-              </div>
-            </li>
-            {% endfor %}
-            {% else %}
-            <li><span class="dropdown-item text-muted">Sin notificaciones</span></li>
-            {% endif %}
-          </ul>
-        </div>
+              {% if notif_items %}
+              {% for n in notif_items %}
+              <li class="px-2">
+                <div
+                  class="dropdown-item d-flex align-items-center gap-2 notif-item {% if not n.leida %}fw-semibold{% endif %}"
+                  data-id="{{ n.notificacion_id|default:n.id }}">
+                  <span class="mt-1">
+                    {% if n.tipo == 'alerta' %}<i class="bi bi-exclamation-triangle"></i>
+                    {% elif n.tipo == 'evento' %}<i class="bi bi-calendar-event"></i>
+                    {% else %}<i class="bi bi-info-circle"></i>
+                    {% endif %}
+                  </span>
 
+                  {% if n.notificacion_id %}
+                  <a class="flex-grow-1 text-decoration-none" href="{% url 'notificacion_click' n.notificacion_id %}">
+                    <span class="d-block">{{ n.titulo }}</span>
+                    {% if n.mensaje %}<small class="text-muted">{{ n.mensaje|truncatechars:90 }}</small>{% endif %}
+                    <small class="d-block text-muted">{{ n.creada_en|timesince }} atrás</small>
+                  </a>
+                  {% else %}
+                  <span class="flex-grow-1">
+                    <span class="d-block">{{ n.titulo }}</span>
+                    {% if n.mensaje %}<small class="text-muted">{{ n.mensaje|truncatechars:90 }}</small>{% endif %}
+                    <small class="d-block text-muted">{{ n.creada_en|timesince }} atrás</small>
+                  </span>
+                  {% endif %}
 
+                  {# Botón siempre visible por ahora #}
+                  <button class="btn btn-sm btn-outline-secondary js-notif-mark-one ms-2 flex-shrink-0"
+                    data-id="{{ n.notificacion_id|default:n.id }}" type="button">✓</button>
 
-        <div class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" role="button"
-            data-bs-toggle="dropdown" aria-expanded="false">
-            <span>Hola, {{ user.nombre }}</span>
+                  {% if not n.leida %}
+                  <span class="badge bg-primary rounded-pill ms-1 flex-shrink-0">nuevo</span>
+                  {% endif %}
+
+                  <button type="button" class="btn btn-sm btn-link text-muted js-notif-dismiss ms-1 flex-shrink-0"
+                    title="Ocultar esta notificación" aria-label="Ocultar"
+                    data-id="{{ n.notificacion_id|default:n.id }}">
+                    &times;
+                  </button>
+
+                </div>
+              </li>
+              {% endfor %}
+              {% else %}
+              <li><span class="dropdown-item text-muted">Sin notificaciones</span></li>
+              {% endif %}
+            </ul>
+          </div>
+
+          <div class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" role="button"
+              data-bs-toggle="dropdown" aria-expanded="false">
+              <span>Hola, {{ user.nombre }}</span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end shadow">
+              <li><a class="dropdown-item" href="{% url 'perfil' %}">Mi perfil</a></li>
+              <li>
+                <hr class="dropdown-divider" />
+              </li>
+              <li>
+                <form method="post" action="{% url 'account_logout' %}">
+                  {% csrf_token %}
+                  <button type="submit" class="dropdown-item logout-item">Cerrar sesión</button>
+                </form>
+              </li>
+            </ul>
+          </div>
+          {% else %}
+          <a href="{% url 'account_login' %}" class="btn btn-primary btn-login">
+            Iniciar Sesión
           </a>
-          <ul class="dropdown-menu dropdown-menu-end shadow">
-            <li><a class="dropdown-item" href="{% url 'perfil' %}">Mi perfil</a></li>
-            <li>
-              <hr class="dropdown-divider" />
-            </li>
-            <li>
-              <form method="post" action="{% url 'account_logout' %}">
-                {% csrf_token %}
-                <button type="submit" class="dropdown-item logout-item">Cerrar sesión</button>
-              </form>
-            </li>
-          </ul>
+          {% endif %}
         </div>
-        {% else %}
-        <a href="{% url 'account_login' %}" class="btn btn-primary btn-login ms-3">
-          Iniciar Sesión
-        </a>
-        {% endif %}
 
-
-        <!-- Toggle buscador móvil -->
-        <button id="btnMobileSearch" class="btn btn-link p-0 ms-2 d-lg-none" type="button" data-bs-toggle="collapse"
-          data-bs-target="#mobileSearch" aria-expanded="false" aria-controls="mobileSearch" aria-label="Buscar">
-          <i class="bi bi-search" style="font-size:1.35rem;"></i>
-        </button>
-
-        <button id="btnMobileNav" class="btn btn-link p-0 ms-2 d-lg-none" type="button" data-bs-toggle="collapse"
-          data-bs-target="#mobileNav" aria-expanded="false" aria-controls="mobileNav" aria-label="Menú">
-          <i class="bi bi-list" style="font-size:1.6rem;"></i>
-        </button>
       </div>
     </div>
 
-    <!-- Agrupador de colapsables móviles -->
     <div id="mobileCollapses" class="d-lg-none">
-      <!-- Menú móvil colapsable -->
+
       <div id="mobileNav" class="collapse border-top bg-white" data-bs-parent="#mobileCollapses">
         <div class="container py-2">
           <nav aria-label="Navegación principal móvil">
+
+            <ul class="nav flex-column mobile-nav mb-2">
+              {% if user.is_authenticated %}
+              <li class="nav-item">
+                <a class="nav-link fw-bold" href="{% url 'perfil' %}">
+                  <i class="bi bi-person-circle me-2"></i>
+                  Hola, {{ user.nombre }}
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'perfil' %}?tab=notificaciones">
+                  <i class="bi bi-bell me-2"></i>
+                  Notificaciones
+                  {% if notif_count and notif_count > 0 %}
+                  <span class="badge bg-danger ms-1">{{ notif_count }}</span>
+                  {% endif %}
+                </a>
+              </li>
+              <li class="nav-item">
+                <form method="post" action="{% url 'account_logout' %}">
+                  {% csrf_token %}
+                  <button type="submit" class="nav-link text-danger"
+                    style="border:none; background:none; padding: 0.5rem 1rem; width: 100%; text-align: left;">
+                    <i class="bi bi-box-arrow-right me-2"></i>
+                    Cerrar sesión
+                  </button>
+                </form>
+              </li>
+              {% else %}
+              <li class="nav-item">
+                <a class="nav-link fw-bold" href="{% url 'account_login' %}">
+                  <i class="bi bi-box-arrow-in-right me-2"></i>
+                  Iniciar Sesión
+                </a>
+              </li>
+              {% endif %}
+            </ul>
+
+            <hr class="my-1">
+
             <ul class="nav flex-column mobile-nav">
               <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#hero">Inicio</a></li>
               <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#clients">Categorías</a></li>
@@ -1327,8 +1337,8 @@
           </nav>
         </div>
       </div>
+
     </div>
-    <!-- /OPCIONAL -->
   </header>
 
   {% block flash_messages %}
@@ -1376,10 +1386,9 @@
         <div class="col-lg-3 col-md-12">
           <h4>Síguenos</h4>
           <div class="social-links d-flex">
-            <a href=""><i class="bi bi-twitter-x"></i></a>
-            <a href=""><i class="bi bi-facebook"></i></a>
-            <a href=""><i class="bi bi-instagram"></i></a>
-            <a href=""><i class="bi bi-linkedin"></i></a>
+            <a href="https://x.com/gifterscl"><i class="bi bi-twitter-x"></i></a>
+            <a href="https://www.facebook.com/profile.php?id=61583611932820"><i class="bi bi-facebook"></i></a>
+            <a href="https://www.instagram.com/gifterscl"><i class="bi bi-instagram"></i></a>
           </div>
         </div>
 
@@ -1465,22 +1474,22 @@
 
   <!-- Drawer (interfaz clásica simple) -->
   <div id="chatDrawer" class="chat-drawer phone-ui" aria-hidden="true">
+
     <div class="phone-header">
       <div class="brand">
+        <button id="btnMobileBack" type="button"><i class="bi bi-arrow-left"></i></button>
+
         <img src="{% static 'img/Gifters/favicongift.png' %}" alt="Gifter’s" />
-        <span>Gifter’s</span>
+        <span id="chat-header-title">Gifter’s</span>
       </div>
 
-      <!-- Acciones a la derecha -->
       <div class="d-flex align-items-center gap-2">
-        <!-- Menú kebab de grupo (solo autor) -->
         <div class="dropdown" id="groupKebab" style="display:none;">
           <button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown" data-bs-display="static"
-            aria-expanded="false" title="Opciones del grupo">⋮</button>
+            aria-expanded="false">⋮</button>
           <ul class="dropdown-menu dropdown-menu-end">
             <li><button class="dropdown-item" data-action="add-members">Agregar miembros…</button></li>
             <li><button class="dropdown-item" data-action="remove-member">Quitar miembro…</button></li>
-            <!-- 👇 NUEVO botón -->
             <li><button class="dropdown-item" data-action="view-members">Ver miembros</button></li>
             <li>
               <hr class="dropdown-divider">
@@ -1488,10 +1497,9 @@
             <li><button class="dropdown-item text-danger" data-action="delete-group">Eliminar grupo</button></li>
           </ul>
         </div>
-        <!-- Menú kebab de grupo (solo miembro NO autor) -->
         <div class="dropdown" id="memberKebab" style="display:none;">
           <button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown" data-bs-display="static"
-            aria-expanded="false" title="Opciones del grupo">⋮</button>
+            aria-expanded="false">⋮</button>
           <ul class="dropdown-menu dropdown-menu-end">
             <li><button class="dropdown-item" data-action="view-members">Ver miembros</button></li>
             <li>
@@ -1523,58 +1531,33 @@
 
     <div class="chat-head" hidden></div>
 
-
-
-
-    <!-- OJO: todo dentro de .chat-body -->
-    <div class="chat-body" style="display:flex; height:100%;">
-
-      <!-- Columna izquierda (lista) con position:relative -->
-      <div style="position:relative; width:340px; border-right:1px solid #eee; overflow:auto;">
+    <div class="phone-body">
+      <div class="phone-list" style="position:relative; width:340px; border-right:1px solid #eee; overflow:auto;">
         <div class="chat-list" id="chatList"></div>
 
-        <!-- Lista de amigos superpuesta -->
         <div id="friendsList" class="chat-list"
           style="display:none; position:absolute; inset:0; overflow:auto; background:#fff;"></div>
-
-        <!-- ✅ Mueve groupsList aquí adentro para que “inset:0” funcione -->
         <div id="groupsList" class="chat-list"
           style="display:none; position:absolute; inset:0; overflow:auto; background:#fff;"></div>
-
         <div id="eventsList" class="chat-list"
           style="display:none; position:absolute; inset:0; overflow:auto; background:#fff;"></div>
       </div>
 
-      <style>
-        .event-actions {
-          position: sticky;
-          top: 0;
-          z-index: 11;
-          display: none;
-          /* se muestra solo en eventos */
-          justify-content: center;
-          align-items: center;
-          padding: 8px 0;
-          background: transparent;
-        }
-
-        .event-actions .btn-sortear {
-          font-weight: 600;
-        }
-      </style>
       <div class="event-actions" id="eventActions"
-        style="display:none; justify-content:center; align-items:center; padding:8px 0; background:transparent;">
+        style="display:none; justify-content:center; align-items:center; padding:8px 0; background:transparent; position: sticky; top: 0; z-index: 11;">
         <button class="btn btn-warning btn-sortear" data-action="draw-event">Sortear</button>
       </div>
 
-      <!-- Columna derecha (mensajes) -->
-      <div class="chat-pane" style="flex:1; display:flex; flex-direction:column;">
+      <div class="phone-chat chat-pane" style="flex:1; display:flex; flex-direction:column;">
         <div id="chatEmpty" class="p-3 text-muted">Selecciona un chat para empezar</div>
+
         <div id="chatMessages" class="chat-messages" hidden></div>
+
         <div id="typingIndicator" class="typing-indicator" hidden>
           <span class="dot"></span><span class="dot"></span><span class="dot"></span>
           <em class="who"></em> está escribiendo…
         </div>
+
         <form id="chatForm" class="chat-input" hidden>
           <input id="chatImage" type="file" accept="image/*" hidden>
           <button type="button" id="btnAttach" class="btn btn-outline-secondary" title="Adjuntar imagen"
@@ -1586,16 +1569,20 @@
           <button type="submit">Enviar</button>
         </form>
       </div>
+
     </div>
+  </div>
+
+
   </div>
   {% endif %}
   <script>
     window.URLS = {
       amigos: "{% url 'amistad_amigos' %}",
       conversaciones: "{% url 'conversaciones_list' %}",
-      mensajesBase: "{% url 'mensajes_list_create' 0 %}", // luego se reemplaza el /0/
+      mensajesBase: "{% url 'mensajes_list_create' 0 %}",
       convConUsuarioId: "{% url 'chat_con_usuario_id' '__USER__' %}",
-      typing: "{% url 'chat_typing' 0 %}",  // ← nuevo (placeholder /0/) // placeholder literal
+      typing: "{% url 'chat_typing' 0 %}",
       typingSummary: "{% url 'chat_typing_summary' %}",
       gruposCreate: "{% url 'grupos_create' %}",
       conversacionDetalleBase: "{% url 'conversacion_detalle' 0 %}",
@@ -1604,12 +1591,11 @@
       grupoQuitarMiembro: "{% url 'grupos_remove_member' 0 %}",
       grupoEliminar: "{% url 'grupos_delete' 0 %}",
       grupoSalir: "{% url 'grupos_leave' 0 %}",
-      eventosListCreate: "{% url 'events_list_create' 0 %}",     // .replace('/0/', `/${convId}/`)
+      eventosListCreate: "{% url 'events_list_create' 0 %}",
       eventoDetail: "{% url 'event_detail' 0 %}",
       eventoDraw: '/api/events/0/draw/',
       eventoLock: "{% url 'event_lock' 0 %}",
       eventoMine: "{% url 'event_my_assignment' 0 %}",
-      /* NUEVO: crea evento con su propio chat */
       eventCreateWithChat: "{% url 'event_create_with_chat' %}",
     };
   </script>
@@ -1635,7 +1621,7 @@
         id: Number('{{ user.id|default:"0"|escapejs }}'),
         username: ("{{ user.nombre_usuario|default:''|escapejs }}").trim()
       };
-      // Cache liviana del preview por conversación
+
       const previewCache = new Map();
 
       function setPreview(convId, text, timeISO, lastId = null, opts = {}) {
@@ -1645,17 +1631,17 @@
         const next = { text: text || '', time: timeISO || null, id: lastId ?? null };
         const prev = previewCache.get(key);
 
-        // ⚠️ Semilla inicial (no había cache)
+
         if (!prev) {
           previewCache.set(key, next);
-          // Si venimos de un click (seed), NO reordenar
+
           if (noReorderOnSeed) return;
-          // Comportamiento anterior: en otros casos sí puede reordenar
+
           patchAnyRow(convId);
           return;
         }
 
-        // --- Tu misma lógica de cambio (prioriza id) ---
+
         let changed;
         if ((prev && prev.id != null) || (next.id != null)) {
           changed = String(prev?.id ?? '') !== String(next.id ?? '');
@@ -1668,15 +1654,15 @@
 
         previewCache.set(key, next);
 
-        // Solo reordenar si cambió
+
         if (changed) patchAnyRow(convId);
       }
       function getPreview(convId) {
         return previewCache.get(String(convId)) || { text: '', time: null };
       }
       function slicePreview(t) { return (t || '').toString().slice(0, 72); }
-      // === Typing: estado previo por conversación (para detectar flanco "dejó de escribir")
-      const wasTypingMap = new Map(); // convId -> boolean
+
+      const wasTypingMap = new Map();
 
       window.CHAT_INDEX = window.CHAT_INDEX || { direct: new Set(), groups: new Set() };
 
@@ -1692,27 +1678,27 @@
         containers.forEach(container => {
           if (!container) return;
 
-          // En grupos, las filas viven dentro del “inner”
+
           const list = (container.id === 'groupsList')
             ? (container.querySelector('[data-role="groups-inner"], .px-2') || container)
             : container;
 
-          // OJO: buscamos en los hijos reales (las filas)
+
           let row = Array.from(list.children).find(
             el => String(el?.dataset?.convId) === String(convId)
           );
-          if (!row) return; // No inventamos filas: si no existe, salimos.
+          if (!row) return; 
 
-          // parcheo de texto/hora
+
           const l2 = row.querySelector('.line2'); if (l2) l2.textContent = prev.text || '';
           const t = row.querySelector('.chat-time'); if (t && prev.time) t.textContent = formatTime(prev.time);
 
-          // mover al tope si no lo está
+        
           if (list.firstElementChild !== row) list.prepend(row);
         });
       }
 
-      // Pide sólo el último mensaje del hilo, hidrata cache y parcha la fila
+
       async function hydratePreview(convId) {
         const url = "{% url 'mensajes_list_create' 0 %}".replace('/0/', `/${convId}/`);
         const r = await fetch(url + "?limit=1", { credentials: 'same-origin' });
@@ -1742,7 +1728,7 @@
       }
 
 
-      // FIX: esta función estaba rota en tu código (comillas/plantillas)
+      
       function getCookie(name) {
         const value = `; ${document.cookie}`;
         const parts = value.split(`; ${name}=`);
@@ -1752,25 +1738,55 @@
       window.CSRF_TOKEN = CSRFTOKEN;
 
       function openDrawer() {
-        drawer.classList.add('open');
-        drawer.setAttribute('aria-hidden', 'false');
-        fab.style.display = 'none';
+        console.log("Intentando abrir drawer..."); // Log para verificar clic
+
+        const drawerEl = document.getElementById('chatDrawer');
+
+        if (!drawerEl) {
+          console.error("¡ERROR CRÍTICO! No se encuentra el elemento con id='chatDrawer'. Revisa tu HTML.");
+          alert("Error: No se encuentra el chat. Recarga la página.");
+          return;
+        }
+
+        // Si llegamos aqui, el elemento existe
+        drawerEl.classList.add('open');
+        drawerEl.setAttribute('aria-hidden', 'false');
+
+        // Ocultar el boton
+        const fabEl = document.getElementById('chatFab');
+        if (fabEl) fabEl.style.display = 'none';
+
+        // Cargar conversaciones
         Promise.resolve(loadConversations()).finally(() => {
           try { refreshGlobalUnreadDot(); } catch { }
         });
 
+        // Cargar grupos (si aplica)
         if (typeof loadGroups === 'function') {
-          // solo la primera vez
           window.__groupsPreloaded ||= false;
           if (!window.__groupsPreloaded) {
             loadGroups().finally(() => { window.__groupsPreloaded = true; });
           }
         }
-        if (window.unreadLightPoll) { clearInterval(window.unreadLightPoll); window.unreadLightPoll = null; }
+
+        // Limpiar polling de luces
+        if (window.unreadLightPoll) {
+          clearInterval(window.unreadLightPoll);
+          window.unreadLightPoll = null;
+        }
+
+        // Iniciar pollings activos
+        if (typeof startTypingSummaryPoll === 'function') startTypingSummaryPoll();
+        if (typeof startGroupPreviewPoll === 'function') startGroupPreviewPoll();
+
+        console.log("Drawer abierto correctamente.");
       }
       function closeDrawer() {
-        drawer.classList.remove('open');
-        drawer.setAttribute('aria-hidden', 'true');
+        const drawerEl = document.getElementById('chatDrawer');
+        if (drawerEl) { // Solo si existe
+          drawerEl.classList.remove('open');
+          drawerEl.setAttribute('aria-hidden', 'true');
+        }
         fab.style.display = '';
         stopPolling();
         if (!unreadLightPoll) {
@@ -1784,14 +1800,14 @@
       openDrawer = function () {
         __openDrawer();
         startTypingSummaryPoll();
-        startGroupPreviewPoll();   // 👈 NUEVO (sólo grupos)
+        startGroupPreviewPoll();
       };
 
       const __closeDrawer = closeDrawer;
       closeDrawer = function () {
         __closeDrawer();
         stopTypingSummaryPoll();
-        stopGroupPreviewPoll();    // 👈 NUEVO
+        stopGroupPreviewPoll();
       };
       fab?.addEventListener('click', openDrawer);
       closeBtn?.addEventListener('click', closeDrawer);
@@ -1816,7 +1832,7 @@
         const apiURL = window.URLS.conversaciones;
 
         try {
-          // Pedimos en paralelo: conversaciones + resumen de "escribiendo"
+
           const [res, typingMap] = await Promise.all([
             fetch(apiURL, {
               credentials: 'same-origin',
@@ -1827,7 +1843,7 @@
 
           if (!res.ok) throw new Error('HTTP ' + res.status);
           const data = await res.json();
-          // refresca índice de directos con data real
+
           (function updateDirectIndex(list) {
             try {
               const direct = (list || []).filter(c => !(c.is_group || String(c.tipo || '').toLowerCase() === 'grupo'));
@@ -1835,14 +1851,14 @@
             } catch { }
           })(data);
 
-          // NEW: llenar/actualizar cache con el último mensaje de cada conversación
+
           (data || []).forEach(c => {
             const last = c.ultimo_mensaje || {};
             const prevText = (last.tipo === 'imagen') ? '📷 Imagen' : slicePreview(last.contenido);
             setPreview(c.conversacion_id, prevText, last.creado_en, last.id || last.pk || null);
           });
 
-          renderConversationList(data, typingMap);  // ← pasamos typingMap al renderer
+          renderConversationList(data, typingMap);
           try { refreshGlobalUnreadDot(); } catch { }
         } catch (e) {
           listEl.innerHTML = '<div class="p-3 text-danger">No se pudieron cargar tus chats.</div>';
@@ -1850,7 +1866,7 @@
           try { refreshGlobalUnreadDot(); } catch { }
         }
       }
-      // Rellena/actualiza cache con el último mensaje de cada conversación
+
 
 
       const AVATAR_FALLBACK = "{% static 'img/Gifters/favicongift.png' %}";
@@ -1906,7 +1922,7 @@
           return;
         }
 
-        // 🚫 fuera los grupos en la pestaña "Chats"
+
         const chatsOnly = items.filter(c => {
           const t = String(c.tipo || '').toLowerCase();
           const isGroup = c.is_group || t === 'grupo';
@@ -1930,17 +1946,17 @@
           const p = partnerFrom(conv);
           const last = conv.ultimo_mensaje || {};
 
-          // ✅ Detecta imagen y guarda en cache el texto correcto
+      
           const isImg = (last.tipo === 'imagen') || !!last.archivo_url || !!(last.metadatos && last.metadatos.archivo_url);
           const prevText = isImg ? '📷 Imagen' : slicePreview(last.contenido);
           setPreview(conv.conversacion_id, prevText, last.creado_en, last.id || last.pk || null);
 
           const row = document.createElement('div');
           row.className = 'chat-list-item' + (conv.conversacion_id === window.currentConvId ? ' active' : '');
-          row.dataset.convId = conv.conversacion_id;      // data-conv-id
-          row.setAttribute('data-conv', conv.conversacion_id); // data-conv 
+          row.dataset.convId = conv.conversacion_id;      
+          row.setAttribute('data-conv', conv.conversacion_id); 
 
-          // ✅ Si hay typing muéstralo; si no, usa SIEMPRE el cache (no last.contenido)
+
           const tUsers = typingMap[String(conv.conversacion_id)] || [];
           const line2 = tUsers.length ? prettyTyping(tUsers) : getPreview(conv.conversacion_id).text;
 
@@ -1988,12 +2004,12 @@
                 line2El.classList.add('text-primary');
               } else {
                 if (wasTyping) {
-                  // ⚡ Flanco: antes estaba escribiendo y ahora no → probablemente envió mensaje
+                  //  Flanco: antes estaba escribiendo y ahora no, probablemente envio mensaje
                   hydratePreview(convId)
                     .then(() => { try { refreshGlobalUnreadDot(); } catch { } })
                     .catch(() => { });
                 } else {
-                  // Restaurar desde cache sin pegar a red
+
                   const prev = getPreview(convId);
                   line2El.textContent = prev.text || '';
                   line2El.classList.remove('text-primary');
@@ -2026,7 +2042,7 @@
             const last = c.ultimo_mensaje || {};
             const isImg = (last.tipo === 'imagen') || !!last.archivo_url || !!(last.metadatos && last.metadatos.archivo_url);
             const prevText = isImg ? '📷 Imagen' : slicePreview(last.contenido);
-            // 👉 esto actualiza cache + texto/tiempo y mueve la fila al tope en #groupsList si ya existe
+
             setPreview(c.conversacion_id, prevText, last.creado_en, last.id || last.pk || null);
           });
         } catch { /* noop */ }
@@ -2049,7 +2065,7 @@
 
         const url = "{% url 'mensajes_list_create' 0 %}".replace('/0/', `/${window.currentConvId}/`);
 
-        // Declarar fuera del try para poder usarlo luego sin romper
+
         let arr = [];
         try {
           const nearBottom = (() => {
@@ -2068,12 +2084,12 @@
           // Render
           renderMessages(arr);
 
-          // El más nuevo
+
           const newest = arr[0] || {};
           const newLastId = String(newest.id || newest.pk || newest.uuid || '');
           msgsEl.dataset.lastMsgId = newLastId;
 
-          // Actualiza preview/horario en ambas listas (chats y grupos)
+
           if (newest) {
             const prevText = (newest.tipo === 'imagen') ? '📷 Imagen' : slicePreview(newest.contenido);
             setPreview(
@@ -2081,11 +2097,11 @@
               prevText,
               newest.creado_en,
               newest.id || newest.pk || null,
-              { noReorderOnSeed: true }   // 👈 evita subir solo por click
+              { noReorderOnSeed: true }
             );
           }
 
-          // Auto-scroll si hay mensajes nuevos o ya estabas abajo
+
           const gotNew = newLastId && newLastId !== prevLastId;
           if (gotNew || nearBottom) {
             requestAnimationFrame(() => { msgsEl.scrollTop = msgsEl.scrollHeight; });
@@ -2100,7 +2116,7 @@
         msgsEl.innerHTML = '';
         const meId = Number('{{ user.id|default:"0"|escapejs }}');
 
-        // Orden cronológico en pantalla
+
         const ordered = msgs.slice().reverse();
 
         let prevAuthorId = null;
@@ -2137,7 +2153,7 @@
           const whenMs = parseMs(m.creado_en);
           const showAvatar = window.currentConvIsGroup ? true : isBlockStart(authorId, whenMs);
 
-          // —— Separador de día si cambió
+          // Separador de día
           const dayKey = dayKeyFromMs(whenMs || Date.now());
           if (dayKey !== prevDayKey) {
             const sep = document.createElement('div');
@@ -2150,34 +2166,57 @@
           const row = document.createElement('div');
           row.className = 'msg ' + (isMe ? 'me' : 'other') + (showAvatar ? '' : ' compact');
 
-          const avatarUrl =
-            toAbsoluteMedia((m.remitente && (m.remitente.avatar || m.remitente.avatar_url)) || null) ||
-            "{% static 'img/Gifters/favicongift.png' %}";
-
+          const avatarUrl = toAbsoluteMedia((m.remitente && (m.remitente.avatar || m.remitente.avatar_url)) || null) || "{% static 'img/Gifters/favicongift.png' %}";
           const when = m.creado_en ? new Date(m.creado_en).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
 
-          const isImage = (m.tipo === 'imagen') || !!m.archivo_url || !!(m.metadatos && m.metadatos.archivo_url);
-          const safeText = String(m.contenido || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-          const bodyHTML = isImage
-            ? (() => {
-              const imgUrl = toAbsoluteMedia(m.archivo_url || (m.metadatos && m.metadatos.archivo_url));
-              return `<a href="${imgUrl}" target="_blank" rel="noopener">
-                      <img class="msg-image" src="${imgUrl}" alt="imagen">
-                    </a>${safeText ? `<div style="margin-top:6px;">${safeText}</div>` : ''}`;
-            })()
-            : safeText;
+          // LOGICA DE CONTENIDO 
 
-          const senderName =
-            (m.remitente && (m.remitente.nombre_completo ||
-              [m.remitente.nombre, m.remitente.apellido].filter(Boolean).join(' ') ||
-              m.remitente.display_name ||
-              m.remitente.username ||
-              m.remitente.nombre_usuario)) || 'Usuario';
+          function linkify(text) {
+            let escapedText = String(text || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            return escapedText.replace(urlRegex, function (url) {
+              return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: #0d6efd; text-decoration: underline;">${url}</a>`;
+            });
+          }
+
+          // 1. Detectar si es IMAGEN
+          const isImage = (m.tipo === 'imagen') || !!m.archivo_url || !!(m.metadatos && m.metadatos.archivo_url);
+
+          // 2. Detectar si es GRÁFICO (QuickChart)
+          const isChart = (m.metadatos && m.metadatos.tipo === 'chart_card' && m.metadatos.chart_url);
+
+          let bodyHTML = '';
+
+          if (isChart) {
+            bodyHTML = `
+               <div class="mb-1 fw-bold">${linkify(m.contenido)}</div>
+               <div class="text-center bg-white p-2 rounded border shadow-sm" style="display:inline-block; min-width: 200px;">
+                   <img src="${m.metadatos.chart_url}" 
+                        alt="Gráfico de votación" 
+                        class="img-fluid" 
+                        style="border-radius: 8px; min-height:150px; max-width: 100%;"
+                        onerror="this.onerror=null; this.src='https://quickchart.io/chart?c={type:%27pie%27,data:{labels:[%27Error%27],datasets:[{data:[1]}]}}&text=Error+Cargando';">
+               </div>
+             `;
+          }
+          else if (isImage) {
+            // CASO FOTO
+            const imgUrl = toAbsoluteMedia(m.archivo_url || (m.metadatos && m.metadatos.archivo_url));
+            const textPart = m.contenido ? linkify(m.contenido) : '';
+            bodyHTML = `<a href="${imgUrl}" target="_blank" rel="noopener">
+                           <img class="msg-image" src="${imgUrl}" alt="imagen">
+                         </a>${textPart ? `<div style="margin-top:6px;">${textPart}</div>` : ''}`;
+          }
+          else {
+            // CASO TEXTO
+            bodyHTML = linkify(m.contenido);
+          }
+
+          const senderName = (m.remitente && (m.remitente.nombre_completo || [m.remitente.nombre, m.remitente.apellido].filter(Boolean).join(' ') || m.remitente.display_name || m.remitente.username || m.remitente.nombre_usuario)) || 'Usuario';
 
           row.innerHTML = `
             ${showAvatar ? `
-              <img class="msg-avatar" src="${avatarUrl}" alt=""
-                  onerror="this.onerror=null;this.src='${AVATAR_FALLBACK}'">` : ''
+              <img class="msg-avatar" src="${avatarUrl}" alt="" onerror="this.onerror=null;this.src='${AVATAR_FALLBACK}'">` : ''
             }
             <div class="bubble">
               ${window.currentConvIsGroup ? `<div style="font-weight:700; font-size:.9rem; margin-bottom:4px;">${senderName}</div>` : ''}
@@ -2188,7 +2227,6 @@
 
           msgsEl.appendChild(row);
 
-          // actualizar punteros para el siguiente mensaje
           prevAuthorId = authorId;
           prevWhenMs = whenMs;
         });
@@ -2215,10 +2253,10 @@
           await loadMessagesOnce();
           requestAnimationFrame(() => { msgsEl.scrollTop = msgsEl.scrollHeight; });
 
-          // ✅ esto actualiza preview + reordena en ambas listas SIN repintar todo
+
           setPreview(window.currentConvId, slicePreview(text), new Date().toISOString());
 
-          // ❌ NO llames loadConversations() acá
+
         } catch (e) {
           console.error(e);
           alert('No se pudo enviar el mensaje.');
@@ -2263,7 +2301,7 @@
           await loadMessagesOnce();
           scrollToBottom();
 
-          // 👉 Esto actualiza texto/tiempo y además mueve la fila al tope en ambas listas
+
           setPreview(window.currentConvId, '📷 Imagen', new Date().toISOString());
           patchAnyRow(window.currentConvId);
         } catch (e) {
@@ -2280,11 +2318,11 @@
       window.openChatWith = async function (username) {
         if (!username) return;
 
-        // abre el cajón
+
         if (typeof openDrawer === 'function') openDrawer();
         else document.getElementById('chatFab')?.click();
 
-        // 1) buscar una conversación 1:1 existente (no grupos)
+
         try {
           const res = await fetch(window.URLS.conversaciones, { credentials: 'same-origin' });
           const data = await res.json();
@@ -2350,12 +2388,12 @@
       }
 
       function scheduleTypingPing() {
-        // limita a 1 ping cada ~2s
+
         if (typingPingTimer) return;
         sendTyping(true);
         typingPingTimer = setTimeout(() => { typingPingTimer = null; }, 2000);
 
-        // si no hay nuevos inputs por 2.5s, marca stop
+
         clearTimeout(typingStopTimer);
         typingStopTimer = setTimeout(() => sendTyping(false), 2500);
       }
@@ -2384,17 +2422,17 @@
         typingEl.hidden = false;
       }
 
-      // engancha eventos del textarea
+
       if (textEl) {
         textEl.addEventListener('input', scheduleTypingPing);
         textEl.addEventListener('blur', () => sendTyping(false));
       }
 
-      // integra con tu ciclo de polling existente
+
       const _startPollingOriginal = startPolling;
       startPolling = function () {
         _startPollingOriginal();
-        // además del polling de mensajes, hacemos uno para typing algo más frecuente
+
         clearInterval(typingPollTimer);
         typingPollTimer = setInterval(pollTyping, 1500);
       };
@@ -2428,13 +2466,13 @@
       const msgsEl = drawer.querySelector('#chat-messages');      // panel derecho mensajes
       const emptyEl = drawer.querySelector('#chat-empty');         // “Selecciona un chat…”
       const formEl = drawer.querySelector('#chat-form');          // form enviar mensaje
-      const headerTitleEl = drawer.querySelector('#chat-header-title');  // título/Nombre del chat/grupo
+      const headerTitleEl = drawer.querySelector('#chat-header-title');  // titulo/Nombre del chat/grupo
       const inputMsgEl = drawer.querySelector('#chat-input');         // textarea/input mensaje
 
       // estado global
       window.currentConvId = null;
 
-      /* === 1) delegación de eventos (robusto para contenido dinámico) === */
+      /* delegación de eventos */
       drawer.addEventListener('click', (ev) => {
         const row = ev.target.closest('.chat-list-item');
         if (!row) return;
@@ -2460,7 +2498,7 @@
         ev.preventDefault();
         openConversation(id);
       });
-      /* === 2) marcar activo en ambas listas === */
+      /* marcar activo en ambas listas  */
       function markActive(convId) {
         const { drawer } = getChatRefs();
         if (!drawer) return;
@@ -2471,13 +2509,16 @@
         });
       }
 
-      /* === 3) abrir conversación (meta + mensajes) === */
+      /* abrir conversación  */
       window.currentConvId = null;
 
       async function openConversation(convId) {
 
 
         const { msgsEl, emptyEl, formEl, headerTitleEl, inputMsgEl } = getChatRefs();
+
+        if (drawer) drawer.classList.add('in-chat');
+
         if (!msgsEl || !emptyEl || !formEl) {
           console.error('[openConversation] No están los contenedores necesarios (msgsEl/emptyEl/formEl). Revisa los IDs/clases del drawer.');
           return;
@@ -2495,100 +2536,41 @@
           }
           markActive(convId);
 
-          // Estado UI inmediato (asegura que existen antes de setear)
+
           emptyEl.hidden = true;
           msgsEl.hidden = false;
           formEl.hidden = false;
           msgsEl.innerHTML = '<div class="p-2 text-muted">Cargando mensajes…</div>';
           if (headerTitleEl) headerTitleEl.textContent = 'Cargando…';
 
-          // 1) META
+
           const metaUrl = window.URLS.conversacionDetalleBase.replace('/0/', `/${convId}/`);
           const rMeta = await fetch(metaUrl, { credentials: 'same-origin' });
           if (rMeta.status === 403) { msgsEl.innerHTML = '<div class="p-2 text-danger">No perteneces a este grupo.</div>'; return; }
           if (!rMeta.ok) { msgsEl.innerHTML = '<div class="p-2 text-danger">No fue posible abrir la conversación.</div>'; return; }
           const meta = await rMeta.json();
           const isGroup = !!meta?.is_group;
-          window.currentConvIsGroup = isGroup;      // ← sincroniza 1:1 vs grupo (restaura tu estilo)
-          if (typeof startPolling === 'function') startPolling();  // ← empieza el polling de mensajes
-          if (typeof pollTyping === 'function') pollTyping();      // ← primer fetch de “escribiendo…”
+          window.currentConvIsGroup = isGroup;      
+          if (typeof startPolling === 'function') startPolling(); 
+          if (typeof pollTyping === 'function') pollTyping();     
           const titulo = meta?.titulo || 'Chat';
           if (headerTitleEl) {
-            // En pestaña “grupos” mantenemos el título fijo; si no, mostramos el nombre
+
             headerTitleEl.textContent = (typeof currentTab !== 'undefined' && currentTab === 'grupos')
               ? 'Grupos'
               : titulo;
           }
           const esEvento = String(meta?.tipo || '').toLowerCase() === 'evento';
 
-          // zona de acciones a la derecha de la barra (ya existe en tu HTML)
+          // zona de acciones a la derecha de la barra
           const actionsRight = document.querySelector('.phone-header .d-flex.align-items-center.gap-2');
 
           // limpia botón previo si hubiera
           let oldBtn = document.getElementById('btnEventDraw');
           if (oldBtn) oldBtn.remove();
 
-          // si es evento y NO está sorteado, inyecta el botón
-          if (esEvento && meta?.evento && meta.evento.estado !== 'sorteado') {
-            const drawBtn = document.createElement('button');
-            drawBtn.id = 'btnEventDraw';
-            drawBtn.className = 'btn btn-sm btn-warning';
-            drawBtn.textContent = 'Sortear';
 
-            drawBtn.addEventListener('click', async () => {
-              const id = Number(meta?.evento?.id);
-              if (!id) {
-                console.warn('⚠️ Sin id de evento en meta.evento');
-                return;
-              }
-              if (!confirm('¿Confirmas realizar el sorteo?')) return;
-
-              // Construye URL canónica: usa window.URLS.eventoDraw si existe, si no fallback
-              const base = window.URLS?.eventoDraw || '/api/events/0/draw/';
-              const url = base.replace(/\/0\/$/, `/${id}/`);
-
-              drawBtn.disabled = true;
-              const oldTxt = drawBtn.textContent;
-              drawBtn.textContent = 'Sorteando…';
-
-              try {
-                const r = await fetch(url, {
-                  method: 'POST',
-                  credentials: 'same-origin',
-                  headers: {
-                    'X-CSRFToken': (window.CSRF_TOKEN || ''),
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Content-Type': 'application/json'
-                  },
-                  body: JSON.stringify({})
-                });
-
-                // intenta leer JSON (para capturar msg del backend)
-                const data = await r.json().catch(() => ({}));
-                if (!r.ok) {
-                  const msg = data?.msg || data?.error || `Error ${r.status}`;
-                  throw new Error(msg);
-                }
-
-                // éxito: refresca, marca estado y quita botón
-                if (typeof window.loadMessagesOnce === 'function') await window.loadMessagesOnce();
-                meta.evento.estado = 'sorteado';
-                drawBtn.remove();
-              } catch (err) {
-                console.error('❌ Sorteo falló:', err);
-                alert(typeof err?.message === 'string' ? err.message : 'No fue posible sortear.');
-              } finally {
-                if (document.body.contains(drawBtn)) {
-                  drawBtn.disabled = false;
-                  drawBtn.textContent = oldTxt;
-                }
-              }
-            });
-
-            actionsRight?.prepend(drawBtn);
-          }
-          // === Mostrar/ocultar menú kebab “junto a la bandeja” ===
-          // === Mostrar/ocultar menús kebab (autor vs miembro) ===
+          //  Mostrar/ocultar menú kebab “junto a la bandeja” 
           const kebabAutor = document.getElementById('groupKebab');
           const kebabMiembro = document.getElementById('memberKebab');
 
@@ -2605,7 +2587,7 @@
             kebabMiembro.style.display = (enTabGrupos && esGrupo && !esAutor) ? 'block' : 'none';
           }
 
-          // === Wire del menú (SIN capturar "meta"; lee el id en cada click) ===
+
           const kebab = esAutor ? kebabAutor : kebabMiembro;
           const menuEl = kebab ? kebab.querySelector('.dropdown-menu') : null;
           if (menuEl) {
@@ -2617,14 +2599,14 @@
               if (!convId) return;
 
               if (action === 'add-members') {
-                // si tus funciones necesitan meta, puedes reconsultar:
+
                 const detalle = await fetch(window.URLS.conversacionDetalleBase.replace('/0/', `/${convId}/`), { credentials: 'same-origin' }).then(r => r.ok ? r.json() : {});
                 await uiOpenAddMembers(detalle);
               } else if (action === 'remove-member') {
                 const detalle = await fetch(window.URLS.conversacionDetalleBase.replace('/0/', `/${convId}/`), { credentials: 'same-origin' }).then(r => r.ok ? r.json() : {});
                 await uiOpenRemoveMember(detalle);
               } else if (action === 'delete-group') {
-                uiOpenDeleteGroup(convId); // 👈 ahora pasamos SOLO el id
+                uiOpenDeleteGroup(convId);
               }
 
             };
@@ -2738,13 +2720,12 @@
               }
             };
           })();
-          // Handler del botón "Ver miembros"
+
           document.addEventListener('click', async (e) => {
             const btn = e.target.closest('[data-action="view-members"]');
             if (!btn) return;
 
-            // Necesitamos el ID de la conversación/grupo actualmente abierto.
-            // Asumimos que lo tienes guardado en window.CURRENT_CONV_ID (igual que para enviar mensajes).
+
             const convId = window.currentConvId;
             if (!convId || !window.URLS || !window.URLS.grupoMiembros) {
               console.error('Falta CURRENT_CONV_ID o URLS.grupoMiembros');
@@ -2757,7 +2738,7 @@
               if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
               const data = await resp.json();
 
-              // data: { conversacion_id, creador_id, miembros:[{id,username,nombre,apellido,rol,avatar_url}], soy_admin }
+
               showMembersModal(data.miembros || [], data.creador_id);
             } catch (err) {
               console.error('Error cargando miembros:', err);
@@ -2769,10 +2750,8 @@
           });
 
 
-          // 2) MENSAJES
-          // 2) MENSAJES — usa SIEMPRE el renderer “bueno” del primer script
           if (typeof loadMessagesOnce === 'function') {
-            await loadMessagesOnce();           // pinta con burbujas con estilos
+            await loadMessagesOnce();          
             msgsEl.scrollTop = msgsEl.scrollHeight;
           }
           inputMsgEl?.focus();
@@ -2824,7 +2803,7 @@
       let friendsCache = [];     // para el modal
       let groupsLoaded = false;
 
-      // ------- AMIGOS (reutiliza tu loader existente si quieres) -------
+      // AMIGOS 
       async function loadFriends() {
         if (friendsLoaded) return;
         friendsEl.innerHTML = '<div class="p-3 text-muted">Cargando amigos…</div>';
@@ -2888,7 +2867,7 @@
         });
       }
 
-      // ------- MODAL CREAR GRUPO -------
+      // MODAL CREAR GRUPO 
       (() => {
         const AVATAR_FALLBACK = "{% static 'img/Gifters/favicongift.png' %}";
         const CSRFTOKEN = (function getCookie(name) {
@@ -2896,7 +2875,7 @@
           if (parts.length === 2) return decodeURIComponent(parts.pop().split(';').shift());
         })('csrftoken');
 
-        // Reutilizamos tus caches si existen; si no, los creamos.
+
         window.friendsLoaded ??= false;
         window.friendsCache ??= [];
 
@@ -2939,9 +2918,9 @@
       </label>
     `).join('');
 
-          btnCreate.onclick = createGroup;           // una sola vez por apertura
+          btnCreate.onclick = createGroup;           
           gm.style.display = 'block';
-          document.body.style.overflow = 'hidden';   // bloqueo scroll fondo
+          document.body.style.overflow = 'hidden';  
           gmName?.focus();
         }
 
@@ -2954,7 +2933,7 @@
           document.body.style.overflow = '';
         }
 
-        // Delegación global: X, Cancelar, backdrop, Escape y botón "+ Nuevo"
+
         document.addEventListener('click', (e) => {
           if (e.target.closest('#btnNewGroup')) { e.preventDefault(); openGroupModal(); return; }
           if (e.target.closest('#groupModal [data-close], #groupModal .btn-close')) { e.preventDefault(); closeGroupModal(); return; }
@@ -2987,7 +2966,7 @@
 
             closeGroupModal();
 
-            // Refresca bandejas
+
             if (typeof window.loadConversations === 'function') window.loadConversations();
             if (typeof window.refreshGroups === 'function') await window.refreshGroups();
 
@@ -3002,7 +2981,7 @@
           }
         }
 
-        // por si lo necesitas en otro lado
+
         Object.assign(window, { openGroupModal, closeGroupModal });
       })();
 
@@ -3046,10 +3025,10 @@
           if (j && j.conversacion_id && window.openConversation) {
             window.openConversation(j.conversacion_id);
           }
-          // refrescar listado de conversaciones/grupos
+
           if (typeof window.loadConversations === 'function') window.loadConversations();
 
-          // cerrar modal
+
           if (gm) gm.style.display = 'none';
           if (gmName) gmName.value = '';
         } catch (e) {
@@ -3059,7 +3038,7 @@
       }
       document.getElementById('gmCreate')?.addEventListener('click', createGroup);
 
-      // ------- LISTAR GRUPOS -------
+      // LISTAR GRUPOS
       async function loadGroups() {
         if (groupsLoaded) return;
         groupsEl.innerHTML = `
@@ -3135,10 +3114,10 @@
           groupsEl.innerHTML = '<div class="p-3 text-danger">No se pudieron cargar tus grupos.</div>';
           try { refreshGlobalUnreadDot(); } catch { }
         }
-        // Forzar refresco externo (lo usa el modal al crear un grupo)
+
         window.refreshGroups = async function () {
           try {
-            // resetea el flag y repinta
+
             groupsLoaded = false;
             await loadGroups();
           } catch (e) {
@@ -3147,8 +3126,8 @@
         };
       }
 
-      // ------- Tabs -------
-      /* 👇 NUEVO: recuerda la pestaña actual */
+      // Tabs
+
       let currentTab = 'chats';
 
       function setActiveTab(tab) {
@@ -3165,7 +3144,7 @@
           groupsEl.style.display = 'none';
           eventsEl.style.display = 'none';
           if (headerTitleEl) headerTitleEl.textContent = "Gifter’s";
-          if (topKebab) topKebab.style.display = 'none';  // el kebab ya no va en la barra azul
+          if (topKebab) topKebab.style.display = 'none';
           loadFriends();
         } else if (tab === 'chats') {
           friendsEl.style.display = 'none';
@@ -3208,13 +3187,31 @@
 
       // Estado inicial
       setActiveTab('chats');
-    })();
+
+
+      const btnBack = document.getElementById('btnMobileBack');
+      if (btnBack) {
+        btnBack.addEventListener('click', (e) => {
+          e.preventDefault();
+
+          drawer.classList.remove('in-chat');
+
+
+          window.currentConvId = null;
+          drawer.querySelectorAll('.chat-list-item.active').forEach(row => {
+            row.classList.remove('active');
+          });
+        });
+      }
+
+
+    })(); // Cierre del IIFE
   </script>
 
   {% endif %}
 
   <script>
-    // Botón de chat en perfil público (si aparece en alguna vista)
+
     document.addEventListener('DOMContentLoaded', () => {
       const btn = document.getElementById('btnChatPerfilPublico');
       btn?.addEventListener('click', (e) => {
@@ -3251,20 +3248,20 @@
         ${(s.marca || s.categoria) ? `<span class="meta">${esc([s.marca, s.categoria].filter(Boolean).join(' • '))}</span>` : ''}
       </div>`;
 
-      /* === NUEVO: animaciones === */
+
       function openSugs(animate = true) {
         sugs.hidden = false;
         form.classList.add('is-open');
         if (animate) {
           sugs.classList.remove('anim-out');
-          void sugs.offsetWidth;            // reflow para reiniciar anim
+          void sugs.offsetWidth;            
           sugs.classList.add('anim-in');
         }
         active = -1;
       }
 
       function closeSugs() {
-        if (sugs.hidden) {                  // ya está cerrado
+        if (sugs.hidden) {                 
           form.classList.remove('is-open');
           active = -1;
           return;
@@ -3285,7 +3282,7 @@
 
       function show(list) {
         if (!list?.length) return closeSugs();
-        const wasHidden = sugs.hidden;      // solo animar si estaba oculto
+        const wasHidden = sugs.hidden;     
         sugs.innerHTML = list.map(tpl).join('');
         openSugs(wasHidden);
       }
@@ -3340,7 +3337,7 @@
     })();
 
 
-    // ===== helpers de refs (tolerantes a distintos IDs/clases) =====
+
     function qOne(root, selectors) {
       for (const sel of selectors) {
         const el = root.querySelector(sel);
@@ -3539,7 +3536,7 @@
       const convId = Number(meta?.conversacion_id || window.currentConvId || 0);
       if (!convId) return;
 
-      // 1) Asegura/recarga amigos UNA sola vez por fetch.json()
+
       if (!window.friendsLoaded) {
         try {
           const res = await fetch(window.URLS.amigos, {
@@ -3556,7 +3553,7 @@
         }
       }
 
-      // 2) Normalizador (por si el endpoint cambia de forma)
+
       const normalizeMembers = (x) => {
         if (Array.isArray(x)) return x;
         if (x && Array.isArray(x.participantes)) return x.participantes;
@@ -3565,7 +3562,7 @@
         return [];
       };
 
-      // 3) Trae miembros FRESCOS desde el endpoint (si existe)
+  
       let miembrosIds = [];
       try {
         if (window.URLS.grupoMiembros) {
@@ -3586,10 +3583,10 @@
         miembrosIds = normalizeMembers(meta?.participantes).map(p => Number(p.id));
       }
 
-      // 4) Candidatos = amigos que NO están en el grupo
+
       const candidates = (window.friendsCache || []).filter(f => !miembrosIds.includes(Number(f.id)));
 
-      // 5) Pintar lista
+
       const list = document.getElementById('addMembersList');
       list.innerHTML = candidates.length
         ? candidates.map(f => {
@@ -3607,7 +3604,7 @@
         }).join('')
         : '<div class="text-muted">No hay amigos disponibles para agregar.</div>';
 
-      // 6) Confirmar agregar
+
       const btn = document.getElementById('btnConfirmAddMembers');
       btn.onclick = async () => {
         const ids = Array.from(list.querySelectorAll('input[type=checkbox]:checked')).map(i => Number(i.value));
@@ -3634,32 +3631,31 @@
       openBasicModal('modalAddMembers');
     }
 
-    // ====== UI: Quitar miembro ======
-    // Reemplaza COMPLETO tu uiOpenRemoveMember(meta) por este:
+
     async function uiOpenRemoveMember(metaOrConv) {
-      // 1) Resolver convId aunque pase meta incompleto
+
       const convId = Number(
         (metaOrConv && metaOrConv.conversacion_id) ||
         (window.currentConvId) || 0
       );
       if (!convId) return;
 
-      // 2) Helpers
+
       const AVATAR_FALLBACK = "{% static 'img/Gifters/favicongift.png' %}";
       const meId = Number('{{ user.id|default:"0"|escapejs }}');
 
-      // Autor: intenta varios nombres posibles
+      
       const authorId = Number(
         (metaOrConv && (metaOrConv.author_id ||
           (metaOrConv.autor && metaOrConv.autor.id) ||
           (metaOrConv.creado_por && metaOrConv.creado_por.id))) || 0
       );
 
-      // 3) Normalizador robusto
+
       function normalizeMembers(x) {
-        // ya es array
+
         if (Array.isArray(x)) return x;
-        // objetos conocidos
+
         if (x && Array.isArray(x.participantes)) return x.participantes;
         if (x && Array.isArray(x.miembros)) return x.miembros;
         if (x && Array.isArray(x.members)) return x.members;
@@ -3667,7 +3663,7 @@
         return [];
       }
 
-      // 4) Trae lista de miembros fresca (si existe endpoint)
+
       let participantes = normalizeMembers(metaOrConv && metaOrConv.participantes);
       try {
         if (window.URLS.grupoMiembros) {
@@ -3681,13 +3677,13 @@
         // si falla, seguimos con lo que tengamos
       }
 
-      // 5) Filtra: no me dejes quitar al autor ni a mí mismo
+
       const candidates = normalizeMembers(participantes).filter(p => {
         const id = Number(p.id);
         return id && id !== meId && id !== authorId;
       });
 
-      // 6) Pinta modal
+
       const list = document.getElementById('removeMembersList');
       list.innerHTML = candidates.length
         ? candidates.map(p => {
@@ -3705,7 +3701,7 @@
         }).join('')
         : '<div class="text-muted">No hay miembros a quitar.</div>';
 
-      // 7) Confirmar
+
       const btn = document.getElementById('btnConfirmRemoveMember');
       btn.onclick = async () => {
         const sel = list.querySelector('input[name=rmMember]:checked');
@@ -3724,7 +3720,7 @@
 
           closeBasicModal('modalRemoveMember');
 
-          // refrescos opcionales
+
           if (typeof window.refreshGroups === 'function') await window.refreshGroups();
           if (typeof window.loadMessagesOnce === 'function') await window.loadMessagesOnce();
         } catch {
@@ -3784,7 +3780,7 @@
       const btn = e.target.closest('[data-action="view-members"]');
       if (!btn) return;
 
-      // Necesitamos el ID de la conversación/grupo actualmente abierto.
+
       const convId = window.currentConvId;
       if (!convId || !window.URLS || !window.URLS.grupoMiembros) {
         console.error('Falta CURRENT_CONV_ID o URLS.grupoMiembros');
@@ -3797,7 +3793,7 @@
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
 
-        // data: { conversacion_id, creador_id, miembros:[{id,username,nombre,apellido,rol,avatar_url}], soy_admin }
+
         showMembersModal(data.miembros || [], data.creador_id);
       } catch (err) {
         console.error('Error cargando miembros:', err);
@@ -3805,7 +3801,7 @@
       }
     });
 
-    // ====== UI: Eliminar grupo ======
+    //  UI: Eliminar grupo 
     function uiOpenDeleteGroup(convId) {
       const btn = document.getElementById('btnConfirmDeleteGroup');
       btn.onclick = async () => {
@@ -3813,7 +3809,7 @@
           const url = window.URLS.grupoEliminar.replace('/0/', `/${convId}/`);
           const csrf = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
           const r = await fetch(url, {
-            method: 'POST', // o 'DELETE' si tu view lo permite (con CSRF igual)
+            method: 'POST', 
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf }
           });
@@ -3821,7 +3817,7 @@
 
           closeBasicModal('modalDeleteGroup');
 
-          // Limpia la UI del chat abierto si era este grupo
+
           if (Number(window.currentConvId) === Number(convId)) {
             window.currentConvId = null;
             document.getElementById('chatMessages')?.setAttribute('hidden', '');
@@ -3829,7 +3825,7 @@
             const empty = document.getElementById('chatEmpty'); if (empty) empty.hidden = false;
           }
 
-          // Refresca listas sin recargar la página
+
           if (typeof window.loadConversations === 'function') window.loadConversations();
           if (typeof window.refreshGroups === 'function') await window.refreshGroups();
         } catch {
@@ -3846,14 +3842,14 @@
           const url = window.URLS.grupoSalir.replace('/0/', `/${convId}/`);
           const csrf = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
           const r = await fetch(url, {
-            method: 'POST',                // o 'DELETE' si tu view lo usa
+            method: 'POST',               
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
-            body: JSON.stringify({})       // 👈 body JSON válido
+            body: JSON.stringify({})       
           });
 
           if (!r.ok) {
-            // intenta leer mensaje del backend
+            
             let msg = 'No se pudo abandonar el grupo.';
             try { const j = await r.json(); if (j?.error) msg = j.error; } catch { }
             throw new Error(msg + ` (HTTP ${r.status})`);
@@ -3919,16 +3915,13 @@
         case "group_left":
         case "group_removed":
         case "group_deleted":
-          // Refresca la bandeja y/o la lista de miembros si la vista del grupo está abierta
           refreshInboxList(payload.kind);
-          // Si estás parado en la sala de ese grupo, avisa para refrescar miembros:
           if (payload.conversacion_id && window.location.href.includes(`/chat/${payload.conversacion_id}`)) {
             window.dispatchEvent(new CustomEvent("gifters:group:members:refresh", {
               detail: { conversacion_id: payload.conversacion_id, reason: payload.kind }
             }));
           }
           break;
-        // otros tipos: new_dm, new_group_msg, typing, etc.
         default:
           // noop
           break;
@@ -3939,74 +3932,71 @@
 
     // === Puntitos ===
     async function refreshGlobalUnreadDot() {
-    try {
+      try {
         const r = await fetch("/chat/unread-summary/", { credentials: "same-origin" });
 
-        // Si la respuesta no es OK (ej: 500, 404), para.
+
         if (!r.ok) {
-            // Si el status es 401 o 403, significa que el backend nos dijo
-            // explícitamente que no estamos logueados.
-            if (r.status === 401 || r.status === 403) {
-                 console.warn("[unread-summary] No autenticado (401/403). Deteniendo polling.");
-                 if (window.unreadLightPoll) {
-                    clearInterval(window.unreadLightPoll);
-                    window.unreadLightPoll = null;
-                 }
+
+          if (r.status === 401 || r.status === 403) {
+            console.warn("[unread-summary] No autenticado (401/403). Deteniendo polling.");
+            if (window.unreadLightPoll) {
+              clearInterval(window.unreadLightPoll);
+              window.unreadLightPoll = null;
             }
-            return; // No continuar
+          }
+          return; // No continuar
         }
 
-        // --- ESTE ES EL ARREGLO CLAVE ---
-        // Antes de .json(), revisamos si la respuesta ES JSON.
+
         const contentType = r.headers.get("content-type");
         if (!contentType || !contentType.includes("application/json")) {
-            // ¡Esto es HTML! El @login_required nos redirigió al login.
-            console.warn("[unread-summary] Respuesta no es JSON (es HTML). Usuario desconectado. Deteniendo polling.");
-            
-            // Detenemos el bucle para no seguir pidiendo la página de login.
-            if (window.unreadLightPoll) {
-                clearInterval(window.unreadLightPoll);
-                window.unreadLightPoll = null;
-            }
-            return; // No intentes parsear JSON.
+
+          console.warn("[unread-summary] Respuesta no es JSON (es HTML). Usuario desconectado. Deteniendo polling.");
+
+          // Detenemos el bucle para no seguir pidiendo la página de login.
+          if (window.unreadLightPoll) {
+            clearInterval(window.unreadLightPoll);
+            window.unreadLightPoll = null;
+          }
+          return; // No intentes parsear JSON.
         }
         // --- FIN DEL ARREGLO ---
 
-        // Si llegamos aquí, ES JSON y estamos logueados.
+
         const { total, per_conversation } = await r.json();
 
-        // (El resto de tu código para pintar los puntitos)
+
         const dot = document.getElementById("chatGlobalDot");
         if (dot) dot.classList.toggle("hidden", !(total > 0));
 
         if (window.Chat?.applyUnreadToInbox) {
-            window.Chat.applyUnreadToInbox(per_conversation || {});
+          window.Chat.applyUnreadToInbox(per_conversation || {});
         }
         const map = per_conversation || {};
         let unreadChats = 0, unreadGroups = 0;
         for (const [id, cnt] of Object.entries(map)) {
-            if (!(cnt > 0)) continue;
-            const sid = String(id);
-            if (window.CHAT_INDEX?.groups?.has(sid)) unreadGroups += cnt;
-            else unreadChats += cnt;
+          if (!(cnt > 0)) continue;
+          const sid = String(id);
+          if (window.CHAT_INDEX?.groups?.has(sid)) unreadGroups += cnt;
+          else unreadChats += cnt;
         }
         const tabChatsDot = document.getElementById("tabDotChats");
         const tabGroupsDot = document.getElementById("tabDotGrupos");
         if (tabChatsDot) tabChatsDot.classList.toggle("hidden", unreadChats === 0);
         if (tabGroupsDot) tabGroupsDot.classList.toggle("hidden", unreadGroups === 0);
 
-    } catch (e) {
+      } catch (e) {
         // Esta es la línea que ves en tu consola.
         console.error("unread-summary failed (probablemente por JSON inválido/redirect).", e);
         // Detener el polling aquí también.
         if (window.unreadLightPoll) {
-            clearInterval(window.unreadLightPoll);
-            window.unreadLightPoll = null;
+          clearInterval(window.unreadLightPoll);
+          window.unreadLightPoll = null;
         }
+      }
     }
-}
-      
-    // 🔔 Poll ligero global para el FAB (corre aunque nunca abras el cajón)
+
     window.unreadLightPoll ??= null;
     document.addEventListener("DOMContentLoaded", () => {
       try { refreshGlobalUnreadDot(); } catch { }
@@ -4019,7 +4009,7 @@
 
     window.Chat = window.Chat || {};
 
-    // Aplica { conv_id: count } a cada ítem
+
     window.Chat.applyUnreadToInbox = function (perMap) {
       document.querySelectorAll(".chat-list-item").forEach(li => {
         const id =
@@ -4035,7 +4025,7 @@
       });
     };
 
-    // Y actualiza clearUnreadDot para que funcione con ambos atributos
+
     window.Chat.clearUnreadDot = function (convId) {
       document
         .querySelectorAll(
@@ -4058,7 +4048,6 @@
     };
 
 
-    // Estado inicial
     document.addEventListener("DOMContentLoaded", refreshGlobalUnreadDot);
   </script>
   <script>
@@ -4262,7 +4251,7 @@
         m.id = 'modalCrearEvento';
         m.tabIndex = -1;
         m.innerHTML = `
-      <div class="modal-dialog">
+        <div class="modal-dialog">
         <div class="modal-content">
           <form id="formCrearEvento" autocomplete="off">
             <div class="modal-header">
@@ -4274,6 +4263,12 @@
                 <label class="form-label">Título</label>
                 <input type="text" class="form-control" name="titulo" placeholder="Ej: Amigo Secreto fin de año" required>
               </div>
+
+              <div class="mb-2">
+                <label class="form-label">Fecha del Intercambio</label>
+                <input type="date" class="form-control" name="fecha_intercambio" required>
+                <small class="text-muted">¿Cuándo se entregarán los regalos?</small>
+              </div>
               <div class="mb-2">
                 <label class="form-label">Monto estimado</label>
                 <input type="number" class="form-control" name="monto" min="0" step="1" placeholder="Ej: 10000">
@@ -4281,7 +4276,6 @@
 
               <hr class="my-2">
               <label class="form-label d-block">Participantes</label>
-              <!-- Aquí se inyecta el picker -->
               <div id="eventFriendPicker"></div>
             </div>
             <div class="modal-footer">
@@ -4325,6 +4319,7 @@
 
           const titulo = form.querySelector('[name="titulo"]').value.trim();
           const montoStr = form.querySelector('[name="monto"]').value.trim();
+          const fecha = form.querySelector('[name="fecha_intercambio"]').value;
           const presupuesto_fijo = montoStr ? Number(montoStr) : null;
 
           const miembros = getSelectedFriendIds('eventFriendPicker'); // IDs de usuario
@@ -4336,7 +4331,7 @@
               method: 'POST',
               credentials: 'same-origin',
               headers: { 'Content-Type': 'application/json', 'X-CSRFToken': (window.CSRF_TOKEN || '') },
-              body: JSON.stringify({ titulo, presupuesto_fijo, miembros })
+              body: JSON.stringify({ titulo, presupuesto_fijo, miembros, fecha_intercambio: fecha })
             });
             if (!r.ok) throw new Error('HTTP ' + r.status);
             const j = await r.json();
@@ -4374,18 +4369,48 @@
     // Cache de amigos para reusar
     window._friendsCache = window._friendsCache || null;
 
+    // === CONSTANTES PARA URLS DE IMAGEN ===
+    const MEDIA_PREFIX_PICKER = ("{% get_media_prefix %}" || "/media/").replace(/\/+$/, '');
+    const AVATAR_FALLBACK_PICKER = "{% static 'img/Gifters/favicongift.png' %}";
+
+    function fixMediaUrl(u) {
+      if (!u) return AVATAR_FALLBACK_PICKER;
+      if (u.startsWith('http') || u.startsWith('//')) return u;
+      if (u.startsWith('/')) return u;
+      return (MEDIA_PREFIX_PICKER + '/' + u.replace(/^\/+/, '')).replace(/\/{2,}/g, '/');
+    }
+
     async function fetchFriendsForPicker() {
       if (Array.isArray(window._friendsCache) && window._friendsCache.length) return window._friendsCache;
+
       const r = await fetch(window.URLS.amigos, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
       if (!r.ok) throw new Error('No pude cargar amigos (HTTP ' + r.status + ')');
+
       const data = await r.json();
-      const list = (data?.amigos || data || []).map(a => ({
-        id: Number(a.id ?? a.user_id ?? a.pk),
-        nombre: a.nombre_completo
-          ?? [a.nombre, a.apellido].filter(Boolean).join(' ')
-          ?? a.display_name ?? a.username ?? a.nombre_usuario ?? 'Amigo',
-        avatar: a.avatar_url || a.avatar || a.foto_url || a.foto || null,
-      })).filter(x => Number.isFinite(x.id));
+
+      const list = (data?.amigos || data || []).map(a => {
+        // === LÓGICA CORREGIDA: Incluye profile_picture_url ===
+        let img = null;
+
+        // 1. Estrategia usada en "Crear Grupo" (La que funciona)
+        if (a.perfil) {
+          img = a.perfil.profile_picture_url || a.perfil.avatar_url || a.perfil.avatar || a.perfil.foto;
+        }
+
+        // 2. Estrategia de respaldo (raíz)
+        if (!img) {
+          img = a.avatar_url || a.avatar || a.foto_url || a.foto || a.profile_image;
+        }
+
+        return {
+          id: Number(a.id ?? a.user_id ?? a.pk),
+          nombre: a.nombre_completo
+            ?? [a.nombre, a.apellido].filter(Boolean).join(' ')
+            ?? a.display_name ?? a.username ?? a.nombre_usuario ?? 'Amigo',
+          avatar: img,
+        };
+      }).filter(x => Number.isFinite(x.id));
+
       window._friendsCache = list;
       return list;
     }
@@ -4405,7 +4430,9 @@
       cont.appendChild(search);
 
       const list = document.createElement('div');
-      list.className = 'list-group list-group-flush';
+      list.className = 'list-group list-group-flush pe-2';
+      list.style.maxHeight = '200px';
+      list.style.overflowY = 'auto';
       cont.appendChild(list);
 
       const draw = (term = '') => {
@@ -4415,7 +4442,7 @@
           .filter(f => !t || (f.nombre || '').toLowerCase().includes(t))
           .forEach(f => {
             const row = document.createElement('label');
-            row.className = 'list-group-item d-flex align-items-center gap-2';
+            row.className = 'list-group-item d-flex align-items-center gap-2 border-0 px-1 py-2';
             row.style.cursor = 'pointer';
 
             const cb = document.createElement('input');
@@ -4425,12 +4452,17 @@
             if (preselected.includes(f.id)) cb.checked = true;
 
             const avatar = document.createElement('img');
-            avatar.src = f.avatar || '{% static "img/Gifters/user-default.png" %}';
-            avatar.width = 24; avatar.height = 24;
-            avatar.className = 'rounded-circle';
+            avatar.src = fixMediaUrl(f.avatar);
+            avatar.width = 28; avatar.height = 28;
+            avatar.className = 'rounded-circle bg-light';
+            avatar.style.objectFit = 'cover';
+            avatar.onerror = () => { avatar.src = AVATAR_FALLBACK_PICKER; };
 
             const name = document.createElement('span');
             name.textContent = f.nombre;
+            name.style.whiteSpace = 'nowrap';
+            name.style.overflow = 'hidden';
+            name.style.textOverflow = 'ellipsis';
 
             row.append(cb, avatar, name);
             list.appendChild(row);
@@ -5134,13 +5166,128 @@
           btn.disabled = false;
           btn.textContent = oldText;
         }
+
       });
 
       // Expón la función para que la llames después de pintar la lista:
       window.__wireEventRows = wireEventRows;
     })();
   </script>
+  <style>
+    /* ============================================================
+       CORRECCIÓN RESPONSIVA MÓVIL (Estilo WhatsApp) - FORZADO
+       ============================================================ */
 
+    /* 1. Estado Base (Escritorio y Móvil por defecto): Botón oculto */
+    #btnMobileBack {
+      display: none !important;
+    }
+
+    /* 2. Solo en Pantallas Pequeñas (Móvil) */
+    @media (max-width: 860px) {
+
+      /* --- AJUSTE DEL CONTENEDOR PRINCIPAL --- */
+      /* Forzamos que el drawer ocupe toda la pantalla y quite bordes redondos */
+      .chat-drawer.phone-ui {
+        /* Posición fija ocupando todo el viewport */
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+
+        /* Anular tamaños máximos de escritorio */
+        width: 100vw !important;
+        height: 100vh !important;
+        max-width: none !important;
+        max-height: none !important;
+
+        /* Quitar bordes redondos y márgenes */
+        border-radius: 0 !important;
+        margin: 0 !important;
+
+        /* Flexbox para estructura vertical */
+        display: flex;
+        flex-direction: column;
+
+        /* Estado INICIAL (Cerrado): Oculto y abajo */
+        transform: translateY(105%) !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+        z-index: 9999 !important;
+        /* Asegurar que tape todo */
+        background: #fff;
+        /* Fondo blanco sólido para que no se trasluzca nada */
+      }
+
+      .chat-drawer.phone-ui.open {
+        transform: translateY(0) !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+      }
+
+      /* --- ESTADO A: MODO LISTA (Cuando NO estás en un chat) --- */
+      /* La lista ocupa el 100%, el chat de mensajes no existe */
+      .chat-drawer:not(.in-chat) .phone-body .phone-list {
+        display: block !important;
+        width: 100% !important;
+      }
+
+      .chat-drawer:not(.in-chat) .phone-body .chat-pane {
+        display: none !important;
+      }
+
+      /* --- ESTADO B: MODO CHAT (Cuando JS agrega la clase .in-chat) --- */
+
+      /* 1. Ocultamos la lista de amigos y las pestañas */
+      .chat-drawer.in-chat .phone-body .phone-list,
+      .chat-drawer.in-chat .phone-tabs,
+      .chat-drawer.in-chat .phone-bottom-nav {
+        display: none !important;
+      }
+
+      /* 2. Mostramos el área de chat al 100% */
+      .chat-drawer.in-chat .phone-body .chat-pane {
+        display: flex !important;
+        width: 100% !important;
+        height: 100% !important;
+      }
+
+      /* 3. APARECEMOS EL BOTÓN DE VOLVER */
+      .chat-drawer.in-chat #btnMobileBack {
+        display: inline-flex !important;
+        /* Aparece */
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: none;
+        color: #fff;
+        /* Flecha blanca sobre fondo azul */
+        font-size: 1.5rem;
+        /* Tamaño cómodo para el dedo */
+        margin-right: 8px;
+        padding: 0 5px;
+        cursor: pointer;
+        z-index: 1001;
+      }
+
+      .chat-drawer.in-chat .brand {
+        padding-left: 0 !important;
+        /* Quitar padding extra si lo hay */
+      }
+
+      .chat-drawer.in-chat .brand span#chat-header-title {
+        display: none;
+      }
+
+      /* Ajuste opcional: Ocultar el texto "Gifter's" si ocupa mucho espacio en chat */
+      .chat-drawer.in-chat .brand-text {
+        font-size: 1rem;
+        /* Reducir un poco el texto */
+      }
+    }
+  </style>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </body>
 

@@ -2,19 +2,27 @@ from pathlib import Path
 import os
 import environ
 
-GIPHY_API_KEY = os.getenv('GIPHY_API_KEY', '')
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+# === Carga de base y variables ===
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Cargar variables del .env ANTES DE TODO
 env = environ.Env()
-environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
-for key, value in env.ENVIRON.items():
-    os.environ[key] = value
+env.read_env(os.path.join(BASE_DIR, ".env"))
 
+# Variables iniciales
+GIPHY_API_KEY = os.getenv("GIPHY_API_KEY", "")
 # ===== Meilisearch  =====
 USE_MEILI = os.getenv("USE_MEILI", "false").lower() == "true"
 MEILI_URL = os.getenv("MEILI_URL", "http://meilisearch:7700")
 MEILI_MASTER_KEY = os.getenv("MEILI_MASTER_KEY", "dev_meili_key")
+
+OLLAMA_URL = env("OLLAMA_URL", default="http://ollama:11434")
+USE_GIFTER_AI = True
+# IA Local (Ollama)
+GIFTER_AI_MODEL = env("GIFTER_AI_MODEL", default="llama3.2:1b")
+GIFTER_AI_CACHE_TTL = env.int("GIFTER_AI_CACHE_TTL", default=1800)
+
+
 
 AUTH_USER_MODEL = "core.User"
 # Quick-start development settings - unsuitable for production
@@ -181,7 +189,6 @@ USE_L10N = True
 
 USE_TZ = True
 
-USE_GIFTER_AI = env.bool("USE_GIFTER_AI", default=True)
 
 
 # Static files (CSS, JavaScript, Images)
@@ -267,14 +274,6 @@ REST_FRAMEWORK = {
 }
 
 
-# Activa o desactiva IA (fallback local funciona igual si no hay clave)
-USE_GIFTER_AI = env.bool("USE_GIFTER_AI", default=True)
-
-# Modelo a usar (GPT-4o-mini recomendado)
-GIFTER_AI_MODEL = "gpt-4o-mini"
-
-# Tiempo de caché para sugerencias IA (30 minutos)
-GIFTER_AI_CACHE_TTL = 60 * 30
 
 # === Calendarific ===
 CALENDARIFIC_API_KEY = env("CALENDARIFIC_API_KEY", default="")
@@ -287,6 +286,11 @@ if not CALENDARIFIC_API_KEY:
         "Calendarific: falta CALENDARIFIC_API_KEY (solo se desactivarán funciones dependientes)."
     )
 
+# === CAPTCHA ===
+RECAPTCHA_SITE_KEY = os.getenv("RECAPTCHA_SITE_KEY", "6Lc0nhQsAAAAABpywyuPwThF-EVwREZVc-IDHkwh")
+
+# ✅ CORRECCIÓN: Pedir la variable "RECAPTCHA_SECRET_KEY"
+RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY", "6Lc0nhQsAAAAAGpqpKihCJ-BvDPqAn4OXgntgMMI")
 
 LOGGING_DIR = BASE_DIR / 'logs'
 if not os.path.exists(LOGGING_DIR):

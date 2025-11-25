@@ -12,12 +12,20 @@ class ApiClient:
     """
     Gestor de comunicación con La API REST del proyecto xiquillos!
     """
-    def __init__(self, base_url="http://127.0.0.1:8000/api", local_auth_cache=None): # <-- 1. AÑADE ESTO
+    def __init__(self, base_url="http://127.0.0.1:8000/api", local_auth_cache=None, timeout_seconds=10):
         self.base_url = base_url
         self.token = None
-        self.headers = {'Content-Type': 'application/json'}
+        # Mantenemos self.headers para compatibilidad, pero la función _get_auth_headers es la fuente de verdad.
+        self.headers = {'Content-Type': 'application/json'} 
         self.local_auth_cache = local_auth_cache 
-        logger.info(f"ApiClient inicializado con base_url: {base_url}")
+        self.logger = logger 
+        
+        # <<< --- SOLUCIÓN: Definir self.timeout --- >>>
+        self.timeout = timeout_seconds  # <-- Soluciona el error 'no attribute timeout'
+        # <<< ------------------------------------- >>>
+        
+        self.logger.info(f"ApiClient inicializado con base_url: {base_url}")
+        
 
     def login(self, username, password):
         """
@@ -277,7 +285,7 @@ class ApiClient:
             "Username": "nombre_usuario",
             "Es Admin": "es_admin",
             "Is Staff": "is_staff",
-            "Is Active": "is_active",
+            "Está Activa": "is_active",
         }
         
         api_field_name = field_mapping.get(field_name)
@@ -418,55 +426,90 @@ class ApiClient:
             logger.critical(f"Error inesperado en download_product_report: {e}", exc_info=True)
             return None, f"Error inesperado: {str(e)}"
             
-    def create_product(self, product_data):
-        """
-        Envía una petición POST para crear un nuevo producto.
-        """
-        if not self.token:
-            logger.warning("create_product llamado sin token.")
-            return None, "No autenticado."
-    
-        create_url = f"{self.base_url}/productos/"
-    
-        try:
-            if 'precio' in product_data and product_data['precio'] is not None:
-                product_data['precio'] = float(str(product_data['precio']).replace(',', '.'))
-            if 'id_categoria' in product_data:
-                product_data['id_categoria'] = int(product_data['id_categoria'])
-            if 'id_marca' in product_data:
-                product_data['id_marca'] = int(product_data['id_marca'])
-        except (ValueError, TypeError) as e:
-            logger.warning(f"create_product: Datos inválidos. Error: {e}, Datos: {product_data}")
-            return None, f"Datos inválidos para crear producto: {e}"
-    
-        try:
-            logger.info(f"Intentando POST en {create_url} con datos: {product_data}")
-            response = requests.post(create_url, json=product_data, headers=self.headers)
-    
-            if response.status_code == 201:
-                new_product_info = response.json()
-                logger.info(f"Producto creado exitosamente. ID: {new_product_info.get('id_producto')}")
-                return new_product_info, "Producto creado exitosamente."
-            else:
-                error_detail = response.text
-                try:
-                    error_data = response.json()
-                    if isinstance(error_data, dict):
-                        error_detail = "; ".join([f"{k}: {v[0]}" for k, v in error_data.items()])
-                    elif isinstance(error_data.get('detail'), str):
-                        error_detail = error_data['detail']
-                except json.JSONDecodeError:
-                    pass
-                logger.error(f"Error al crear producto. Status: {response.status_code}, Error: {error_detail}")
-                return None, f"Error al crear producto: {response.status_code} - {error_detail}"
-    
-        except requests.exceptions.RequestException as e:
-            logger.error(f"create_product: Error de conexión: {e}", exc_info=True)
-            return None, f"Error de conexión al crear producto: {e}"
+    # desktop_admin/api_client.py (REEMPLAZAR create_product)
 
+    def create_product(self, name, description, category_id, brand_id, image_file_path=None):
+        """
+        Crea un nuevo producto en la API. Envía la imagen como una URL (string)
+        en el cuerpo JSON para satisfacer la validación actual del servidor.
+        """
+        endpoint = f"{self.base_url}/productos/" # URL CORREGIDA
+        headers = self._get_auth_headers()
+        
+        # Usamos las claves en ESPAÑOL que el serializador de Django espera
+        data = {
+            "nombre_producto": name,      
+            "descripcion": description,
+            "id_categoria": category_id,  
+            "id_marca": brand_id          
+        }
+        
+        # Enviamos la imagen como un string para pasar la validación de URL del backend
+        if image_file_path:
+            # ADVERTENCIA: Esta ruta DEBE ser una URL válida (http://...) para que Django la acepte.
+            data['imagen'] = image_file_path 
+
+        # Configuramos para enviar JSON
+        if 'Content-Type' not in headers:
+             headers['Content-Type'] = 'application/json' 
+        
+        # Ya no usamos 'files' ni lógica multipart/form-data
+        files = {} 
+
+        try:
+            # Usamos json=data para enviar el cuerpo como JSON
+            response = requests.post(endpoint, headers=headers, json=data, timeout=self.timeout) 
+
+            response.raise_for_status() 
+            return True, "Producto creado exitosamente."
+            
+        except requests.exceptions.HTTPError as http_err:
+            
+            error_detail = "El servidor devolvió un error HTTP."
+            
+            if response.text:
+                try:
+                    error_data = response.json() 
+                    if isinstance(error_data, dict):
+                        # Formato amigable para errores de validación
+                        error_detail = "; ".join([f"{k}: {v[0]}" for k, v in error_data.items()])
+                    else:
+                         error_detail = error_data.get('detail', str(error_data))
+                except requests.exceptions.JSONDecodeError:
+                    error_detail = f"Respuesta no JSON: {response.text[:100]}..." 
+            else:
+                error_detail = f"Respuesta vacía del servidor. Status: {response.status_code}"
+            
+            self.logger.error(f"HTTP error creating product: {http_err} - {error_detail}")
+            
+            return False, f"Error HTTP: {response.status_code} - {error_detail}"
+            
+        except requests.exceptions.RequestException as req_err:
+            self.logger.error(f"Error de conexión o timeout: {req_err}")
+            return False, f"Un error de conexión/timeout inesperado ocurrió: {req_err}"
+            
+        except Exception as e:
+            self.logger.error(f"General error creating product: {e}")
+            return False, f"Un error inesperado ocurrió: {e}"
     ########################
     #REPORTES DE ACTIVIDAD#
     ########################
+    def _get_auth_headers(self):
+        """
+        [IMPLEMENTACIÓN FINAL] Devuelve los encabezados necesarios para la autenticación JWT.
+        """
+        # 1. Crear el diccionario base
+        headers = {'Content-Type': 'application/json'}
+        
+        # 2. Añadir el token si existe
+        if self.token:
+            headers['Authorization'] = f'Bearer {self.token}'
+        else:
+            self.logger.warning("Intento de acceder a la API sin token JWT.")
+            
+        return headers
+    
+    
     
     def _get_report_data(self, endpoint_name, report_url):
         """Helper genérico para obtener datos de reportes."""
@@ -592,6 +635,53 @@ class ApiClient:
             logger.critical(f"Error inesperado en download_site_reviews_report_pdf: {e}", exc_info=True)
             return None, f"Error inesperado: {str(e)}"
         
+    
+    
+    
+    def get_current_user_profile(self):
+        """
+        Obtiene el perfil del usuario logueado (incluye la bandera 'must_change_password').
+        Asume un endpoint /users/me/ en el backend.
+        """
+        if not self.token:
+            return None, "No autenticado."
+            
+        user_me_url = f"{self.base_url}/users/me/" 
+        try:
+            response = requests.get(user_me_url, headers=self.headers)
+            if response.status_code == 200:
+                return response.json(), None
+            else:
+                return None, f"Error al obtener perfil: {response.status_code}"
+        except requests.exceptions.RequestException as e:
+            return None, f"Error de conexión: {e}"
+
+
+    def change_password_forced(self, user_id, new_password):
+        """
+        Envía la nueva contraseña y resetea la bandera 'must_change_password'.
+        Asume un endpoint dedicado para esta acción.
+        """
+        if not self.token:
+            return False, "No autenticado."
+            
+        # Asume que esta ruta existe en el backend y maneja la validación y el reseteo de la bandera.
+        update_url = f"{self.base_url}/users/{user_id}/change-password-forced/" 
+        payload = {'new_password': new_password} 
+        
+        try:
+            response = requests.patch(update_url, json=payload, headers=self.headers)
+            if response.status_code == 200:
+                return True, "Contraseña actualizada exitosamente."
+            else:
+                error_detail = response.json().get('detail', response.text)
+                return False, f"Error: {error_detail}"
+        except requests.exceptions.RequestException as e:
+            return False, f"Error de conexión: {e}"
+        
+
+
+        
     def get_categories(self):
         """
         Obtiene la lista completa de categorías desde la API.
@@ -701,6 +791,38 @@ class ApiClient:
         except requests.exceptions.RequestException as e:
             logger.error(f"delete_user: Error de conexión: {e}", exc_info=True)
             return False, f"Error de conexión al borrar: {e}"
+    
+    def send_user_warning(self, user_id, motivo):
+        """
+        Envía una petición POST para mandar una advertencia por email a un usuario.
+        """
+        if not self.token:
+            logger.warning("send_user_warning llamado sin token.")
+            return False, "No autenticado."
+    
+        url = f"{self.base_url}/admin/send-warning/"
+        payload = {
+            "user_id": user_id,
+            "motivo": motivo
+        }
+        
+        try:
+            logger.info(f"Enviando advertencia a user_id: {user_id} por: {motivo}")
+            response = requests.post(url, json=payload, headers=self.headers)
+    
+            if response.status_code == 200:
+                logger.info(f"Advertencia enviada a {user_id} exitosamente.")
+                return True, response.json().get("message", "Advertencia enviada.")
+            else:
+                error_detail = response.text
+                try: error_detail = response.json().get('detail', error_detail)
+                except json.JSONDecodeError: pass
+                logger.error(f"Error al enviar advertencia a {user_id}. Status: {response.status_code}, Error: {error_detail}")
+                return False, f"Error: {error_detail}"
+        except requests.exceptions.RequestException as e:
+            logger.error(f"send_user_warning: Error de conexión: {e}", exc_info=True)
+            return False, f"Error de conexión: {e}"
+    
         
     def create_category(self, category_data):
         """
@@ -770,6 +892,54 @@ class ApiClient:
             logger.error(f"create_brand: Error de conexión: {e}", exc_info=True)
             return None, f"Error de conexión al crear marca: {e}"
         
+    def initiate_password_reset(self, email):
+        """
+        [SOBREESCRITO] Envía una petición al endpoint que genera la contraseña temporal
+        y la notifica al admin para que él se contacte con el usuario.
+        """
+        reset_url = f"{self.base_url}/admin/reset-request/"
+        payload = {'email': email} 
+        
+        try:
+            logger.info(f"Iniciando solicitud de reset para admin: {email}")
+            temp_headers = {'Content-Type': 'application/json'}
+            
+            response = requests.post(reset_url, json=payload, headers=temp_headers)
+            
+            # <<< --- MODIFICACIÓN CLAVE AQUÍ --- >>>
+            if not response.text:
+                logger.error(f"Respuesta vacía recibida del servidor. Status: {response.status_code}")
+                return False, f"Respuesta vacía del servidor (Status: {response.status_code})."
+            
+            try:
+                data = response.json()
+            except json.JSONDecodeError:
+                logger.error(f"Respuesta inválida de la API. Contenido: {response.text[:100]}...")
+                return False, f"La API devolvió una respuesta inválida (No es JSON)."
+            # <<< --- FIN MODIFICACIÓN CLAVE --- >>>
+
+
+            if response.status_code == 200:
+                # Si es 200, usamos el JSON que ya decodificamos en 'data'
+                return True, data.get("message", "Contraseña temporal GENERADA. Se ha enviado una notificación...")
+            
+            elif response.status_code == 500:
+                # Si es 500, intentamos obtener el detalle del error del JSON
+                error_detail = data.get('detail', 'Error interno del servidor.')
+                if data.get('error_code') == "EMAIL_FAIL":
+                    return False, f"ERROR CRÍTICO: La contraseña temporal fue GENERADA, pero falló el envío de la notificación por correo al administrador. Revisa la configuración SMTP."
+                return False, f"Error del servidor. Status: 500. Detalle: {error_detail}"
+
+            else:
+                # Otros errores HTTP (400, 403, 404)
+                error_detail = data.get('detail', response.text)
+                return False, f"Error de la API: Status: {response.status_code}. Detalle: {error_detail}"
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error de conexión al iniciar reset: {e}")
+            return False, f"Error de conexión: {e}"
+    
+        
     def delete_category(self, category_id):
         """Envía una petición DELETE para borrar una categoría."""
         if not self.token:
@@ -824,5 +994,59 @@ class ApiClient:
         except requests.exceptions.RequestException as e:
             logger.error(f"delete_brand: Error de conexión: {e}", exc_info=True)
             return False, f"Error de conexión al borrar: {e}"    
+    
+    def update_category(self, category_id, data):
+        """
+        Envía una petición PATCH para actualizar una categoría.
+        data debe ser: {'nombre_categoria': 'Nuevo Nombre'}
+        """
+        if not self.token:
+            logger.warning("update_category llamado sin token.")
+            return False, "No autenticado."
+    
+        update_url = f"{self.base_url}/categorias/{category_id}/" 
+        try:
+            logger.info(f"Intentando PATCH en {update_url} con datos: {data}")
+            response = requests.patch(update_url, json=data, headers=self.headers)
+
+            if response.status_code == 200:
+                logger.info(f"Categoría {category_id} actualizada exitosamente.")
+                return True, "Categoría actualizada correctamente."
+            else:
+                error_detail = response.text
+                try: error_detail = response.json().get('detail', error_detail)
+                except json.JSONDecodeError: pass
+                logger.error(f"Error al actualizar categoría {category_id}. Status: {response.status_code}, Error: {error_detail}")
+                return False, f"Error al actualizar: {error_detail}"
+        except requests.exceptions.RequestException as e:
+            logger.error(f"update_category: Error de conexión: {e}", exc_info=True)
+            return False, f"Error de conexión al actualizar: {e}"
+
+    def update_brand(self, brand_id, data):
+        """
+        Envía una petición PATCH para actualizar una marca.
+        data debe ser: {'nombre_marca': 'Nuevo Nombre'}
+        """
+        if not self.token:
+            logger.warning("update_brand llamado sin token.")
+            return False, "No autenticado."
+    
+        update_url = f"{self.base_url}/marcas/{brand_id}/" 
+        try:
+            logger.info(f"Intentando PATCH en {update_url} con datos: {data}")
+            response = requests.patch(update_url, json=data, headers=self.headers)
+
+            if response.status_code == 200:
+                logger.info(f"Marca {brand_id} actualizada exitosamente.")
+                return True, "Marca actualizada correctamente."
+            else:
+                error_detail = response.text
+                try: error_detail = response.json().get('detail', error_detail)
+                except json.JSONDecodeError: pass
+                logger.error(f"Error al actualizar marca {brand_id}. Status: {response.status_code}, Error: {error_detail}")
+                return False, f"Error al actualizar: {error_detail}"
+        except requests.exceptions.RequestException as e:
+            logger.error(f"update_brand: Error de conexión: {e}", exc_info=True)
+            return False, f"Error de conexión al actualizar: {e}"
         
     

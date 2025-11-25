@@ -404,9 +404,23 @@
       {% for it in wishlist_items_publicos %}
       {% with p=it.id_producto %}
       <div class="gift-card">
-        <img
-          src="{% if p.imagen and p.imagen.url %}{{ p.imagen.url }}{% else %}{% static 'img/Gifters/favicongift.png' %}{% endif %}"
-          alt="{{ p.nombre_producto }}">
+        <img 
+  src="
+    {% if p.imagen %}
+        {% if p.imagen.url %}
+            {{ p.imagen.url }}
+        {% elif p.imagen|slice:':4' == 'http' %}
+            {{ p.imagen }}
+        {% else %}
+            /media/{{ p.imagen }}
+        {% endif %}
+    {% else %}
+        {% static 'img/Gifters/favicongift.png' %}
+    {% endif %}
+  "
+  alt="{{ p.nombre_producto }}"
+>
+
         <div class="gift-info">
           <h4>{{ p.nombre_producto }}</h4>
           <p>{{ p.id_marca.nombre_marca|default:'' }}</p>
@@ -460,9 +474,18 @@
       {% for it in recibidos_publicos %}
       {% with p=it.id_producto %}
       <div class="gift-card received-gift" id="recibido-{{ it.id_item }}" data-product-id="{{ p.id_producto }}">
-        <img
-          src="{% if p.imagen and p.imagen.url %}{{ p.imagen.url }}{% else %}{% static 'img/Gifters/favicongift.png' %}{% endif %}"
-          alt="{{ p.nombre_producto }}">
+        {% if p.imagen %}
+    {% if p.imagen.url %}
+        {{ p.imagen.url }}
+    {% elif p.imagen|slice:':4' == 'http' %}
+        {{ p.imagen }}
+    {% else %}
+        /media/{{ p.imagen }}
+    {% endif %}
+{% else %}
+    {% static 'img/Gifters/favicongift.png' %}
+{% endif %}
+
         <div class="gift-info">
           <h4>{{ p.nombre_producto }}</h4>
           <p>{{ p.id_marca.nombre_marca|default:"" }}</p>

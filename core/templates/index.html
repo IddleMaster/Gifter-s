@@ -6,75 +6,129 @@
 
 {% block content %}
 
-<section id="feriado-banner" class="feriado-banner shadow-sm" style="display:none;">
-  🎉 <span id="feriado-msg"></span>
-</section>
-
-
+{# --- ESTILOS EXTRA ESPECÍFICOS PARA CORREGIR EL INDEX MÓVIL --- #}
 <style>
-  /* === Banner de feriado – estilo Gifter’s === */
+  /* 1. SOLUCIÓN GLOBAL AL DESBORDAMIENTO (La franja blanca) */
+  html, body {
+    max-width: 100% !important;
+    overflow-x: hidden !important; /* Corta cualquier cosa que se salga de la pantalla */
+    position: relative;
+  }
+
+  /* Ajustes generales para móvil */
+  @media (max-width: 768px) {
+    
+    /* 2. Reducir espacios verticales exagerados */
+    section.section {
+      padding-top: 20px !important;
+      padding-bottom: 20px !important;
+    }
+    
+    /* Ajuste de títulos */
+    .section-title {
+      padding-bottom: 10px !important;
+      margin-bottom: 0 !important;
+      padding-left: 15px !important; /* Un poco más de aire para que no se pegue */
+      padding-right: 15px !important;
+    }
+    .section-title h2 {
+      font-size: 18px !important; /* Un poco más grande para legibilidad */
+    }
+    .section-title p {
+      font-size: 1rem !important;
+      margin-top: 5px !important;
+    }
+
+    /* 3. CONTROL DE ANCHOS Y CONTENEDORES */
+    
+    /* Evitar que las .row de Bootstrap rompan el ancho */
+    .row {
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      width: 100% !important;
+    }
+    
+    /* Contenedores con padding seguro */
+    .container {
+      padding-left: 15px !important;
+      padding-right: 15px !important;
+      max-width: 100% !important;
+      overflow: hidden; /* Seguridad extra */
+    }
+
+    /* EXCEPCIÓN: El carrusel de categorías */
+    #clients .container {
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+      overflow: visible !important; /* Necesario para que se vea el swiper */
+    }
+
+    /* Ajuste del swiper para que fluya desde el borde */
+    .categorias-carousel .swiper {
+      padding-left: 15px !important; 
+      padding-right: 0 !important;
+      padding-bottom: 30px !important;
+    }
+    
+    /* 4. Ajuste de tarjetas de productos */
+    .portfolio-item .product-image-container {
+      height: 200px !important; 
+    }
+    
+    /* Las columnas en móvil deben tener padding para no pegarse entre sí */
+    .col-lg-4, .col-md-6, .col-12 {
+      padding-left: 8px !important;
+      padding-right: 8px !important;
+    }
+  }
+
+  /* ... (El resto de tus estilos del banner feriado se mantienen igual abajo) ... */
   .feriado-banner {
-    /* Diseño base */
     background: #f4f7ff;
     border: 1px solid #d0ddff;
     border-left: 4px solid #2563eb;
+    /* ... resto de tu CSS original ... */
     border-radius: 999px;
     padding: 8px 22px;
     margin: 16px auto;
     text-align: center;
-
-    /* Tamaño y centrado */
     max-width: 960px;
     width: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-
-    /* Texto / estilo */
     font-size: 0.95rem;
     color: #1f2937;
     font-weight: 500;
-
-    /* Estado inicial para la animación */
     opacity: 0;
     transform: translateY(-10px);
     transition: opacity 0.6s ease, transform 0.6s ease;
     box-shadow: 0 3px 10px rgba(37, 99, 235, 0.1);
   }
-
-  /* Efecto pop-in elegante (rebote suave) */
+  /* ... mantén el keyframes y el media query del feriado tal cual lo tenías ... */
   @keyframes feriadoPop {
-    0% {
-      transform: translateY(-8px) scale(0.96);
-      opacity: 0;
-    }
-
-    60% {
-      transform: translateY(0) scale(1.04);
-      opacity: 1;
-    }
-
-    100% {
-      transform: translateY(0) scale(1);
-      opacity: 1;
-    }
+    0% { transform: translateY(-8px) scale(0.96); opacity: 0; }
+    60% { transform: translateY(0) scale(1.04); opacity: 1; }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
   }
+  .feriado-banner.feriado-pop { animation: feriadoPop 0.7s ease-out; }
 
-  .feriado-banner.feriado-pop {
-    animation: feriadoPop 0.7s ease-out;
-  }
-
-  /* Adaptación responsiva (móvil) */
   @media (max-width: 576px) {
     .feriado-banner {
       font-size: 0.85rem;
       padding: 6px 14px;
       border-left-width: 3px;
       margin: 10px auto;
+      width: calc(100% - 30px); 
     }
   }
 </style>
+
+<section id="feriado-banner" class="feriado-banner shadow-sm" style="display:none;">
+  🎉 <span id="feriado-msg"></span>
+</section>
+
 <script>
 document.addEventListener("DOMContentLoaded", async () => {
   try {
@@ -84,66 +138,35 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const name = data.holiday.name_es || data.holiday.name;
     const fechaStr = data.holiday.date;
-
-    // Cálculo diferencia días
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-    const fechaFeriado = new Date(fechaStr);
-    fechaFeriado.setHours(0, 0, 0, 0);
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    const fechaFeriado = new Date(fechaStr); fechaFeriado.setHours(0, 0, 0, 0);
 
     const diffMs = fechaFeriado - hoy;
     const diffDias = diffMs / (1000 * 60 * 60 * 24);
-    const MAX_DIAS = 60; // muestra solo si faltan menos de 60 días
+    const MAX_DIAS = 60;
     if (diffDias < 0 || diffDias > MAX_DIAS) return;
 
-    const fechaBonita = fechaFeriado.toLocaleDateString("es-CL", {
-      weekday: "long",
-      day: "numeric",
-      month: "long"
-    });
-
+    const fechaBonita = fechaFeriado.toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" });
     let texto;
-    if (diffDias === 0) {
-      texto = `Hoy es ${name} (${fechaBonita}) — ¡ideal para sorprender a alguien con un detalle! 🎁`;
-    } else if (diffDias === 1) {
-      texto = `Mañana es ${name} (${fechaBonita}) — ¡una buena ocasión para regalar! 🎁`;
-    } else {
-      texto = `Se acerca ${name} (${fechaBonita}) — ¡una buena ocasión para regalar! 🎁`;
-    }
+    if (diffDias === 0) texto = `Hoy es ${name} (${fechaBonita}) — ¡ideal para sorprender a alguien! 🎁`;
+    else if (diffDias === 1) texto = `Mañana es ${name} (${fechaBonita}) — ¡una buena ocasión para regalar! 🎁`;
+    else texto = `Se acerca ${name} (${fechaBonita}) — ¡una buena ocasión para regalar! 🎁`;
 
     const banner = document.getElementById("feriado-banner");
     const msg = document.getElementById("feriado-msg");
     msg.textContent = texto;
-
-    // Mostrar sin parpadeo + animación de entrada, sin clases genéricas
     banner.style.display = "flex";
     banner.style.opacity = "0";
     banner.style.transform = "translateY(-10px)";
-
-    // siguiente frame → aplica transición
     requestAnimationFrame(() => {
       banner.style.opacity = "1";
       banner.style.transform = "translateY(0)";
       banner.classList.add("feriado-pop");
     });
-
-    // quitar solo la animación pop luego de reproducirse
-    setTimeout(() => {
-      banner.classList.remove("feriado-pop");
-    }, 800);
-
-  } catch (err) {
-    console.warn("No se pudo cargar feriado:", err);
-  }
+    setTimeout(() => { banner.classList.remove("feriado-pop"); }, 800);
+  } catch (err) { console.warn("No se pudo cargar feriado:", err); }
 });
 </script>
-
-
-
-
-
-
-
 
 {% if not user.is_authenticated %}
 <section id="hero" class="hero section light-background">
@@ -167,7 +190,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 <section id="featured-services" class="featured-services section">
   <div class="container">
     <div class="row gy-4">
-
       <div class="col-xl-3 col-md-6 d-flex" data-aos="fade-up" data-aos-delay="100">
         <div class="service-item position-relative">
           <div class="icon"><i class="bi bi-heart-fill icon" style="color:#6c63ff;"></i></div>
@@ -175,7 +197,6 @@ document.addEventListener("DOMContentLoaded", async () => {
           <p>Un detalle sincero vale más que mil palabras.</p>
         </div>
       </div>
-
       <div class="col-xl-3 col-md-6 d-flex" data-aos="fade-up" data-aos-delay="200">
         <div class="service-item position-relative">
           <div class="icon"><i class="bi bi-gift-fill icon" style="color:#6c63ff;"></i></div>
@@ -183,7 +204,6 @@ document.addEventListener("DOMContentLoaded", async () => {
           <p>Encuentra ideas únicas que sorprenden a quienes más quieres.</p>
         </div>
       </div>
-
       <div class="col-xl-3 col-md-6 d-flex" data-aos="fade-up" data-aos-delay="300">
         <div class="service-item position-relative">
           <div class="icon"><i class="bi bi-stars icon" style="color:#6c63ff;"></i></div>
@@ -191,7 +211,6 @@ document.addEventListener("DOMContentLoaded", async () => {
           <p>No importa el tamaño del regalo, importa la emoción que transmite.</p>
         </div>
       </div>
-
       <div class="col-xl-3 col-md-6 d-flex" data-aos="fade-up" data-aos-delay="400">
         <div class="service-item position-relative">
           <div class="icon"><i class="bi bi-people-fill icon" style="color:#6c63ff;"></i></div>
@@ -199,12 +218,10 @@ document.addEventListener("DOMContentLoaded", async () => {
           <p>Regalar es compartir momentos que se quedan para siempre.</p>
         </div>
       </div>
-
     </div>
   </div>
 </section>
 {% endif %}
-
 
 <div class="container section-title" data-aos="fade-up">
   {% if is_admin %}
@@ -213,8 +230,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     style="margin-top: 20px; padding: 15px; border: 1px solid #ccc; background-color: #f9f9f9;">
     <h4>Descarga para Administradores</h4>
     <p>Descarga la aplicación de escritorio para administrar Gifter's:</p>
-    {% load static %} {# Asegúrate de tener esta línea al principio del archivo si no la tienes #}
-    <a href="{% static 'downloads/main.exe' %}" download class="btn btn-primary">
+    <a href="{% static 'downloads/GiftersAdmin-v1.1.exe' %}" download class="btn btn-primary">
       Descargar Gifter's Admin
     </a>
   </div>
@@ -228,12 +244,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 </div>
 {% endif %}
 
-
-
-<!-- Clients Section - CATEGORÍAS DINÁMICAS CON FLECHAS -->
 <section id="clients" class="clients section light-background categorias-carousel">
   <div class="container">
-
     {% if categorias %}
     <div class="swiper init-swiper">
       <script type="application/json" class="swiper-config">
@@ -253,12 +265,13 @@ document.addEventListener("DOMContentLoaded", async () => {
           },
           "breakpoints": {
             "320": { 
-              "slidesPerView": 2, 
-              "spaceBetween": 15 
+              "slidesPerView": 2.3, 
+              "spaceBetween": 12,
+              "centeredSlides": false
             },
             "480": { 
-              "slidesPerView": 3, 
-              "spaceBetween": 20 
+              "slidesPerView": 3.3, 
+              "spaceBetween": 15 
             },
             "640": { 
               "slidesPerView": 4, 
@@ -280,7 +293,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       </script>
 
-      <!-- Contenedor del carrusel -->
       <div class="swiper-wrapper align-items-center">
         {% for categoria in categorias %}
         <div class="swiper-slide">
@@ -291,11 +303,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         {% endfor %}
       </div>
 
-      <!-- Flechas de navegación -->
       <div class="swiper-button-next"></div>
       <div class="swiper-button-prev"></div>
-
-      <!-- Puntos de paginación -->
       <div class="swiper-pagination"></div>
     </div>
     {% else %}
@@ -306,7 +315,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   </div>
 </section>
 
-
 {% if request.user.is_authenticated %}
 <section id="ai-reco" class="portfolio section">
   <div class="container section-title" data-aos="fade-up">
@@ -316,7 +324,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   <div class="container">
     {% if ai_reco and ai_reco|length > 0 %}
-    <div class="row gy-4" data-aos="fade-up" data-aos-delay="100">
+    <div class="row gy-4 justify-content-center" data-aos="fade-up" data-aos-delay="100">
       {% for producto in ai_reco %}
 
       <div class="col-lg-4 col-md-6" id="reco-card-{{ producto.id_producto }}">
@@ -335,13 +343,22 @@ document.addEventListener("DOMContentLoaded", async () => {
               {% endif %}
             </a>
 
-            {% if producto.imagen and producto.imagen.url %}
-            <img src="{{ producto.imagen.url }}" class="img-fluid" alt="{{ producto.nombre_producto }}"
-              style="width: 100%; height: 100%; object-fit: cover;">
-            {% else %}
-            <img src="{% static 'img/Gifters/favicongift.png' %}" class="img-fluid" alt="{{ producto.nombre_producto }}"
-              style="width: 100%; height: 100%; object-fit: cover;">
-            {% endif %}
+            {% if producto.imagen %}
+    {% if producto.imagen.url %}
+        <img src="{{ producto.imagen.url }}" class="img-fluid"
+             style="width:100%; height:100%; object-fit:cover;">
+    {% elif producto.imagen|slice:':4' == 'http' %}
+        <img src="{{ producto.imagen }}" class="img-fluid"
+             style="width:100%; height:100%; object-fit:cover;">
+    {% else %}
+        <img src="/media/{{ producto.imagen }}" class="img-fluid"
+             style="width:100%; height:100%; object-fit:cover;">
+    {% endif %}
+{% else %}
+    <img src="{% static 'img/Gifters/favicongift.png' %}" class="img-fluid"
+         style="width:100%; height:100%; object-fit:cover;">
+{% endif %}
+
           </div>
 
           <div class="portfolio-info">
@@ -356,7 +373,6 @@ document.addEventListener("DOMContentLoaded", async () => {
                 data-gallery="gal-reco-{{ producto.id_producto }}">
                 <i class="bi bi-zoom-in"></i>
               </a>
-
               {% else %}
               <a href="{% static 'img/Gifters/favicongift.png' %}" class="glightbox preview-link"
                 data-gallery="gal-reco-{{ producto.id_producto }}">
@@ -373,9 +389,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               </a>
               {% with producto.urls_tienda_activas.first as url_tienda %}
               {% if url_tienda %}
-              <a href="{{ url_tienda.url }}" target="_blank" rel="noopener" class="details-link">
-                <i class="bi bi-link-45deg"></i>
-              </a>
+              
               {% endif %}
               {% endwith %}
             </div>
@@ -396,8 +410,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 </section>
 {% endif %}
 
-
-
 <section id="portfolio" class="portfolio section">
   <div class="container text-center" data-aos="fade-up">
     <span id="pop-pill" class="badge rounded-pill px-4 py-2 mb-2 bg-primary">TENDENCIAS</span>
@@ -405,10 +417,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     <p id="pop-rationale" class="text-muted mt-1" style="max-width:720px;margin:0 auto;"></p>
   </div>
 
-
   <div class="container">
-    <div class="row gy-4" id="pop-grid" data-aos="fade-up" data-aos-delay="120">
-      <!-- Las tarjetas se inyectan por JS -->
+    <div class="row gy-4 justify-content-center" id="pop-grid" data-aos="fade-up" data-aos-delay="120">
       <div class="col-12 text-center text-muted" id="pop-skel">Cargando tendencias…</div>
     </div>
 
@@ -418,14 +428,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   </div>
 </section>
 
-<!-- 1) Estado inicial de favoritos para Tendencias -->
 {% if request.user.is_authenticated %}
 {{ favoritos_ids|json_script:"fav-ids-json" }}
 <script>
   (function () {
     try {
       const arr = JSON.parse(document.getElementById('fav-ids-json').textContent) || [];
-      window.FAV_IDS = new Set(arr.map(Number));  // sigue funcionando .has()
+      window.FAV_IDS = new Set(arr.map(Number));
     } catch (_) {
       window.FAV_IDS = new Set();
     }
@@ -435,8 +444,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 <script>window.FAV_IDS = new Set();</script>
 {% endif %}
 
-
-<!-- 2) Carga de Tendencias (populares_ai) -->
 <script>
   (async () => {
     const grid = document.getElementById('pop-grid');
@@ -458,7 +465,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       grid.innerHTML = '';
 
-      // Mapa de badges por product_id
       const badgeMap = {};
       (data.badges || []).forEach(b => { badgeMap[b.product_id] = b.badge; });
 
@@ -470,9 +476,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       items.forEach(p => {
         const col = document.createElement('div');
-        col.className = 'col-lg-4 col-md-6';
+        col.className = 'col-lg-4 col-md-6'; // En móvil será col-12 y se centrará gracias a justify-content-center
 
-        const img = p.img || "{% static 'img/Gifters/favicongift.png' %}";
+        const img =
+        (p.img && p.img.startsWith("http")) ? p.img :
+        (p.img_url && p.img_url.startsWith("http")) ? p.img_url :
+        (p.img ? `/media/${p.img}` : "{% static 'img/Gifters/favicongift.png' %}");
         const marca = p.marca ? `<p class="text-primary">${p.marca}</p>` : '';
         const productoUrl = "{% url 'producto_detalle' 0 %}".replace('/0/', `/${p.id}/`);
         const tiendaUrl = p.url ? `<a href="${p.url}" target="_blank" rel="noopener" class="details-link"><i class="bi bi-link-45deg"></i></a>` : '';
@@ -480,7 +489,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         const badgeTxt = (badgeMap[p.id] || '').trim();
         const badgeHtml = badgeTxt ? `<span class="badge-ribbon">${badgeTxt}</span>` : '';
 
-        // === Estado inicial del corazón (igual que en tus otras secciones) ===
         const fav = FAV_IDS.has(Number(p.id));
         const heartClass = fav ? 'wishlist-badge wishlist-btn is-fav' : 'wishlist-badge wishlist-btn';
         const heartTitle = fav ? 'Quitar de wishlist' : 'Agregar a wishlist';
@@ -522,10 +530,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   })();
 </script>
 
-
-
-
-
 <section id="services" class="services section" style="background-color: #f5f8ff;">
   <div class="container section-title" data-aos="fade-up">
     <h2>Conecta en Gifter’s</h2>
@@ -534,7 +538,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   {% if request.user.is_authenticated %}
   <div class="container position-relative" id="amigos-recomendados-container">
-    <!-- Flechas -->
     <button id="recs-prev" class="recs-nav recs-prev" aria-label="Anterior">
       <i class="bi bi-chevron-left"></i>
     </button>
@@ -542,15 +545,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       <i class="bi bi-chevron-right"></i>
     </button>
 
-    <!-- Carril -->
     <div id="recs-track" class="recs-track">
-      <!-- skeletons suaves -->
       <div class="recs-card skeleton"></div>
       <div class="recs-card skeleton d-none d-md-block"></div>
       <div class="recs-card skeleton d-none d-lg-block"></div>
     </div>
 
-    <!-- estados -->
     <div id="recs-empty" class="text-muted text-center py-3 d-none">Por ahora no hay sugerencias.</div>
     <div id="recs-error" class="text-danger text-center py-3 d-none">No se pudieron cargar sugerencias.</div>
   </div>
@@ -561,29 +561,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       border-radius: 20px;
       padding: 6px 8px 10px;
     }
-
-    /* ——— Pildita superior ——— */
-    .pill-badge {
-      display: inline-block;
-      padding: .45rem .9rem;
-      border-radius: 9999px;
-      background: #0d6efd;
-      color: #fff;
-      font-weight: 600;
-      letter-spacing: .3px;
-      box-shadow: 0 6px 18px rgba(13, 110, 253, .18);
-    }
-
-    /* ——— Contenedor scroll ——— */
     .recs-track {
       display: flex;
       gap: 18px;
       overflow: hidden;
       padding: 8px 8px 12px;
       scroll-behavior: smooth;
+      align-items: stretch;
     }
-
-    /* ——— Tarjeta ——— */
     .recs-card {
       min-width: 260px;
       max-width: 260px;
@@ -592,21 +577,20 @@ document.addEventListener("DOMContentLoaded", async () => {
       background: #fff;
       border: 1px solid #eef0f4;
       box-shadow: 0 8px 24px rgba(0, 0, 0, .06);
-      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+      transition: transform .18s ease, box-shadow .18s ease;
+      display: flex;
+      flex-direction: column;
     }
-
     .recs-card:hover {
       transform: translateY(-2px);
       box-shadow: 0 14px 34px rgba(0, 0, 0, .10);
-      border-color: #e4e7ee;
     }
-
     .recs-body {
       display: flex;
       gap: 12px;
       padding: 14px 14px 10px;
+      flex: 1 1 auto;
     }
-
     .recs-avatar {
       width: 60px;
       height: 60px;
@@ -615,33 +599,43 @@ document.addEventListener("DOMContentLoaded", async () => {
       flex: 0 0 60px;
       box-shadow: 0 4px 14px rgba(0, 0, 0, .12);
     }
-
     .recs-name {
       margin: 0;
       font-size: 1rem;
       font-weight: 700;
       color: #1f2937;
+      line-height: 1.2;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      overflow: hidden;
     }
-
     .recs-username {
       margin-top: 2px;
       font-size: .875rem;
       color: #6b7280;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
-
     .recs-reason {
       margin-top: 6px;
       font-size: .85rem;
       color: #365cf5;
-      display: flex;
+      display: grid;
+      grid-template-columns: 20px 1fr;
       align-items: center;
       gap: 6px;
     }
-
+    .recs-reason-text {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     .recs-footer {
       padding: 0 14px 14px;
+      margin-top: auto;
     }
-
     .recs-btn {
       display: block;
       width: 100%;
@@ -654,44 +648,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       background: linear-gradient(180deg, #fff, #f8fbff);
       color: #2b50f5;
       text-decoration: none;
-      transition: transform .14s ease, box-shadow .14s ease, background .14s ease;
     }
-
-    .recs-btn:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 10px 20px rgba(43, 80, 245, .15);
-      background: #fff;
-    }
-
-    /* ——— Skeleton ——— */
-    .skeleton {
-      position: relative;
-      height: 112px;
-    }
-
-    .skeleton::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      border-radius: 18px;
-      background:
-        linear-gradient(90deg, #f3f4f6 25%, #eceff3 37%, #f3f4f6 63%);
-      background-size: 400% 100%;
-      animation: shimmer 1.1s infinite;
-      border: 1px solid #eef0f4;
-    }
-
-    @keyframes shimmer {
-      0% {
-        background-position: 200% 0;
-      }
-
-      100% {
-        background-position: -200% 0;
-      }
-    }
-
-    /* ——— Flechas ——— */
     .recs-nav {
       position: absolute;
       top: 50%;
@@ -706,133 +663,22 @@ document.addEventListener("DOMContentLoaded", async () => {
       z-index: 5;
       cursor: pointer;
       box-shadow: 0 10px 24px rgba(0, 0, 0, .08);
-      transition: transform .12s ease, box-shadow .12s ease, opacity .12s ease;
     }
-
-    .recs-nav:hover {
-      transform: translateY(-50%) scale(1.03);
-      box-shadow: 0 14px 32px rgba(0, 0, 0, .12);
-    }
-
-    .recs-prev {
-      left: -8px;
-    }
-
-    .recs-next {
-      right: -8px;
-    }
-
-    .recs-nav i {
-      font-size: 1.1rem;
-      color: #111827;
-    }
-
+    .recs-prev { left: -8px; }
+    .recs-next { right: -8px; }
     @media (max-width: 576px) {
-      .recs-prev {
-        left: 4px;
-      }
-
-      .recs-next {
-        right: 4px;
-      }
-
-      .recs-card {
-        min-width: 85vw;
-        max-width: 85vw;
-      }
+      .recs-prev { left: 4px; }
+      .recs-next { right: 4px; }
+      .recs-card { min-width: 85vw; max-width: 85vw; }
     }
-
-    /* Igualar alturas y alinear el botón al fondo */
-    .recs-track {
-      align-items: stretch;
+    .skeleton { position: relative; height: 112px; }
+    .skeleton::before {
+      content: ""; position: absolute; inset: 0; border-radius: 18px;
+      background: linear-gradient(90deg, #f3f4f6 25%, #eceff3 37%, #f3f4f6 63%);
+      background-size: 400% 100%; animation: shimmer 1.1s infinite;
+      border: 1px solid #eef0f4;
     }
-
-    /* estira todas las cards */
-    .recs-card {
-      display: flex;
-      flex-direction: column;
-    }
-
-    /* layout vertical */
-    .recs-body {
-      flex: 1 1 auto;
-    }
-
-    /* ocupa alto disponible */
-    .recs-footer {
-      margin-top: auto;
-    }
-
-    /* empuja el botón abajo */
-
-    /* Centrar cuando no hay overflow (o cuando hay 1–2 items) */
-    .recs-track.centered {
-      justify-content: center;
-    }
-
-    /* Evitar que cambie la altura por títulos largos */
-    .recs-name {
-      line-height: 1.2;
-      display: -webkit-box;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 2;
-      overflow: hidden;
-      min-height: 2.4em;
-      /* reserva el alto de 2 líneas */
-    }
-
-    /* Usuario en 1 línea fija */
-    .recs-username {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    /* Motivo en una línea */
-    .recs-reason {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 100%;
-    }
-
-    /* Permitir que el contenido textual se recorte dentro del flex */
-    .recs-body .w-100 {
-      min-width: 0;
-    }
-
-    /* <- clave para que funcione el ellipsis */
-
-    /* Mantener el motivo en una sola línea y evitar desbordes */
-    .recs-reason {
-      display: grid;
-      grid-template-columns: 20px 1fr;
-      /* icono + texto elástico */
-      align-items: center;
-      gap: 6px;
-    }
-
-    .recs-reason i {
-      font-size: 1rem;
-    }
-
-    .recs-reason-text {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      /* … */
-    }
-
-    .review-avatar {
-      width: 72px;
-      height: 72px;
-      border-radius: 50%;
-      object-fit: cover;
-      object-position: center;
-      display: block;
-      margin: 0 auto 0.75rem;
-      /* centrado + margen abajo */
-    }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
   </style>
 
   <script>
@@ -861,43 +707,37 @@ document.addEventListener("DOMContentLoaded", async () => {
         const data = await res.json();
         const list = Array.isArray(data.results) ? data.results : [];
 
-        // limpio skeletons
         track.innerHTML = "";
-
         if (!list.length) {
           emptyMsg.classList.remove("d-none");
           hideArrowsIfNoOverflow();
           return;
         }
 
-        // render
         list.forEach(p => {
           const card = document.createElement("article");
           card.className = "recs-card";
-
           const avatar = p.avatar || "{% static 'img/Gifters/favicongift.png' %}";
           const full = (p.full_name || "").trim() || `@${p.username}`;
           const userUrl = "{% url 'perfil_detalle' 'USERNAME_PLACEHOLDER' %}".replace("USERNAME_PLACEHOLDER", p.username);
 
           card.innerHTML = `
-  <div class="recs-body">
-    <img class="recs-avatar" src="${avatar}" alt="${full}">
-    <div class="w-100">
-      <h3 class="recs-name">${full}</h3>
-      <div class="recs-username">@${p.username}</div>
-      <div class="recs-reason">
-        <i class="bi bi-people"></i>
-        <span class="recs-reason-text">${p.reason || 'Sugerencia'}</span>
-      </div>
-    </div>
-  </div>
-  <div class="recs-footer">
-    <a class="recs-btn" href="${userUrl}">Ver perfil</a>
-  </div>
-`;
+            <div class="recs-body">
+              <img class="recs-avatar" src="${avatar}" alt="${full}">
+              <div class="w-100">
+                <h3 class="recs-name">${full}</h3>
+                <div class="recs-username">@${p.username}</div>
+                <div class="recs-reason">
+                  <i class="bi bi-people"></i>
+                  <span class="recs-reason-text">${p.reason || 'Sugerencia'}</span>
+                </div>
+              </div>
+            </div>
+            <div class="recs-footer">
+              <a class="recs-btn" href="${userUrl}">Ver perfil</a>
+            </div>`;
           track.appendChild(card);
         });
-
         hideArrowsIfNoOverflow();
         syncArrows();
       } catch (e) {
@@ -908,8 +748,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         nextBtn.style.display = "none";
       }
 
-      // navegación
-      const step = 280; // ~ ancho de card + gap
+      const step = 280;
       prevBtn.addEventListener("click", () => { track.scrollBy({ left: -step, behavior: "smooth" }); setTimeout(syncArrows, 240); });
       nextBtn.addEventListener("click", () => { track.scrollBy({ left: step, behavior: "smooth" }); setTimeout(syncArrows, 240); });
       track.addEventListener("scroll", syncArrows);
@@ -924,15 +763,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   {% endif %}
 </section>
 
-
-
-
-
-
-
 <br><br>
-
-<!-- Reseñas -->
 
 <div class="container section-title" data-aos="fade-up">
   <h2>Reseñas de nuestros usuarios</h2>
@@ -941,8 +772,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 <section id="testimonials" class="section" style="padding-top:0;">
   <div class="container" data-aos="fade-up" data-aos-delay="100">
-
-    {# --- Form de creación (solo si no tienes reseña) --- #}
     {% if user.is_authenticated and not own_resena %}
     <form action="{% url 'resena_sitio_crear' %}" method="post" class="mb-4" id="form-crear-resena">
       {% csrf_token %}
@@ -961,7 +790,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             {% endfor %}
           </div>
         </div>
-
         <div class="col">
           <label for="id_comentario" class="form-label mb-1">Comentario</label>
           <textarea id="id_comentario" name="comentario" rows="2" class="form-control"
@@ -976,7 +804,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     <p class="text-muted">Inicia sesión para dejar tu reseña.</p>
     {% endif %}
 
-    {# --- Carrusel de reseñas --- #}
     {% if resenas %}
     <div id="resenasCarousel" class="carousel slide" data-bs-ride="carousel" data-bs-interval="5000"
       aria-label="Carrusel de reseñas">
@@ -990,11 +817,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             <div class="col-md-6 col-lg-4 d-flex">
               <div class="card shadow-sm border-0 flex-fill" id="resena-{{ r.id }}">
                 <div class="card-body text-center d-flex flex-column justify-content-between">
-
                   <div>
                     <a href="{% url 'perfil_publico' r.id_usuario.nombre_usuario|default:r.id_usuario.get_username|default:'usuario'|slugify %}"
                       class="text-decoration-none">
-
                       {% if r.id_usuario.perfil.profile_picture %}
                       <img src="{{ r.id_usuario.perfil.profile_picture.url }}"
                         alt="@{{ r.id_usuario.nombre_usuario|default:r.id_usuario.get_username|default:'usuario' }}"
@@ -1004,31 +829,18 @@ document.addEventListener("DOMContentLoaded", async () => {
                         alt="@{{ r.id_usuario.nombre_usuario|default:r.id_usuario.get_username|default:'usuario' }}"
                         class="review-avatar" loading="lazy">
                       {% endif %}
-
-
-
-
                       <h5 class="mb-0 text-body t-handle">
                         @{{ r.id_usuario.nombre_usuario|default:r.id_usuario.get_username|default:'usuario' }}
                       </h5>
                     </a>
-
-                    <small class="text-muted d-block fecha-resena">
-                      {{ r.fecha_resena|date:"d/m/Y" }}
-                    </small>
-
+                    <small class="text-muted d-block fecha-resena">{{ r.fecha_resena|date:"d/m/Y" }}</small>
                     <div class="mt-2 estrellas" data-calificacion="{{ r.calificacion }}">
                       {% for i in "12345"|make_list %}
-                      <i
-                        class="bi {% if forloop.counter <= r.calificacion %}bi-star-fill{% else %}bi-star{% endif %}"></i>
+                      <i class="bi {% if forloop.counter <= r.calificacion %}bi-star-fill{% else %}bi-star{% endif %}"></i>
                       {% endfor %}
                     </div>
-
-                    <p class="mt-3 mb-3 comentario">
-                      {{ r.comentario|default:"(Sin comentario)" }}
-                    </p>
+                    <p class="mt-3 mb-3 comentario">{{ r.comentario|default:"(Sin comentario)" }}</p>
                   </div>
-
                   {% if user.is_authenticated and r.id_usuario_id == user.id %}
                   <div class="mt-auto">
                     <button type="button" class="btn btn-outline-primary btn-sm me-1 editar-btn" data-bs-toggle="modal"
@@ -1036,7 +848,6 @@ document.addEventListener("DOMContentLoaded", async () => {
                       data-comentario="{{ r.comentario|escapejs }}">
                       <i class="bi bi-pencil"></i> Editar
                     </button>
-
                     <form action="{% url 'resena_sitio_eliminar' %}" method="post" style="display:inline;">
                       {% csrf_token %}
                       <button class="btn btn-outline-danger btn-sm" onclick="return confirm('¿Eliminar tu reseña?')">
@@ -1045,12 +856,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                     </form>
                   </div>
                   {% endif %}
-
                 </div>
               </div>
             </div>
-
-
 
             {% if forloop.counter|divisibleby:3 or forloop.last %}
           </div>
@@ -1078,7 +886,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   </div>
 </section>
 
-{# --- Modal para editar reseña (AJAX) --- #}
 <div class="modal fade" id="editarResenaModal" tabindex="-1" aria-labelledby="editarResenaLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content border-0 shadow">
@@ -1121,83 +928,24 @@ document.addEventListener("DOMContentLoaded", async () => {
 </div>
 
 <style>
-  #testimonials .card {
-    border-radius: 1rem;
-    transition: transform .2s ease;
-    min-height: 100%;
-  }
-
-  #testimonials .card:hover {
-    transform: translateY(-4px);
-  }
-
-  /* Alturas parejas */
-  #testimonials .card .card-body {
-    display: flex;
-    flex-direction: column;
-  }
-
-  #testimonials .card .mt-auto {
-    margin-top: auto;
-  }
-
-  #testimonials .carousel-item {
-    padding: 1rem 0;
-    min-height: 420px;
-  }
-
-  #testimonials .carousel-inner {
-    min-height: 420px;
-  }
-
-  #testimonials .btn-primary {
-    background-color: #007bff;
-    border-color: #007bff;
-  }
-
-  #testimonials .btn-primary:hover {
-    background-color: #0056d2;
-    border-color: #0056d2;
-  }
-
-  #editarResenaModal .modal-title {
-    color: #fff !important;
-  }
-
-  #editarResenaModal .btn-close.btn-close-white {
-    filter: none;
-    opacity: 1;
-  }
-
-  .alert.fade {
-    opacity: 0;
-    transition: opacity .3s ease-in-out;
-  }
-
-  .alert.fade.show {
-    opacity: 1;
-  }
-
-  /* Evitar overflow del @usuario */
-  #testimonials .t-handle {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
-  }
-
+  #testimonials .card { border-radius: 1rem; transition: transform .2s ease; min-height: 100%; }
+  #testimonials .card:hover { transform: translateY(-4px); }
+  #testimonials .card .card-body { display: flex; flex-direction: column; }
+  #testimonials .card .mt-auto { margin-top: auto; }
+  #testimonials .carousel-item { padding: 1rem 0; min-height: 420px; }
+  #testimonials .carousel-inner { min-height: 420px; }
+  #testimonials .btn-primary { background-color: #007bff; border-color: #007bff; }
+  #testimonials .btn-primary:hover { background-color: #0056d2; border-color: #0056d2; }
+  #editarResenaModal .modal-title { color: #fff !important; }
+  #editarResenaModal .btn-close.btn-close-white { filter: none; opacity: 1; }
+  .alert.fade { opacity: 0; transition: opacity .3s ease-in-out; }
+  .alert.fade.show { opacity: 1; }
+  #testimonials .t-handle { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   @media (max-width:768px) {
-    #testimonials .col-md-6.col-lg-4 {
-      flex: 0 0 50%;
-      max-width: 50%;
-    }
+    #testimonials .col-md-6.col-lg-4 { flex: 0 0 50%; max-width: 50%; }
   }
-
   @media (max-width:576px) {
-    #testimonials .col-md-6.col-lg-4 {
-      flex: 0 0 100%;
-      max-width: 100%;
-    }
+    #testimonials .col-md-6.col-lg-4 { flex: 0 0 100%; max-width: 100%; }
   }
 </style>
 
@@ -1210,11 +958,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const inputId = document.getElementById("editar-id");
     const textarea = document.getElementById("editar-comentario");
     const form = document.getElementById("form-editar-modal");
-
-    const Toast = Swal.mixin({
-      toast: true, position: "top-end", showConfirmButton: false, timer: 1500, timerProgressBar: true,
-      background: "#fff", color: "#111",
-    });
+    const Toast = Swal.mixin({ toast: true, position: "top-end", showConfirmButton: false, timer: 1500, timerProgressBar: true, background: "#fff", color: "#111" });
 
     modal.addEventListener("show.bs.modal", event => {
       const btn = event.relatedTarget;
@@ -1235,7 +979,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       e.preventDefault();
       const fd = new FormData(form);
       const id = fd.get("id");
-
       try {
         const res = await fetch("{% url 'resena_sitio_editar' %}", {
           method: "POST",
@@ -1245,188 +988,84 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (!(res.status >= 200 && res.status < 400)) throw new Error("HTTP " + res.status);
         const ct = (res.headers.get("content-type") || "").toLowerCase();
         if (ct.includes("application/json")) await res.json(); else await res.text();
-
         const card = document.getElementById(`resena-${id}`);
         if (card) {
           card.querySelector(".comentario").textContent = fd.get("comentario") || "(Sin comentario)";
-          const estrellasEl = card.querySelector(".estrellas");
-          actualizarEstrellasCarrusel(estrellasEl, fd.get("calificacion"));
+          actualizarEstrellasCarrusel(card.querySelector(".estrellas"), fd.get("calificacion"));
         }
-
         Toast.fire({ icon: "success", title: "Reseña actualizada correctamente" });
         setTimeout(() => { bootstrap.Modal.getInstance(modal).hide(); }, 800);
-
       } catch (err) {
         console.error(err);
         Swal.fire({ icon: "error", title: "Error", text: "No se pudo actualizar la reseña.", confirmButtonColor: "#007bff" });
       }
     });
 
-    function actualizarEstrellas(valor) {
-      const val = Number(valor) || 5;
+    function actualizarEstrellas(val) {
+      const v = Number(val) || 5;
       estrellas.forEach(b => {
         const n = b.getAttribute("data-value");
-        const icon = b.querySelector("i");
-        if (n <= val) icon.classList.replace("bi-star", "bi-star-fill");
-        else icon.classList.replace("bi-star-fill", "bi-star");
+        b.querySelector("i").classList.replace(n <= v ? "bi-star" : "bi-star-fill", n <= v ? "bi-star-fill" : "bi-star");
       });
     }
-
     function actualizarEstrellasCarrusel(container, val) {
-      const icons = container.querySelectorAll("i");
-      icons.forEach((i, idx) => {
-        if (idx < val) i.className = "bi bi-star-fill";
-        else i.className = "bi bi-star";
+      container.querySelectorAll("i").forEach((i, idx) => {
+        i.className = idx < val ? "bi bi-star-fill" : "bi bi-star";
       });
     }
   });
 </script>
 
-{# ====== CSS/JS del widget de estrellas (ligero) ====== #}
 <style>
-  .rating-star {
-    text-decoration: none;
-  }
-
-  .rating-star:focus-visible {
-    outline: 2px solid #6c63ff;
-    border-radius: .4rem;
-  }
-
-  .rating-star:hover i {
-    transform: scale(1.08);
-  }
+  .rating-star { text-decoration: none; }
+  .rating-star:focus-visible { outline: 2px solid #6c63ff; border-radius: .4rem; }
+  .rating-star:hover i { transform: scale(1.08); }
 </style>
 <script>
-  // Widget de estrellas compartido por ambos formularios
   document.addEventListener('click', function (e) {
     const btn = e.target.closest('.rating-star'); if (!btn) return;
     const group = btn.closest('.js-rating-stars');
     const hidden = group?.parentElement?.querySelector('.js-rating-input');
     if (!group || !hidden) return;
-    const val = parseInt(btn.getAttribute('data-value'), 10) || 5;
-    const clamped = Math.max(1, Math.min(5, val));
-    hidden.value = clamped;
-    const stars = group.querySelectorAll('.rating-star i');
-    stars.forEach((icon, idx) => {
-      icon.className = (idx + 1) <= clamped ? 'bi bi-star-fill fs-4' : 'bi bi-star fs-4';
+    const val = Math.max(1, Math.min(5, parseInt(btn.getAttribute('data-value'), 10) || 5));
+    hidden.value = val;
+    group.querySelectorAll('.rating-star i').forEach((icon, idx) => {
+      icon.className = (idx + 1) <= val ? 'bi bi-star-fill fs-4' : 'bi bi-star fs-4';
     });
   });
 </script>
 
-
-
-<!-- Fin reseñitas nuevas-->
-<!-- Fin reseñitas nuevas-->
-<!-- Fin reseñitas nuevas-->
-
-
-
-
 <style>
-  .wishlist-btn .bi {
-    transition: transform .18s ease;
-  }
-
-  .wishlist-btn.heart-pop .bi {
-    animation: heartPop .28s ease;
-  }
-
-  @keyframes heartPop {
-    0% {
-      transform: scale(1)
-    }
-
-    50% {
-      transform: scale(1.35)
-    }
-
-    100% {
-      transform: scale(1)
-    }
-  }
-</style>
-
-<style>
-  /* Corazón flotante en la foto */
-  .product-image-container {
-    position: relative;
-  }
-
+  .wishlist-btn .bi { transition: transform .18s ease; }
+  .wishlist-btn.heart-pop .bi { animation: heartPop .28s ease; }
+  @keyframes heartPop { 0% { transform: scale(1) } 50% { transform: scale(1.35) } 100% { transform: scale(1) } }
+  .product-image-container { position: relative; }
   .wishlist-badge {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 38px;
-    height: 38px;
-    display: grid;
-    place-items: center;
-    background: rgba(255, 255, 255, .95);
-    border-radius: 9999px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, .12);
-    z-index: 2;
-    text-decoration: none;
+    position: absolute; top: 8px; right: 8px; width: 38px; height: 38px;
+    display: grid; place-items: center; background: rgba(255, 255, 255, .95);
+    border-radius: 9999px; box-shadow: 0 4px 12px rgba(0, 0, 0, .12); z-index: 2; text-decoration: none;
   }
-
-  .wishlist-badge:hover {
-    transform: translateY(-1px);
+  .wishlist-badge:hover { transform: translateY(-1px); }
+  .wishlist-badge .bi { transition: transform .18s ease; }
+  .wishlist-badge.heart-pop .bi { animation: heartPop .28s ease; }
+  .categorias-carousel .cat-name { color: #4D6BFF; font-weight: 700; }
+  .categorias-carousel .swiper-slide a { color: #4D6BFF !important; text-decoration: none; }
+  .categorias-carousel .swiper-slide a:hover, .categorias-carousel .swiper-slide a:focus { color: #4D6BFF !important; text-decoration: none; }
+  .badge-ribbon {
+    position: absolute; top: 10px; left: 10px; z-index: 3;
+    background: #2563eb; color: #fff; font-weight: 700; font-size: .75rem;
+    padding: .28rem .55rem; border-radius: 10px; box-shadow: 0 6px 16px rgba(37, 99, 235, .18);
   }
-
-  /* (reutiliza tu anim) */
-  .wishlist-badge .bi {
-    transition: transform .18s ease;
-  }
-
-  .wishlist-badge.heart-pop .bi {
-    animation: heartPop .28s ease;
-  }
-
-  /* Texto azul para los nombres de categorías */
-  .categorias-carousel .cat-name {
-    color: #4D6BFF;
-    font-weight: 700;
-  }
-
-  /* Por si alguna card no usa <span class="cat-name"> (fallback) */
-  .categorias-carousel .swiper-slide a {
-    color: #4D6BFF !important;
-    text-decoration: none;
-  }
-
-  .categorias-carousel .swiper-slide a:hover,
-  .categorias-carousel .swiper-slide a:focus {
-    color: #4D6BFF !important;
-    text-decoration: none;
-  }
-
-
-  @keyframes heartPop {
-    0% {
-      transform: scale(1)
-    }
-
-    50% {
-      transform: scale(1.35)
-    }
-
-    100% {
-      transform: scale(1)
-    }
+  #testimonials .review-avatar {
+    width: 72px !important; height: 72px !important; aspect-ratio: 1 / 1;
+    border-radius: 50% !important; object-fit: cover; object-position: center;
+    display: block; margin: 0 auto 0.75rem;
   }
 </style>
-
-
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-  const Toast = Swal.mixin({
-    toast: true,
-    position: 'top-end',
-    showConfirmButton: false,
-    timer: 1600,
-    timerProgressBar: true
-  });
-
+  const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 1600, timerProgressBar: true });
   function getCookie(name) {
     const value = `; ${document.cookie}`;
     const parts = value.split(`; ${name}=`);
@@ -1435,120 +1074,62 @@ document.addEventListener("DOMContentLoaded", async () => {
   const csrftoken = getCookie('csrftoken');
 
   document.addEventListener('click', async function (e) {
-    const btn = e.target.closest('.wishlist-btn');
-    if (!btn) return;
-
+    const btn = e.target.closest('.wishlist-btn'); if (!btn) return;
     e.preventDefault();
     const id = btn.getAttribute('data-product-id');
     const icon = btn.querySelector('i');
     const wasFav = btn.classList.contains('is-fav');
     const prevTitle = btn.title;
-
-    // Animación táctil rápida
-    btn.classList.add('heart-pop');
-    setTimeout(() => btn.classList.remove('heart-pop'), 320);
+    btn.classList.add('heart-pop'); setTimeout(() => btn.classList.remove('heart-pop'), 320);
 
     try {
       const url = `{% url 'favoritos_toggle' 0 %}`.replace('/0/', `/${id}/`);
-      const resp = await fetch(url, {
-        method: 'POST',
-        headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }
-      });
-
+      const resp = await fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' } });
       if (resp.redirected || resp.url.includes('{% url "login" %}')) {
-        window.location.href = "{% url 'login' %}?next={{ request.get_full_path|urlencode }}";
-        return;
+        window.location.href = "{% url 'login' %}?next={{ request.get_full_path|urlencode }}"; return;
       }
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
-
       const data = await resp.json();
       const isFav = data.state === 'added';
-
-      // Actualiza UI del botón
       btn.classList.toggle('is-fav', isFav);
       btn.setAttribute('aria-pressed', isFav ? 'true' : 'false');
       btn.title = isFav ? 'Quitar de wishlist' : 'Agregar a wishlist';
       if (icon) icon.className = isFav ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
-
-      // Feedback
-      Toast.fire({
-        icon: isFav ? 'success' : 'info',
-        title: isFav ? 'Agregado a tu wishlist' : 'Quitado de tu wishlist'
-      });
-
+      Toast.fire({ icon: isFav ? 'success' : 'info', title: isFav ? 'Agregado a tu wishlist' : 'Quitado de tu wishlist' });
     } catch (err) {
       console.error(err);
-      // Revertir UI si falla
       btn.classList.toggle('is-fav', wasFav);
       btn.setAttribute('aria-pressed', wasFav ? 'true' : 'false');
       btn.title = prevTitle;
       if (icon) icon.className = wasFav ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
-
       Toast.fire({ icon: 'error', title: 'Ups, no pudimos actualizar' });
     }
   });
-</script>
 
-<script>
   document.addEventListener('DOMContentLoaded', function () {
-    // Asumimos que tienes una función getCookie para el CSRF token
-    function getCookie(name) {
-      let cookieValue = null;
-      if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-          const cookie = cookies[i].trim();
-          if (cookie.substring(0, name.length + 1) === (name + '=')) {
-            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-            break;
-          }
-        }
-      }
-      return cookieValue;
-    }
-    const csrftoken = getCookie('csrftoken');
-
     document.body.addEventListener('click', async function (event) {
       const dislikeButton = event.target.closest('.reco-dislike-btn');
       if (!dislikeButton) return;
-
       event.preventDefault();
-
       const productId = dislikeButton.dataset.productId;
       const card = document.getElementById(`reco-card-${productId}`);
       if (!productId || !card) return;
-
       const formData = new FormData();
       formData.append('product_id', productId);
-
       try {
         const response = await fetch("{% url 'recommendation_feedback' %}", {
           method: 'POST',
-          headers: {
-            'X-CSRFToken': csrftoken,
-            'X-Requested-With': 'XMLHttpRequest'
-          },
+          headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' },
           body: formData
         });
-
         if (!response.ok) throw new Error('Error del servidor');
         const data = await response.json();
-
         if (data.status === 'ok') {
-          // Animar y eliminar la tarjeta del producto
           card.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
           card.style.opacity = '0';
           card.style.transform = 'scale(0.9)';
           setTimeout(() => card.remove(), 400);
-
-          if (typeof Toast !== 'undefined') {
-            Toast.fire({
-              icon: 'info',
-              title: 'Entendido. ¡Afinando tus gustos!'
-            });
-          }
-
-          // Si el backend nos devolvió una nueva recomendación, la insertamos
+          if (typeof Toast !== 'undefined') Toast.fire({ icon: 'info', title: 'Entendido. ¡Afinando tus gustos!' });
           try {
             const rec = data.new_recommendation;
             if (rec) {
@@ -1564,68 +1145,28 @@ document.addEventListener("DOMContentLoaded", async () => {
                         </a>
                         <img src="${rec.imagen_url || '{% static "img/Gifters/favicongift.png" %}'}" class="img-fluid" alt="${rec.nombre}" style="width: 100%; height: 100%; object-fit: cover;">
                       </div>
-
                       <div class="portfolio-info">
                         <h4>${rec.nombre}</h4>
                         <div class="product-actions">
-                          <a href="#" class="btn btn-sm reco-dislike-btn" data-product-id="${rec.id}" title="No me interesa">
-                            <i class="bi bi-hand-thumbs-down"></i>
-                          </a>
-                          <a href="${rec.url || '#'}" class="details-link" target="_blank" rel="noopener">
-                            <i class="bi bi-link-45deg"></i>
-                          </a>
+                          <a href="#" class="btn btn-sm reco-dislike-btn" data-product-id="${rec.id}" title="No me interesa"><i class="bi bi-hand-thumbs-down"></i></a>
+                          <a href="${rec.url || '#'}" class="details-link" target="_blank" rel="noopener"><i class="bi bi-link-45deg"></i></a>
                         </div>
                       </div>
                     </div>
-                  </div>
-                `;
-                const newCol = wrapper.firstElementChild;
-                row.appendChild(newCol);
+                  </div>`;
+                row.appendChild(wrapper.firstElementChild);
               }
             }
-          } catch (err) {
-            console.error('No se pudo insertar la nueva recomendación:', err);
-          }
+          } catch (err) { console.error('No se pudo insertar la nueva recomendación:', err); }
         }
       } catch (error) {
         console.error('Error al registrar el feedback:', error);
-        if (typeof Toast !== 'undefined') {
-          Toast.fire({ icon: 'error', title: 'No se pudo registrar tu feedback.' });
-        }
+        if (typeof Toast !== 'undefined') Toast.fire({ icon: 'error', title: 'No se pudo registrar tu feedback.' });
       }
     });
   });
 </script>
 
-<style>
-  .badge-ribbon {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    z-index: 3;
-    background: #2563eb;
-    color: #fff;
-    font-weight: 700;
-    font-size: .75rem;
-    padding: .28rem .55rem;
-    border-radius: 10px;
-    box-shadow: 0 6px 16px rgba(37, 99, 235, .18);
-  }
-</style>
-
-<style>
-  /* Forzamos que los avatares de reseñas sean SIEMPRE círculos 72x72 */
-  #testimonials .review-avatar {
-    width: 72px !important;
-    height: 72px !important;
-    aspect-ratio: 1 / 1;
-    border-radius: 50% !important;
-    object-fit: cover;
-    object-position: center;
-    display: block;
-    margin: 0 auto 0.75rem;
-  }
-</style>
-
+<div class="d-block d-md-none" style="height: 80px;"></div>
 
 {% endblock %}

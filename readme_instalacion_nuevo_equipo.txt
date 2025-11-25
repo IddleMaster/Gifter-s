@@ -1,4 +1,35 @@
 GUÍA PARA LEVANTAR GIFTERS DESDE GITHUB (LOCAL + DOCKER + ESCRITORIO)
+lo más importante es que instale python desde la microsoft store
+y hacer estos pasos en la powershell con administrador: 
+
+1) Habilitar ejecución de scripts (necesario para usar entornos virtuales)
+
+Abrir PowerShell como Administrador y ejecutar:
+
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+
+
+Cerrar y abrir PowerShell nuevamente.
+
+2) Activar WSL2 y características de virtualización requeridas por Docker Desktop
+
+Ejecutar estos 4 comandos en PowerShell como Administrador:
+
+dism /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
+dism /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
+dism /online /enable-feature /featurename:HypervisorPlatform /all /norestart
+dism /online /enable-feature /featurename:Microsoft-Hyper-V-All /all /norestart
+
+
+Luego reiniciar el PC.
+
+3) Verificar que Python esté disponible
+
+En PowerShell normal:
+
+python --version
+py --version
+
 1. Clonar proyecto
 git clone https://github.com/LO-QUE-SEA/Gifter-s.git
 cd Gifter-s

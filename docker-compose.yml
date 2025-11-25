@@ -10,7 +10,6 @@ services:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      # Monta el volumen de respaldos aquí
       - backups:/backups
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
@@ -33,7 +32,9 @@ services:
       redis:
         condition: service_started
       meilisearch:
-        condition: service_started 
+        condition: service_started
+      ollama:
+        condition: service_started
     environment:
       IS_DOCKER: "1"
       DJANGO_DB_HOST: db
@@ -45,7 +46,7 @@ services:
       MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
       MEILI_URL: ${MEILI_URL}
       USE_MEILI: ${USE_MEILI}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OLLAMA_URL: "http://ollama:11434"
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
@@ -68,7 +69,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      
+
   meilisearch:
     image: getmeili/meilisearch:v1.7
     environment:
@@ -79,41 +80,44 @@ services:
       - meili_data:/meili_data
     restart: unless-stopped
 
-  # 👇 ASEGÚRATE DE QUE db-backup ESTÉ INDENTADO AQUÍ (DENTRO DE SERVICES)
+  # ================
+  # IA LOCAL (OLLAMA)
+  # ================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+  # ================
+  # BACKUPS DIARIOS
+  # ================
   db-backup:
-    image: mysql:8.0 # Usa la misma imagen que tu BD
+    image: mysql:8.0
     depends_on:
       db:
-        condition: service_healthy # Espera a que la BD esté saludable
+        condition: service_healthy
     environment:
-      # Pasa las credenciales de tu BD
       MYSQL_DATABASE: gifters
       MYSQL_USER: gifters_user
       MYSQL_PASSWORD: gifters_pass
-      MYSQL_HOST: db # El nombre del servicio de tu BD
+      MYSQL_HOST: db
     volumes:
-      - backups:/backups # Monta el volumen de respaldos
+      - backups:/backups
       - .:/project:ro
     command: >
       sh -c "while true; do
         echo '📦 Iniciando respaldo diario de BD...'
-        
-        # 1. Respaldo de Base de Datos (ya funciona)
         mysqldump --no-tablespaces -h $${MYSQL_HOST} -u $${MYSQL_USER} -p$${MYSQL_PASSWORD} $${MYSQL_DATABASE} > /backups/backup-$$(date +%Y-%m-%d_%H-%M-%S).sql
-        
         echo 'Respaldo de BD completado.'
 
-        # --- 👇 AÑADE ESTO: Respaldo de 'media' 👇 ---
         echo '📦 Iniciando respaldo diario de Media...'
-        
-        # Comprime la carpeta /project/media/ y la guarda en /backups/
-        # (El -C /project es para que no guarde la ruta completa)
         tar -czf /backups/media-$$(date +%Y-%m-%d_%H-%M-%S).tar.gz -C /project media
-        
         echo 'Respaldo de Media completado.'
-        # --- ------------------------------------ ---
 
-        # Espera 24 horas
         echo 'Durmiendo por 24 horas...'
         sleep 86400
       done"
@@ -121,5 +125,5 @@ services:
 volumes:
   mysql_data:
   meili_data:
-  # Declara el nuevo volumen de respaldos
   backups:
+  ollama_data:

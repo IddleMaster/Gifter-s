@@ -49,7 +49,7 @@ class Command(BaseCommand):
     def detect_encoding(self, file_path):
         """Detecta la codificación del archivo para evitar errores de lectura."""
         with open(file_path, 'rb') as file:
-            raw_data = file.read(10000) # Leer solo los primeros 10KB es suficiente
+            raw_data = file.read(10000) # Leer los primeros 10KB
             result = chardet.detect(raw_data)
             encoding = result['encoding']
             self.stdout.write(f"Codificación detectada: {encoding} (confianza: {result['confidence']:.2f})")
@@ -254,7 +254,6 @@ class Command(BaseCommand):
                                         response.raise_for_status() # Lanza error para respuestas 4xx/5xx
 
                                         # raise_for_status() ya verifica esto, pero doble chequeo por si acaso
-                                        #if response.status_code == 200: # Ya no es estrictamente necesario
                                         # Obtener el nombre del archivo de la URL
                                         # Limpiamos posibles parámetros como ?s=... o #...
                                         file_name_from_url = url_imagen.split('/')[-1].split('?')[0].split('#')[0]
@@ -303,16 +302,3 @@ class Command(BaseCommand):
              self.stdout.write(self.style.ERROR(f"El archivo {csv_file_path} no fue encontrado."))
         except Exception as e:
             self.stdout.write(self.style.ERROR(f'Error general al procesar el archivo: {str(e)}'))
-
-
-#url_imagen = row.get(mapping.get('url_imagen')) # Usamos .get para que no falle si no existe 
-                            #if url_imagen:
-                            #    try:
-                            #        response = requests.get(url_imagen, stream=True)
-                            #        if response.status_code == 200:
-                            #                                        # Obtener el nombre del archivo de la URL
-                            #            file_name = url_imagen.split('/')[-1]
-                            #            producto.imagen.save(file_name, ContentFile(response.content), save=True)
-                            #            self.stdout.write(self.style.SUCCESS(f"  ✓ Imagen descargada para {producto.nombre_producto}"))
-                            #    except Exception as img_e:
-                            #        self.stdout.write(self.style.WARNING(f"  ! No se pudo descargar la imagen para {producto.nombre_producto}: {img_e}"))

@@ -26,7 +26,7 @@ class Command(BaseCommand):
         dry = opts["dry_run"]
         delete_files = opts["delete_files"]
 
-        # Ajusta/añade etiquetas si tus modelos están en otra app distinta a 'core'
+        # Ajustar/añadir etiquetas si modelos están en otra app distinta a 'core'
         Post = _pick_model(["core.Post", "core.Publicacion", "core.FeedPost"])
         Comentario = _pick_model(["core.Comentario", "core.PostComentario", "core.Comment"])
         Like = _pick_model(["core.Like", "core.PostLike", "core.MeGusta"])

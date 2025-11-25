@@ -10,7 +10,7 @@ from django.conf import settings
 from core.services.ai_recommender import rerank_fof
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
 import logging
-from core.services.profanity_filter import censurar_con_openai
+from core.services.profanity_filter import censurar
 from core.models import Seguidor
 from django.views.decorators.http import require_GET
 from django.http import JsonResponse

@@ -715,18 +715,29 @@ button {
   z-index: 1030;
   /* sobre el contenido al hacer scroll si el header es sticky */
 }
+/* --- Buscador móvil (REVISADO para ocupar 100% de ancho) --- */
 
-/* Asegura buenos paddings y tap targets en mobile */
+/* AÑADIDO: Asegura que el contenedor principal ocupe el 100% */
+.site-search-mobile {
+  width: 100%;
+}
+
+/* AÑADIDO: El .search-pill (que es d-flex) también debe ocupar el 100% */
 .site-search-mobile .search-pill {
   border: 2px solid #6383ff;
   border-radius: 9999px;
   overflow: hidden;
+  width: 100%; /* <-- Esto es importante */
 }
 
 .site-search-mobile .search-input {
   border: 0;
   padding: .7rem 1rem;
   box-shadow: none;
+  
+  /* AÑADIDO: Estas dos líneas hacen que el input crezca */
+  flex-grow: 1;
+  width: 0; /* Técnica de Flexbox para que flex-grow funcione correctamente */
 }
 
 .site-search-mobile .search-input:focus {
@@ -738,6 +749,7 @@ button {
   background: transparent;
   border: 0;
   padding: .6rem .95rem;
+  flex-shrink: 0; /* Evita que el botón se "aplaste" */
 }
 
 .site-search-mobile .btn-search i {

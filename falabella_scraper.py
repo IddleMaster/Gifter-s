@@ -1,119 +1,169 @@
-# falabella_scraper.py
+import os
+import django
+from urllib.parse import urljoin
+import re
 import asyncio
 import json
-import os
-import re
-from urllib.parse import urljoin
 
-import django
-
-# --- Configurar Django ---
+# === Cargar settings de Django ===
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "myproject.settings")
 django.setup()
 
-from core.models import ProductoExterno  # noqa: E402
+# === Cargar modelos después de setup() ===
+from django.apps import apps
+Producto = apps.get_model('core', 'Producto')
+Marca = apps.get_model('core', 'Marca')
+Categoria = apps.get_model('core', 'Categoria')
+UrlTienda = apps.get_model('core', 'UrlTienda')
+
 from playwright.async_api import async_playwright
 
 HEADLESS = True
-
 
 def parse_price(text):
     digits = re.sub(r"\D+", "", text or "")
     return int(digits) if digits else None
 
 
-async def scrape_falabella(url):
+async def scrape_falabella(url, brand):
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=HEADLESS)
         page = await browser.new_page()
 
         print(f"🕒 Cargando página: {url}")
         await page.goto(url, timeout=90000)
-        await page.wait_for_selector("a[href*='/falabella-cl/product/']", timeout=60000)
+
+        try:
+            await page.wait_for_selector("a[href*='/falabella-cl/product/']", timeout=60000)
+        except:
+            print("⚠ No se encontraron productos en esta categoría")
+            await browser.close()
+            return []
+
         await page.wait_for_timeout(2000)
 
         cards = await page.query_selector_all("a[href*='/falabella-cl/product/']")
-        print(f"🔍 Detectadas {len(cards)} tarjetas de producto (preliminar)")
+        print(f"🔍 Detectadas {len(cards)} tarjetas")
 
         base = "https://www.falabella.com/falabella-cl"
         products = []
 
         for a in cards:
             href = await a.get_attribute("href")
-            full_text = " ".join((await a.inner_text()).split())
+            full_text = " ".join((await a.inner_text()).split() if await a.inner_text() else "")
+
             if not href or not full_text:
                 continue
 
             url_abs = urljoin(base, href)
-            card = a  
 
-            # ---- IMAGEN ----
-            img = await card.query_selector("img")
+            # IMAGEN
+            img = await a.query_selector("img")
             img_src = await img.get_attribute("src") if img else None
-
-            # 🔥 1. DESCARTAR PRODUCTOS SIN IMAGEN REAL
             if not img_src or not img_src.startswith("http"):
                 continue
 
-            # ---- PRECIO ----
-            price_el = await card.query_selector("text=$")
-            price = None
-            if price_el:
-                txt = (await price_el.inner_text()).strip()
-                price = parse_price(txt)
-
+            # PRECIO
+            price_el = await a.query_selector("span:has-text('$')")
+            price = parse_price(await price_el.inner_text()) if price_el else None
             if not price:
                 continue
 
-            # ---- NOMBRE LIMPIO ----
-            parts = full_text.split("$", 1)
-            name_clean = parts[0].strip()
+            # NOMBRE
+            name_clean = full_text.split("$", 1)[0].strip()
 
-            # ---- GUARDAR ----
-            products.append(
-                {
-                    "name": name_clean,
-                    "price": price,
-                    "brand": "Sony",
-                    "category": "Consolas",
-                    "url": url_abs,
-                    "image": img_src,   # ya validado
-                }
-            )
+            products.append({
+                "name": name_clean,
+                "price": price,
+                "brand": brand,
+                "category": "Tecnología", 
+                "url": url_abs,
+                "image": img_src,
+            })
 
         await browser.close()
         return products
 
 
+
 def guardar_en_bd(productos):
-    """Guarda o actualiza los productos en ProductoExterno."""
     creados = 0
     actualizados = 0
 
     for p in productos:
-        obj, created = ProductoExterno.objects.update_or_create(
-            url=p["url"],
-            defaults={
-                "nombre": p["name"],
-                "precio": p["price"],
-                "marca": p["brand"],
-                "categoria": p["category"],
-                "imagen": p["image"],  # imagen real
-                "fuente": "Falabella",
-            },
+
+        categoria_obj, _ = Categoria.objects.get_or_create(
+            nombre_categoria="Tecnología"
         )
-        if created:
-            creados += 1
-        else:
+
+        marca_obj, _ = Marca.objects.get_or_create(
+            nombre_marca=p["brand"]
+        )
+
+        url_existente = UrlTienda.objects.filter(url=p["url"]).first()
+
+        if url_existente:
+            prod = url_existente.producto
+            prod.nombre_producto = p["name"]
+            prod.precio = p["price"]
+            prod.imagen = p["image"]
+            prod.id_categoria = categoria_obj
+            prod.id_marca = marca_obj
+            prod.save()
             actualizados += 1
+            continue
 
-    print(f"💾 Guardados {creados} nuevos, actualizados {actualizados} productos externos.")
+        producto = Producto.objects.create(
+            nombre_producto=p["name"],
+            descripcion=f"[Falabella] {p['name']}",
+            precio=p["price"],
+            imagen=p["image"],
+            id_categoria=categoria_obj,
+            id_marca=marca_obj,
+            url=p["url"],
+        )
+
+        UrlTienda.objects.create(
+            producto=producto,
+            url=p["url"],
+            nombre_tienda="Falabella",
+            es_principal=True,
+            activo=True,
+        )
+
+        creados += 1
+
+    print(f"💾 {creados} nuevos, {actualizados} actualizados.")
 
 
+
+# === CATEGORÍAS FINALES QUE SEGURO FUNCIONAN ===
+URLS = [
+    # Consolas Sony
+    {
+        "url": "https://www.falabella.com/falabella-cl/category/cat202303/Consolas?f.product.brandName=sony",
+        "brand": "Sony",
+    },
+
+    # Perfumes HOMBRE
+    {
+        "url": "https://www.falabella.com/falabella-cl/category/cat70057/Perfumes-Hombre",
+        "brand": "Genérico",
+    },
+
+    # Perfumes MUJER
+    {
+        "url": "https://www.falabella.com/falabella-cl/category/cat70056/Perfumes-Mujer",
+        "brand": "Genérico",
+    },
+]
+
+
+# === EJECUCIÓN ===
 if __name__ == "__main__":
-    url = "https://www.falabella.com/falabella-cl/category/cat202303/Consolas?f.product.brandName=sony"
-    data = asyncio.run(scrape_falabella(url))
-    print(f"\n✅ Encontrados {len(data)} productos válidos (con imagen)\n")
-    print(json.dumps(data, ensure_ascii=False, indent=2))
+    for u in URLS:
+        productos = asyncio.run(scrape_falabella(u["url"], u["brand"]))
+        print(f"\n✅ Encontrados {len(productos)} productos válidos\n")
+        guardar_en_bd(productos)
 
-    guardar_en_bd(data)
+    print("\n🎉 SCRAPER COMPLETADO SIN ERRORES\n")

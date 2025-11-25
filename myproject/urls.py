@@ -12,7 +12,6 @@ from django.views.decorators.cache import never_cache
 from core import api_views
 from core.api_views import AmigosRecomendadosView
 from core.views_populares import populares_ai
-
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_GET
 import json
@@ -36,6 +35,10 @@ from django.utils import timezone
 from django.contrib.auth import get_user_model
 
 urlpatterns = [
+    
+    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/admin/reset-request/', views.admin_password_reset_request, name='api_admin_reset_request'),
     # Admin / auth
     path('admin/', admin.site.urls),
     path('accounts/', include('allauth.urls')),
@@ -53,17 +56,24 @@ urlpatterns = [
     path("usuarios/", views.usuarios_list, name="usuarios_list"),
     path("buscar/", views.buscar_router, name="buscar_router"),
     path("producto/<int:id_producto>/", views.producto_detalle, name="producto_detalle"),
-
+    
     path(
     'productos/externo/<int:id_externo>/',
     views.producto_externo_detalle,
     name='producto_externo_detalle',
 ),
     path(
-    'favoritos/externo/<int:id_externo>/toggle/',
-    views.favoritos_toggle_externo,
-    name='favoritos_toggle_externo',
+    'favoritos/toggle/<int:product_id>/',
+    views.toggle_favorito,
+    name='favoritos_toggle',
 ),
+
+    path(
+    'wishlist/marcar_recibido_externo/<int:id_externo>/',
+    views.wishlist_marcar_recibido_externo,
+    name='wishlist_marcar_recibido_externo'
+),
+    path('favoritos/toggle/<int:pk>/', views.favoritos_toggle, name='favoritos_toggle'),
 
     # Perfil
     path('perfil/', views.profile_view, name='perfil'),
@@ -114,8 +124,7 @@ urlpatterns = [
     path('amistad/cancelar/<str:username>/', views.amistad_cancelar, name='amistad_cancelar'),
 
     # --- API REST (si las usas desde frontend) ---
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    
     path('api/admin/upload-csv/', views.upload_csv_view, name='api_upload_csv'),
     path('api/productos/', views.ProductoListAPIView.as_view(), name='api_producto_list'), 
     path('api/productos/<int:pk>/', views.ProductoDetailAPIView.as_view(), name='api_producto_detail'),
@@ -135,6 +144,8 @@ urlpatterns = [
     path('api/admin/logs/', views.get_web_app_logs, name='api_get_web_logs'),
     path('api/reports/popular-searches/download/pdf/', views.download_popular_search_report_pdf, name='api_report_search_pdf_download'),
     
+    path('api/admin/send-warning/', views.send_warning_email_api, name='api_send_warning'),
+    
     
     # Esta ruta es para ver el detalle de un usuario (para el reporte de "a quién bloqueó")
     path('api/reports/user-activity/<int:pk>/', views.UserActivityDetailAPIView.as_view(), name='api_report_user_activity_detail'),
@@ -142,6 +153,8 @@ urlpatterns = [
     # --- Rutas API para Usuarios (Admin) --- # <-- NUEVA SECCIÓN
     path('api/users/', views.UserListAPIView.as_view(), name='api_user_list'),
     path('api/users/<int:pk>/', views.UserDetailAPIView.as_view(), name='api_user_detail'),
+    path('api/users/<int:pk>/change-password-forced/', views.change_password_forced_api, name='api_change_password_forced'),
+    
     
     # Amistad
     path('api/amistad/solicitudes/', views.EnviarSolicitudAmistad.as_view(), name='api_amistad_enviar'),
@@ -295,7 +308,9 @@ urlpatterns = [
     path('chat/events/<int:evento_id>/', views.event_detail, name='event_detail'),                             # GET detalle (admin)             # POST sortear
     path('chat/events/<int:evento_id>/lock/', views.event_lock, name='event_lock'),                            # POST cerrar (opcional)
     path('chat/events/<int:evento_id>/mine/', views.event_my_assignment, name='event_my_assignment'),          # GET mi asignación
+
     
+
 
 ]
 
