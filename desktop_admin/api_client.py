@@ -58,6 +58,70 @@ class ApiClient:
             logger.critical(f"Fallo de conexión en login: {e}") # Error crítico de conexión
             return False, f"No se pudo conectar con el servidor: {e}"
 
+    def get_product_detail(self, product_id):
+        """
+        Obtiene los detalles completos de un producto por su ID (GET /productos/{id}/).
+        """
+        if not self.token:
+            logger.warning("get_product_detail llamado sin token.")
+            return None, "No autenticado."
+        
+        detail_url = f"{self.base_url}/productos/{product_id}/"
+        
+        try:
+            response = requests.get(detail_url, headers=self.headers)
+            response.raise_for_status()
+            logger.info(f"Detalles del producto {product_id} cargados exitosamente.")
+            return response.json(), None
+        except requests.exceptions.HTTPError as http_err:
+            error_detail = http_err.response.text
+            try:
+                error_data = http_err.response.json()
+                error_detail = error_data.get("detail", error_detail)
+            except json.JSONDecodeError:
+                pass
+            logger.error(f"Error HTTP al obtener detalle del producto {product_id}. Status: {response.status_code}, Error: {error_detail}")
+            return None, f"Error al cargar detalle: {response.status_code} - {error_detail}"
+        except requests.exceptions.RequestException as e:
+            logger.error(f"get_product_detail: Error de conexión: {e}", exc_info=True)
+            return None, f"Error de conexión: {e}"
+
+
+    def update_product_full(self, product_id, data):
+        """
+        Envía una actualización completa (PATCH) a un producto con el diccionario de datos.
+        data debe contener: nombre_producto, descripcion, id_categoria, id_marca, imagen, etc.
+        """
+        if not self.token:
+            logger.warning("update_product_full llamado sin token.")
+            return False, "No autenticado."
+        
+        update_url = f"{self.base_url}/productos/{product_id}/" 
+        
+        try:
+            logger.info(f"Intentando PATCH COMPLETO en {update_url} con {len(data)} campos.")
+            response = requests.patch(update_url, json=data, headers=self.headers)
+
+            if response.status_code == 200:
+                logger.info(f"Producto {product_id} actualizado completamente.")
+                return True, "Producto actualizado correctamente."
+            else:
+                error_detail = response.text
+                try:
+                    error_data = response.json()
+                    if isinstance(error_data, dict):
+                        # Manejo de errores de validación de DRF
+                        error_detail = "; ".join([f"{k}: {v[0]}" for k, v in error_data.items()])
+                    elif isinstance(error_data.get('detail'), str):
+                        error_detail = error_data['detail']
+                except json.JSONDecodeError:
+                    pass 
+                
+                logger.error(f"Error al actualizar producto {product_id}. Status: {response.status_code}, Error: {error_detail}")
+                return False, f"Error al actualizar producto: {response.status_code} - {error_detail}"
+        except requests.exceptions.RequestException as e:
+            logger.error(f"update_product_full: Error de conexión: {e}", exc_info=True)
+            return False, f"Error de conexión al actualizar: {e}"
     def get_products(self):
         """
         Obtiene TODOS los productos desde la API...

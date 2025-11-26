@@ -11,7 +11,6 @@
  /* Grid layout responsivo para wishlist y recibidos */
   .gift-grid {
     display: grid;
-    /* CAMBIO: 1fr permite que las tarjetas crezcan. justify-content: center centra si hay pocas. */
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     justify-content: center; 
     gap: clamp(10px, 2vw, 20px);
@@ -22,9 +21,6 @@
   }
 
 
-
-
-  /* Tarjetas de regalo responsivas */
   /* Tarjetas de regalo responsivas */
   .gift-card {
     position: relative;
@@ -38,7 +34,6 @@
     width: 100%;
     min-height: 300px;
     height: 100%;
-    /* NUEVO: que llene toda la celda */
     z-index: 0;
   }
 
@@ -55,7 +50,6 @@
     border-radius: 12px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
-    /* overflow: hidden;  <-- QUITADO */
     overflow: visible;
     display: flex;
     flex-direction: column;
@@ -68,20 +62,17 @@
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   }
 
-  /* Imágenes responsivas */
-  /* Imágenes con alto fijo para que no crezcan a todo el alto del contenedor */
-  /* Imágenes responsivas mejoradas */
+
   .gift-card img,
   .recibido-item img {
     display: block;
     width: 100%;
     height: 220px;
-    /* CAMBIO: contain para ver el producto entero + fondo blanco + padding */
     object-fit: contain; 
     background-color: #fff; 
     padding: 12px;
     border-radius: 12px 12px 0 0;
-    border-bottom: 1px solid #f0f0f0; /* Sutil separación con la info */
+    border-bottom: 1px solid #f0f0f0; 
   }
 
 
@@ -125,7 +116,6 @@
     margin: 0;
   }
 
-  /* Precio y fecha responsivos */
   .gift-info .price,
   .gift-info .received-date {
     font-size: clamp(0.8rem, 2vw, 0.925rem);
@@ -220,7 +210,6 @@
     font-size: clamp(1rem, 2.5vw, 1.2rem);
   }
 
-  /* Tooltip responsivo en hover */
   .gift-actions a::before {
     content: attr(title);
     position: absolute;
@@ -258,7 +247,6 @@
 
     .gift-actions a::before {
       display: none;
-      /* Ocultar tooltips en móvil */
     }
   }
 
@@ -273,8 +261,7 @@
     color: #666;
   }
 
-  /* Responsive */
-  /* Estilos responsivos mejorados */
+
   @media (max-width: 1200px) {
     .gift-grid {
       gap: 16px;
@@ -320,7 +307,6 @@
 
   @media (max-width: 640px) {
     .gift-grid {
-      /* CAMBIO: auto-fit para que la tarjeta ocupe el ancho disponible */
       grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
       justify-content: center;
       gap: 12px;
@@ -328,7 +314,7 @@
 
     .gift-card img,
     .recibido-item img {
-      height: 160px; /* Un poco más alto para que se vea bien el producto */
+      height: 160px; 
     }
 
     .gift-info {
@@ -359,18 +345,16 @@
   }
 
   @media (max-width: 480px) {
-    /* CORRECCIÓN DE PESTAÑAS (TABS) */
     .profile-nav ul {
-      /* CAMBIO: wrap para que bajen a otra línea en vez de cortarse */
       flex-wrap: wrap; 
       justify-content: center;
       overflow-x: visible;
       padding-bottom: 0;
-      gap: 6px; /* Espacio entre botones */
+      gap: 6px; 
     }
 
     .profile-nav li {
-      flex: 1 1 auto; /* Permite que los botones se ajusten */
+      flex: 1 1 auto; 
       text-align: center;
     }
 
@@ -381,13 +365,13 @@
       font-size: 0.85rem;
       border-radius: 20px;
       background-color: #f8f9fa; /* Fondo claro */
-      color: #333 !important;    /* <--- NUEVO: Fuerza la letra oscura (gris oscuro) */
+      color: #333 !important;    
       text-decoration: none;
     }
     
     .profile-nav a.active {
       background-color: #0d6efd;
-      color: white !important;   /* Mantiene letra blanca solo si está activo */
+      color: white !important;   
       font-weight: 600;
     }
 
@@ -515,11 +499,10 @@
     padding-top: .5rem;
   }
 
-  /* ===== Formulario de nuevo evento ===== */
+  /* Formulario de nuevo evento  */
   .events-form {
     display: grid;
     grid-template-columns: 160px 1fr;
-    /* columna de label + campo */
     gap: .75rem 1rem;
     align-items: center;
   }
@@ -564,7 +547,7 @@
     padding: .5rem .9rem;
   }
 
-  /* ===== Amigos: grid uniforme ===== */
+  /* Amigos: grid uniforme  */
   .friends-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));

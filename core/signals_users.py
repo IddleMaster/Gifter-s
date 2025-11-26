@@ -1,13 +1,12 @@
-# core/signals_users.py
+
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.contrib.auth import get_user_model
 from django.apps import apps
-# SE ELIMINÓ: from core.push_utils_v1 import send_webpush_to_user
 from core.search import meili
-import json # Import json needed for the DB part
-from django.utils import timezone # Import timezone needed for the DB part
-from django.db import connection # Import connection needed for the DB part
+import json 
+from django.utils import timezone 
+from django.db import connection 
 
 INDEX = "users"
 User = get_user_model()
@@ -31,7 +30,7 @@ def meili_user_saved(sender, instance: User, **kwargs):
             return
         idx.add_documents([_doc(instance)], primary_key="id")
     except Exception:
-        # evita romper el flujo si Meili está caído
+        
         pass
 
 @receiver(post_delete, sender=User)

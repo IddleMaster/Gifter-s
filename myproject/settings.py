@@ -31,15 +31,11 @@ AUTH_USER_MODEL = "core.User"
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = '+)9=)%0hw!lc0!_cc4o(43bb-t4$vr==(@0anb-h!9#kb4!3tg'
 
-# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
 ALLOWED_HOSTS = []
 
 # --- Firebase (FCM) ---
-
-
-
 
 LOGGING = {
   "version": 1,
@@ -118,7 +114,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'myproject.wsgi.application'
 
-# <-- NUEVO: ASGI + CHANNEL LAYERS
+
 ASGI_APPLICATION = 'myproject.asgi.application'
 
 CHANNEL_LAYERS = {
@@ -169,9 +165,9 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'giftersg4@gmail.com'          # <-- tu Gmail
-EMAIL_HOST_PASSWORD = 'lhix entt ockg lqrl'         # <-- contraseña de aplicación (no la normal)
-DEFAULT_FROM_EMAIL = EMAIL_HOST_USER            # usa el mismo remitente real
+EMAIL_HOST_USER = 'giftersg4@gmail.com'          
+EMAIL_HOST_PASSWORD = 'lhix entt ockg lqrl'         
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER           
 
 # URL base para enlaces de verificación
 SITE_URL = os.getenv("SITE_URL", "http://localhost:8000")
@@ -191,8 +187,7 @@ USE_TZ = True
 
 
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/3.1/howto/static-files/
+# Static files (CSS, JavaScript, Images) 
 # Configuración de archivos media
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
@@ -203,8 +198,7 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'core/static'),
 ]
-##STATIC_URL = '/assets/'
-##comentado hasta que se cree assest: STATICFILES_DIRS = [os.path.join(BASE_DIR, 'assets')]
+
 
 
 LOGIN_REDIRECT_URL = '/'
@@ -214,7 +208,7 @@ LOGOUT_REDIRECT_URL = '/'
 ACCOUNT_LOGIN_METHODS = ['email']
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
 ACCOUNT_USER_MODEL_EMAIL_FIELD = 'correo'
-ACCOUNT_EMAIL_VERIFICATION = 'optional'  # cambia a 'mandatory' si quieres forzar verificación
+ACCOUNT_EMAIL_VERIFICATION = 'optional'  
 
 # Adapters (los crearemos después en core/adapters.py)
 ACCOUNT_ADAPTER = 'core.adapters.CustomAccountAdapter'
@@ -289,7 +283,7 @@ if not CALENDARIFIC_API_KEY:
 # === CAPTCHA ===
 RECAPTCHA_SITE_KEY = os.getenv("RECAPTCHA_SITE_KEY", "6Lc0nhQsAAAAABpywyuPwThF-EVwREZVc-IDHkwh")
 
-# ✅ CORRECCIÓN: Pedir la variable "RECAPTCHA_SECRET_KEY"
+# CORRECCIÓN: Pedir la variable "RECAPTCHA_SECRET_KEY"
 RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY", "6Lc0nhQsAAAAAGpqpKihCJ-BvDPqAn4OXgntgMMI")
 
 LOGGING_DIR = BASE_DIR / 'logs'
@@ -339,7 +333,7 @@ LOGGING = {
             'level': 'WARNING', # Solo loggea warnings y errores de Django
             'propagate': False,
         },
-        # El logger de tu app (puedes loggear desde 'core' con logging.info())
+        
         'core': {
             'handlers': ['console', 'file_web_app'],
             'level': 'INFO',

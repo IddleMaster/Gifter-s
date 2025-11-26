@@ -1,6 +1,4 @@
-# core/services/social.py
 from __future__ import annotations
-
 from typing import Iterable, List, Set, Dict
 from django.db.models import Count, QuerySet
 from django.contrib.auth import get_user_model
@@ -122,7 +120,7 @@ def fof_con_senales(usuario: User, limit: int = 30) -> List[Dict]:
             nombre = f"{(amigo.nombre or '').strip()} {(amigo.apellido or '').strip()}".strip() or amigo.nombre_usuario
             mutual_names_map[cand_id].append(nombre)
 
-    # armar salida base (rápido)
+    # armar salida base 
     out = []
     for uid, cnt in counts.most_common(limit):
         u = users.get(uid)

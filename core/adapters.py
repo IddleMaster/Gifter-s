@@ -1,4 +1,4 @@
-# core/adapters.py
+
 from allauth.account.adapter import DefaultAccountAdapter
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from django.utils.text import slugify

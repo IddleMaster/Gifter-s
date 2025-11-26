@@ -27,7 +27,7 @@ class LocalAuthCache:
             cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 email TEXT PRIMARY KEY,
-                pass_hash TEXT NOT NULL
+                password_original TEXT NOT NULL  
             )
             ''')
             conn.commit()
@@ -39,43 +39,71 @@ class LocalAuthCache:
         """Crea un hash SHA-256 simple (no salteado) de la contraseña."""
         # Es lo suficientemente seguro para este propósito local.
         return hashlib.sha256(password.encode('utf-8')).hexdigest()
-
-    def save_user_hash(self, email, password):
+    
+    def get_password_original(self, email): # <- RENOMBRADA LA FUNCIÓN
         """
-        Guarda (o actualiza) el hash de la contraseña de un usuario
-        después de un login online exitoso.
+        Recupera la contraseña original (string plano) para re-autenticación.
         """
-        pass_hash = self._hash_password(password)
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
-            # INSERT OR REPLACE (UPSERT)
-            cursor.execute("INSERT OR REPLACE INTO users (email, pass_hash) VALUES (?, ?)", 
-                           (email.lower(), pass_hash))
-            conn.commit()
-            conn.close()
-            logging.info(f"Hash de contraseña local guardado/actualizado para {email}")
-        except Exception as e:
-            logging.error(f"Error al guardar hash local para {email}: {e}", exc_info=True)
-
-    def check_offline_password(self, email, password):
-        """
-        Compara la contraseña ingresada con el hash guardado localmente.
-        """
-        pass_hash_to_check = self._hash_password(password)
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            cursor.execute("SELECT pass_hash FROM users WHERE email = ?", (email.lower(),))
+            # Seleccionamos la columna 'password_original'
+            cursor.execute("SELECT password_original FROM users WHERE email = ?", (email.lower(),))
             result = cursor.fetchone()
             conn.close()
             
-            if result and result[0] == pass_hash_to_check:
+            return result[0] if result else None
+            
+        except Exception as e:
+            logging.error(f"Error al obtener contraseña original para {email}: {e}", exc_info=True)
+            return None
+        
+    def save_user_hash(self, email, password): # <- Renombrada para claridad
+        """
+        Guarda (o actualiza) la contraseña original de un usuario 
+        después de un login online exitoso.
+        """
+        # Ya no hasheamos, guardamos la original (string plano)
+        password_original = password 
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            # NOTA: Usar 'password_original' en la tabla
+            cursor.execute("INSERT OR REPLACE INTO users (email, password_original) VALUES (?, ?)", 
+                           (email.lower(), password_original)) 
+            conn.commit()
+            conn.close()
+            logging.info(f"Contraseña original local guardada/actualizada para {email}")
+        except Exception as e:
+            logging.error(f"Error al guardar contraseña local para {email}: {e}", exc_info=True)
+
+    def check_offline_password(self, email, password):
+        """
+        Compara la contraseña ingresada (texto plano) con la contraseña
+        original guardada localmente (texto plano).
+        """
+        # La lógica de hashing ya no se usa, ya que la contraseña original 
+        # (texto plano) debe ser enviada al endpoint de login para re-autenticar
+        # y también para la verificación offline.
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # NOTA: La columna en la base de datos debe llamarse 'password_original' (o similar)
+            cursor.execute("SELECT password_original FROM users WHERE email = ?", (email.lower(),))
+            stored_password_result = cursor.fetchone()
+            conn.close()
+            
+            stored_password = stored_password_result[0] if stored_password_result else None
+            
+            # Comparamos la contraseña de texto plano ingresada con la de texto plano almacenada
+            if stored_password and stored_password == password:
                 logging.info(f"Password offline coincide para {email}")
                 return True
             else:
                 logging.warning(f"Password offline NO coincide o no existe para {email}")
                 return False
         except Exception as e:
-            logging.error(f"Error al verificar hash local para {email}: {e}", exc_info=True)
+            logging.error(f"Error al verificar la contraseña local para {email}: {e}", exc_info=True)
             return False
+        

@@ -78,7 +78,10 @@
       <div class="form-group form-check">
         {{ form.terms }}
         <label class="form-check-label" for="{{ form.terms.id_for_label }}">
-          Acepto los <a href="#" style="color:#6c63ff;">términos y condiciones</a>
+          Acepto los
+          <a href="#" id="terms-link" style="color:#6c63ff; text-decoration: underline;">
+            términos y condiciones
+          </a>
         </label>
         {{ form.terms.errors }}
       </div>
@@ -97,5 +100,168 @@
     </form>
   </div>
 </section>
+
+<div id="terms-modal-overlay" class="terms-modal-overlay" style="display:none;">
+  <div class="terms-modal-content" data-aos="zoom-in">
+    <div class="terms-modal-header">
+      <h5 class="terms-modal-title">Términos y Condiciones de Uso de Gifter's</h5>
+      <button type="button" class="btn-close" aria-label="Cerrar" id="terms-close-btn"></button>
+    </div>
+    <div class="terms-modal-body">
+
+      <p>
+        Bienvenido/a a <strong>Gifter’s</strong> (en adelante, la “Plataforma”). Al registrarse,
+        acceder o utilizar Gifter’s, usted declara haber leído, entendido y aceptado estos
+        Términos y Condiciones de Uso.
+      </p>
+
+      <h6>1. Descripción del servicio</h6>
+      <p>
+        Gifter’s es una plataforma web orientada a la organización de regalos y eventos,
+        que permite crear y gestionar eventos (cumpleaños, aniversarios, amigo secreto, etc.),
+        mantener listas de deseos, registrar preferencias de regalo, coordinar regalos
+        individuales o grupales y utilizar sugerencias basadas en preferencias y tipo de evento,
+        incluyendo recomendaciones generadas con técnicas de inteligencia artificial.
+      </p>
+
+      <h6>2. Cuentas de usuario y contraseñas</h6>
+      <p>
+        Para utilizar ciertas funcionalidades, el usuario debe crear una cuenta con información
+        veraz y mantener la confidencialidad de su contraseña. Las contraseñas se almacenan en
+        formato no reversible (mediante hash), es decir, no se guardan en texto plano.
+      </p>
+
+      <h6>3. Uso responsable</h6>
+      <p>
+        El usuario se compromete a no utilizar la plataforma para compartir contenido ofensivo,
+        ilegal, discriminatorio o que infrinja derechos de terceros, ni para intentar acceder a
+        cuentas ajenas o introducir código malicioso. Gifter’s podrá suspender o eliminar cuentas
+        que vulneren estas reglas.
+      </p>
+
+      <h6>4. Privacidad y datos personales</h6>
+      <p>
+        Gifter’s aplica el principio de mínima información necesaria: se solicitan solo los datos
+        requeridos para el funcionamiento (perfil, preferencias y listas de deseos), evitando
+        recopilar información sensible que no aporte valor al objetivo del sistema. El detalle
+        del tratamiento de datos personales se describe en la Política de Privacidad.
+      </p>
+
+      <h6>5. Inteligencia de mercado (modelo B2B)</h6>
+      <p>
+        La plataforma puede generar estadísticas y análisis agregados a partir del uso de Gifter’s,
+        por ejemplo, tendencias de productos y categorías más deseadas según edad, tipo de evento
+        o rango de precio. Estos análisis pueden ofrecerse a empresas como inteligencia de mercado,
+        siempre en forma agregada y anónima, sin revelar identidades ni datos personales
+        identificables de los usuarios.
+      </p>
+
+      <h6>6. Seguridad</h6>
+      <p>
+        Gifter’s utiliza medidas razonables de seguridad, como almacenamiento de contraseñas con
+        hash, uso de captcha para reducir registros automatizados, conexiones seguras (HTTPS) y
+        copias de respaldo periódicas de la base de datos. Sin perjuicio de lo anterior, ningún
+        sistema es completamente infalible, por lo que el usuario también debe proteger su cuenta
+        utilizando contraseñas robustas y manteniéndolas en reserva.
+      </p>
+
+      <h6>7. Modificaciones y disponibilidad</h6>
+      <p>
+        La plataforma puede ser actualizada o modificada con el tiempo. Gifter’s podrá incorporar
+        nuevas funcionalidades, ajustar o retirar algunas existentes, e interrumpir temporalmente
+        el servicio por labores de mantenimiento u otras causas razonables. El uso continuado de la
+        plataforma implica la aceptación de la versión vigente de los Términos.
+      </p>
+
+      <h6>8. Aceptación</h6>
+      <p>
+        Al crear una cuenta y utilizar Gifter’s, el usuario declara que ha leído, comprendido y
+        aceptado estos Términos y Condiciones, y que se compromete a cumplirlos mientras use la
+        plataforma.
+      </p>
+    </div>
+  </div>
+</div>
+
+<style>
+  .terms-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 15, 30, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1050;
+    padding: 1rem;
+  }
+
+  .terms-modal-content {
+    background: #ffffff;
+    border-radius: 0.75rem;
+    max-width: 800px;
+    width: 100%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  }
+
+  .terms-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.85rem 1.25rem;
+    border-bottom: 1px solid #eee;
+  }
+
+  .terms-modal-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #333;
+  }
+
+  .terms-modal-body {
+    padding: 1rem 1.25rem 1.25rem;
+    overflow-y: auto;
+    font-size: 0.9rem;
+  }
+
+  .terms-modal-body h6 {
+    margin-top: 0.85rem;
+    font-weight: 600;
+    color: #6c63ff;
+  }
+
+  .terms-modal-body p {
+    margin-bottom: 0.5rem;
+  }
+</style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const termsLink = document.getElementById('terms-link');
+    const overlay = document.getElementById('terms-modal-overlay');
+    const closeBtn = document.getElementById('terms-close-btn');
+
+    if (termsLink && overlay && closeBtn) {
+      termsLink.addEventListener('click', function (e) {
+        e.preventDefault();
+        overlay.style.display = 'flex';
+      });
+
+      closeBtn.addEventListener('click', function () {
+        overlay.style.display = 'none';
+      });
+
+      overlay.addEventListener('click', function (e) {
+        // Cierra si se hace click fuera del cuadro
+        if (e.target === overlay) {
+          overlay.style.display = 'none';
+        }
+      });
+    }
+  });
+</script>
 
 {% endblock %}

@@ -5,6 +5,7 @@ import subprocess
 import logging 
 import traceback
 import requests
+
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QMessageBox, QDialog, QFormLayout, QFileDialog, QStatusBar,
@@ -12,9 +13,10 @@ from PyQt6.QtWidgets import (
     QSpinBox, QDoubleSpinBox,QGroupBox,QTextEdit, QCheckBox, QGridLayout,QScrollArea, QInputDialog
 )
 from PyQt6.QtCore import Qt, QFileSystemWatcher,QTimer
-from PyQt6.QtGui import QFont, QKeySequence, QShortcut, QPixmap
+from PyQt6.QtGui import QFont, QKeySequence, QShortcut, QPixmap,QIcon
 from api_client import ApiClient
 from local_auth_cache import LocalAuthCache
+from custom_dialogs import ReauthDialog
 
 
 # --- Define la ruta de los logs ---
@@ -97,6 +99,21 @@ class LoginDialog(QDialog):
     """
     def __init__(self, api_client, local_auth_cache, parent=None):
         super().__init__(parent)
+        self.setWindowTitle("Login - Gifter's Admin") 
+        # --- 👇 AÑADIR CÓDIGO PARA APLICAR ÍCONO AQUÍ 👇 ---
+        try:
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            icon_file = os.path.join(script_dir, "gift_icon.ico") 
+            if not os.path.exists(icon_file):
+                 icon_file = os.path.join(script_dir, "gift_icon.png")
+            
+            # Aplica el ícono a esta ventana modal (LoginDialog)
+            self.setWindowIcon(QIcon(icon_file)) 
+        except Exception:
+            logging.warning("No se pudo cargar el ícono del LoginDialog.")
+        # --- -------------------------------------------- ---
+        
+        self.setMinimumSize(400, 550)
         self.setWindowTitle("Login - Gifter's Admin")
         self.setMinimumSize(400, 550) 
         self.api_client = api_client
@@ -705,6 +722,21 @@ class WarningTypeDialog(QDialog):
 class MainWindow(QMainWindow):
     def __init__(self, api_client, is_offline=False,user_email=""): 
         super().__init__()
+        
+       # --- CÓDIGO PARA AÑADIR EL ÍCONO (Ajustado) ---
+        try:
+            # Busca la imagen en la raíz del paquete (donde PyInstaller la puso)
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            icon_file = os.path.join(script_dir, "gift_icon.ico") # Intenta usar el .ico
+            
+            if not os.path.exists(icon_file):
+                icon_file = os.path.join(script_dir, "gift_icon.png") # Si no existe, usa el .png
+                
+            self.setWindowIcon(QIcon(icon_file))
+            
+        except Exception as e:
+            logging.warning(f"No se pudo cargar el ícono de la ventana principal: {e}")
+            
         self.setWindowTitle("Panel de Administración de Gifter's")
         self.setGeometry(100, 100, 900, 700)
         self.api_client = api_client
@@ -906,10 +938,12 @@ class MainWindow(QMainWindow):
         # Determinar el estado inicial y el texto
         if self.is_offline:
             self.btn_refresh_connection.setText("RECONECTAR OFFLINE")
+            # El botón está habilitado por defecto si es offline.
+            self.btn_refresh_connection.setEnabled(True) 
         else:
-            self.btn_refresh_connection.setText("Estado: ONLINE")
+            self.btn_refresh_connection.setText("Estado: ONLINE (Refrescar)") # Cambiar el texto
             self.btn_refresh_connection.setStyleSheet("#RefreshButton { background-color: #28a745; border: 2px solid #1e7e34; color: white; }")
-            self.btn_refresh_connection.setEnabled(False) # Deshabilitar si ya está online
+            self.btn_refresh_connection.setEnabled(True) # Deshabilitar si ya está online
         # ===================================================
 
         # --- Botones Principales (Solo Menú e Importar CSV) ---
@@ -1268,53 +1302,81 @@ class MainWindow(QMainWindow):
     
     def reconnect_online(self):
         """
-        Intenta forzar la reconexión al servidor llamando a una API simple.
-        Si tiene éxito, cambia el estado de la aplicación a online.
+        [MODIFICADO] Intenta forzar la reconexión al servidor re-autenticando 
+        al usuario con sus credenciales cacheadas o preguntándole la contraseña.
         """
-        if not self.is_offline:
-            self.statusBar().showMessage("El modo online ya está activo.", 3000)
-            return
-
-        self.statusBar().showMessage("Intentando reconectar al servidor...", 0)
+        self.statusBar().showMessage("Intentando refrescar conexión...", 0)
         QApplication.processEvents()
 
         email = self.user_email
         
-        # <<< --- LÍNEA CORREGIDA --- >>>
-        # Usamos el método correcto de la caché local: get_password_hash
-        password_hash = self.api_client.local_auth_cache.get_password_hash(email)
-        # <<< ----------------------- >>>
+        # 1. Intentar usar la contraseña cacheada (Modo Offline)
+        # <<< --- CAMBIO CRÍTICO: RENOMBRAR LA FUNCIÓN --- >>>
+        re_auth_password = self.api_client.local_auth_cache.get_password_original(email)
+        # <<< ------------------------------------------ >>>
+        
+        # El resto de la lógica debe usar re_auth_password:
 
-        if not password_hash:
-            QMessageBox.critical(self, "Error", "No se encontró contraseña en caché. Necesitas reiniciar y hacer login online primero.")
+        if not re_auth_password and not self.is_offline:
+            # Reemplazar QInputDialog con tu CustomDialog
+            dialog = ReauthDialog(self) # Pasa 'self' como parent
+            result = dialog.exec() # Mostrar el diálogo y esperar respuesta
+            
+            if result == QDialog.DialogCode.Accepted: # Si el usuario hizo clic en Aceptar
+                password = dialog.get_password()
+                ok = True
+            else: # Si el usuario hizo clic en Cancelar o cerró el diálogo
+                password = ""
+                ok = False
+            
+            if not ok or not password:
+                self.statusBar().showMessage("Re-autenticación cancelada.", 3000)
+                return
+            
+            re_auth_password = password
+            
+        elif self.is_offline and not re_auth_password:
+        # ... (la lógica de error sigue igual) ...
+            QMessageBox.critical(self, "Error", "No hay credenciales en caché. Reinicia la aplicación para iniciar sesión online.")
             self.statusBar().showMessage("Reconexión fallida: No hay caché de contraseña.", 5000)
             return
 
-        # 1. Intentar hacer login de nuevo con las credenciales cacheadas
-        #    La función login() del API client manejará la obtención del nuevo token.
-        success, message = self.api_client.login(email, password_hash) 
-
+        # 2. Intentar hacer login de nuevo con las credenciales
+        # <<< --- USAMOS LA CONTRASEÑA OBTENIDA --- >>>
+        success, message = self.api_client.login(email, re_auth_password)
         if success:
-            # 2. Transición exitosa a modo Online
+            # Transición exitosa a modo Online / Refresco de token exitoso
             self.is_offline = False
             self.statusBar().showMessage("¡Conexión Restablecida! Recargando datos...", 5000)
             self.statusBar().setStyleSheet("background-color: #28a745; color: white;") # Verde
-            QMessageBox.information(self, "Conexión Exitosa", "Se ha restablecido la conexión con el servidor. Recargando datos de catálogo y usuarios.")
+            self.btn_refresh_connection.setText("Estado: ONLINE (Refrescar)")
+            self.btn_refresh_connection.setStyleSheet("#RefreshButton { background-color: #28a745; border: 2px solid #1e7e34; color: white; }")
 
-            # 3. Habilitar botones y recargar datos (similar a la carga inicial)
-            self.btn_importar.setEnabled(True)
-            self.btn_importar.setText("Importar CSV")
-            self.btn_run_scraper.setEnabled(True)
+            # Recargar todos los datos
             self.load_products()
             self.load_users()
             self.load_categories_and_brands()
-            self.btn_refresh_connection.setText("Estado: ONLINE")
-            self.btn_refresh_connection.setStyleSheet("#RefreshButton { background-color: #28a745; border: 2px solid #1e7e34; color: white; }")
             
         else:
-            # 4. Reconexión fallida
-            self.statusBar().showMessage(f"Reconexión fallida: {message}", 5000)
-            QMessageBox.critical(self, "Fallo de Conexión", f"No se pudo conectar al servidor. Detalle: {message}")
+            # Login/Refresco fallido (Token no válido o error de conexión)
+            is_connection_error = "No se pudo conectar" in message or "Error de conexión" in message
+            
+            if is_connection_error:
+                # Si falló por conexión, volvemos a modo Offline (si las credenciales locales son válidas)
+                if self.api_client.local_auth_cache.check_offline_password(email, re_auth_password):
+                     QMessageBox.information(self, "Modo Offline", "Fallo al conectar con el servidor. Volviendo a Modo Offline.")
+                     self.is_offline = True
+                     self.statusBar().showMessage("Modo Offline (Conexión fallida).", 5000)
+                     self.statusBar().setStyleSheet("background-color: #ffc107; color: black;")
+                     self.btn_refresh_connection.setText("RECONECTAR OFFLINE")
+                else:
+                     # Si la contraseña local tampoco es válida (o no hay conexión), forzamos al usuario a intentar de nuevo.
+                     QMessageBox.critical(self, "Fallo de Conexión", f"No se pudo conectar al servidor. Detalle: {message}")
+                     self.statusBar().showMessage(f"Fallo de conexión. Intentar de nuevo.", 5000)
+            else:
+                # Fallo por credenciales incorrectas (401/403)
+                QMessageBox.critical(self, "Fallo de Autenticación", f"La re-autenticación falló. Detalle: {message}. Reinicia la aplicación si persiste.")
+                self.statusBar().showMessage(f"Reconexión fallida. Token inválido.", 5000)
     
     
     def create_moderation_report_page(self):
@@ -1991,8 +2053,9 @@ class MainWindow(QMainWindow):
 
         self.table_products.setSortingEnabled(False)
         self.table_products.itemChanged.connect(self.handle_product_change)
+        
         self.table_products.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table_products.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.table_products.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         
         # Estilo para la tabla
         self.table_products.setStyleSheet("""
@@ -2012,24 +2075,33 @@ class MainWindow(QMainWindow):
 
         # 5. Botones de Acción (Restaurados)
         button_row_layout = QHBoxLayout()
-        
+    
         self.btn_create_product = QPushButton("Crear Nuevo Producto")
         self.btn_create_product.setStyleSheet("background-color: #007bff; color: white; padding: 10px; font-size: 14px; border-radius: 5px;")
         self.btn_create_product.clicked.connect(self.handle_create_product)
         button_row_layout.addWidget(self.btn_create_product)
         
-        button_row_layout.addStretch()
-        
+        # --- 👇 BOTÓN DE EDITAR (YA ESTABA AQUÍ) 👇 ---
+        self.btn_edit_product = QPushButton("Editar Producto Seleccionado")
+        self.btn_edit_product.setStyleSheet("background-color: #ffc107; color: black; padding: 10px; font-size: 14px; border-radius: 5px;")
+        self.btn_edit_product.clicked.connect(self.handle_edit_product)
+        button_row_layout.addWidget(self.btn_edit_product)
+
+        button_row_layout.addStretch() # Espaciador para empujar el botón rojo a la derecha
+
+        # --- 👇 BOTÓN DE BORRAR (RESTAURADO) 👇 ---
         self.btn_delete_product = QPushButton("Borrar Producto Seleccionado")
         self.btn_delete_product.setStyleSheet("background-color: #dc3545; color: white; padding: 10px; font-size: 14px; border-radius: 5px;")
         self.btn_delete_product.clicked.connect(self.handle_delete_product)
         button_row_layout.addWidget(self.btn_delete_product)
+        # --- ------------------------------------ ---
         
         if self.is_offline:
             self.btn_create_product.setEnabled(False)
-            self.btn_delete_product.setEnabled(False)
-
-        table_layout.addLayout(button_row_layout) # Añade los botones A LA TARJETA
+            self.btn_edit_product.setEnabled(False)
+            self.btn_delete_product.setEnabled(False) # <-- Ahora esta línea funciona
+        
+        table_layout.addLayout(button_row_layout) # Añade los botones A LA TARJETA [cite: 461]
         layout.addWidget(table_group, 1) # Añade la tarjeta al layout principal
         
         return page
@@ -3032,46 +3104,81 @@ class MainWindow(QMainWindow):
             self.load_products() 
 
     def handle_delete_product(self):
-        """Maneja el clic en el botón 'Borrar Producto Seleccionado'."""
-        selected_items = self.table_products.selectedItems()
-        if not selected_items:
-            QMessageBox.warning(self, "Borrar Producto", "Por favor, selecciona una fila para borrar.")
+        """Maneja el clic en el botón 'Borrar Producto Seleccionado' para múltiples filas."""
+        
+        # Obtenemos TODAS las filas seleccionadas (puede ser más de una)
+        selected_rows = self.table_products.selectionModel().selectedRows()
+        
+        if not selected_rows:
+            QMessageBox.warning(self, "Borrar Producto", "Por favor, selecciona al menos una fila para borrar.")
             return
         
-        selected_row = self.table_products.currentRow()
-        product_id_item = self.table_products.item(selected_row, 0)
-        product_name_item = self.table_products.item(selected_row, 1)
-    
-        if not product_id_item:
-            logging.error("handle_delete_product: No se pudo obtener el ID del producto seleccionado.")
-            QMessageBox.critical(self, "Error", "No se pudo obtener el ID del producto seleccionado.")
+        # 1. Recolectar IDs y Nombres
+        products_to_delete = []
+        for index in selected_rows:
+            row = index.row()
+            try:
+                product_id = self.table_products.item(row, 0).text()
+                # La columna 2 ahora tiene el Nombre (la columna 1 es la Imagen)
+                product_name = self.table_products.item(row, 2).text()
+                products_to_delete.append((product_id, product_name))
+            except AttributeError:
+                logging.error(f"Error al leer datos de la fila {row} para borrado múltiple.")
+        
+        num_products = len(products_to_delete)
+        
+        if num_products == 0:
+            QMessageBox.critical(self, "Error", "No se pudo obtener información válida para borrar.")
             return
-    
-        product_id = product_id_item.text()
-        product_name = product_name_item.text() if product_name_item else f"ID {product_id}"
-    
-        reply = QMessageBox.question(self, 'Confirmar Borrado',
-                                     f"¿Estás seguro de que quieres borrar el producto '{product_name}' (ID: {product_id})?\n"
-                                     "Esta acción no se puede deshacer.",
+
+        # 2. Preparar el mensaje de confirmación
+        
+        if num_products == 1:
+            prod_name = products_to_delete[0][1]
+            message = f"¿Estás seguro de que quieres borrar el producto '{prod_name}'?\nEsta acción no se puede deshacer."
+            info_text = f"Se borrará 1 producto: {prod_name}"
+            confirm_title = "Confirmar Borrado de Producto Único"
+        else:
+            # Mensaje para borrado múltiple
+            prod_list = "\n- " + "\n- ".join([name for _, name in products_to_delete][:5]) + ("..." if num_products > 5 else "")
+            message = f"¿Estás seguro de que quieres borrar estos {num_products} productos seleccionados?"
+            info_text = f"Se eliminarán permanentemente {num_products} productos, incluyendo:\n{prod_list}"
+            confirm_title = f"Confirmar Borrado Masivo ({num_products} productos)"
+
+
+        reply = QMessageBox.question(self, confirm_title, message,
                                      QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                                      QMessageBox.StandardButton.No)
-    
+        
+        # 3. Ejecutar el borrado
         if reply == QMessageBox.StandardButton.Yes:
-            logging.info(f"Iniciando borrado de producto ID={product_id}, Nombre='{product_name}'")
-            self.statusBar().showMessage(f"Borrando Producto {product_id}...")
+            self.statusBar().showMessage(f"Borrando {num_products} productos...")
             QApplication.processEvents()
-    
-            success, message = self.api_client.delete_product(product_id)
-    
-            if success:
-                logging.info(f"Producto {product_id} borrado exitosamente.")
-                self.statusBar().showMessage(f"Producto {product_id} borrado exitosamente.", 3000)
-                self.load_products()
+            
+            all_successful = True
+            error_count = 0
+            
+            for product_id, product_name in products_to_delete:
+                logging.info(f"Iniciando borrado de producto ID={product_id}, Nombre='{product_name}'")
+                success, message = self.api_client.delete_product(product_id)
+                
+                if not success:
+                    logging.error(f"Fallo al borrar producto {product_id}: {message}")
+                    all_successful = False
+                    error_count += 1
+            
+            # 4. Mostrar resultado y recargar
+            if all_successful:
+                final_message = f"{num_products} productos borrados exitosamente."
+                QMessageBox.information(self, "Borrado Exitoso", final_message)
             else:
-                QMessageBox.critical(self, "Error al Borrar", message)
-                self.statusBar().showMessage(f"Error al borrar Producto {product_id}.", 5000)
+                final_message = f"Borrado completado con {error_count} errores. Consulta los logs para detalles."
+                QMessageBox.critical(self, "Borrado Parcial/Fallido", final_message)
+                
+            self.statusBar().showMessage(final_message, 5000)
+            self.load_products() # Recargar la tabla después de la operación
         else:
-            logging.info("Borrado de producto cancelado por el usuario.")
+            logging.info("Borrado de productos cancelado por el usuario.")
             self.statusBar().showMessage("Borrado cancelado.")
         
     def open_csv_importer(self):
@@ -3747,15 +3854,111 @@ class MainWindow(QMainWindow):
         else:
             logging.info("Descarga de logs locales cancelada.")
             self.statusBar().showMessage("Descarga cancelada.", 3000)
+    def handle_edit_product(self):
+        """
+        Maneja la edición detallada de un producto seleccionado.
+        1. Obtiene el ID del producto seleccionado.
+        2. Llama a la API para obtener los detalles completos (incluyendo descripción/URL).
+        3. Muestra el diálogo EditProductDialog precargado.
+        4. Envía la actualización PATCH al servidor.
+        """
+        selected_rows = self.table_products.selectionModel().selectedRows()
+        if len(selected_rows) != 1:
+            QMessageBox.warning(self, "Editar Producto", "Por favor, selecciona *exactamente un* producto para editar.")
+            return
 
+        selected_row = selected_rows[0].row()
+        product_id = self.table_products.item(selected_row, 0).text()
+
+        if self.is_offline:
+            QMessageBox.warning(self, "Modo Offline", "Esta función no está disponible en modo offline.")
+            return
+
+        self.statusBar().showMessage(f"Cargando detalles del Producto {product_id}...")
+        QApplication.processEvents()
+
+        # 1. Obtener detalles completos del producto desde la API
+        product_detail, error = self.api_client.get_product_detail(product_id)
+
+        if error:
+            QMessageBox.critical(self, "Error de Carga", f"No se pudieron cargar los detalles del producto: {error}")
+            self.statusBar().showMessage("Error de carga.", 5000)
+            return
+
+        # 2. Aseguramos listas cargadas para los ComboBox
+        self.load_categories_and_brands()
+        categories_data = self.all_categories
+        brands_data = self.all_brands
+
+        # 3. Lanzar el diálogo de edición precargado
+        dialog = EditProductDialog(product_detail, categories_data, brands_data, self) 
+
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            updated_data = dialog.get_data()
+
+            # El diálogo devuelve las claves Django (nombre_producto, id_categoria, etc.)
+            self.statusBar().showMessage(f"Guardando cambios en Producto {product_id}...")
+
+            # 4. Enviar actualización al servidor
+            success, message = self.api_client.update_product_full(product_id, updated_data)
+
+            if success:
+                QMessageBox.information(self, "Éxito", f"Producto {product_id} actualizado exitosamente.")
+                self.load_products() # Recargar tabla para ver los cambios
+            else:
+                QMessageBox.critical(self, "Error de Actualización", f"Error al actualizar producto: {message}")
+                self.load_products() # Recargar para revertir la vista si falló
+
+        else:
+            self.statusBar().showMessage("Edición cancelada.", 3000)
+            
+class EditProductDialog(CreateProductDialog):
+    """
+    Diálogo para editar un producto existente, precargando los datos.
+    """
+    def __init__(self, product_data, categories_list, brands_list, parent=None):
+        # Llama al constructor de la clase padre (CreateProductDialog)
+        super().__init__(categories_list, brands_list, parent)
+        self.setWindowTitle(f"Editar Producto: {product_data.get('nombre_producto', 'N/A')}")
+        
+        self.product_data = product_data
+        self.original_id = product_data.get('id_producto') # Guardamos el ID
+
+        # Precargar datos
+        self._load_data_into_fields()
+        
+        # Cambiar texto del botón para reflejar la acción
+        self.save_button.setText("Guardar Cambios")
+
+    def _load_data_into_fields(self):
+        """Precarga todos los campos del formulario con los datos del producto."""
+        
+        self.name_input.setText(self.product_data.get('nombre_producto', ''))
+        self.desc_input.setText(self.product_data.get('descripcion', ''))
+        self.image_url_input.setText(self.product_data.get('imagen', ''))
+        
+        # Precargar ComboBox de Categoría
+        cat_id = self.product_data.get('id_categoria')
+        if cat_id is not None:
+            index = self.category_input.findData(cat_id)
+            if index != -1:
+                self.category_input.setCurrentIndex(index)
+
+        # Precargar ComboBox de Marca
+        brand_id = self.product_data.get('id_marca')
+        if brand_id is not None:
+            index = self.brand_input.findData(brand_id)
+            if index != -1:
+                self.brand_input.setCurrentIndex(index)
     
-
 
 
 
 # ---
 # --- SECCIÓN 6: Manejador Global de Errores
 # ---
+
+
 
 def handle_uncaught_exception(exc_type, exc_value, exc_traceback):
     """

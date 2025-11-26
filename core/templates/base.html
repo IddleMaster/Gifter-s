@@ -4499,9 +4499,9 @@
 
 
 
-  <!-- 2) Helper global para el spinner del botón ✓ -->
+  <!-- 2) Helper global para el botón ✓ -->
   <script>
-    // Helper global para el spinner del botón ✓
+
     function showLoading(btn, on) {
       if (!btn) return;
       if (on) {
@@ -4518,7 +4518,7 @@
   <!-- 3) helpers/fallbacks globales + handler "marcar una (✓)" -->
   <script>
     (function () {
-      // --- helpers/fallbacks globales (no duplican si ya existen) ---
+
       if (typeof window.getCookie !== 'function') {
         window.getCookie = function (name) {
           const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
@@ -4554,7 +4554,6 @@
         const id = btn.getAttribute('data-id') || btn.closest('.dropdown-item')?.getAttribute('data-id');
         if (!id || btn.disabled) return;
 
-        // construye la URL reemplazando /0/ por el id real
         const url = markOneTpl.replace('/0/', '/' + encodeURIComponent(id) + '/');
         console.log('[notif] POST mark-one', { id, url });
 
@@ -4578,7 +4577,6 @@
           .then((data) => {
             console.log('[notif] json', data);
 
-            // si tienes setBadge y el server envía unread_count, actualiza el badge
             if (typeof window.setBadge === 'function' && typeof data.unread_count !== 'undefined') {
               window.setBadge(data.unread_count);
             }
@@ -4603,18 +4601,18 @@
     })();
   </script>
 
-  <!-- 4) Marcar TODO leído (CSRF + badge + toggleMarkAll) -->
+  <!-- 4) Marcar TODO leído  -->
   <script>
     (function () {
-      // === CSRF (único) ===
+      //  CSRF (único) 
       function getCookie(name) {
         const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
         return m ? m.pop() : '';
       }
       const csrftoken = getCookie('csrftoken');
-      const badgeEl = document.getElementById('notifBadge'); // ✅ NECESARIO
+      const badgeEl = document.getElementById('notifBadge'); 
 
-      // === Mostrar/Ocultar "Marcar todo leído" según el badge ===
+      //  Mostrar/Ocultar "Marcar todo leído" 
       const markAllBtn = document.getElementById('markAllBtn');
       function currentUnread() {
         if (!badgeEl) return 0;
@@ -4625,7 +4623,7 @@
         if (!markAllBtn) return;
         markAllBtn.classList.toggle('d-none', currentUnread() === 0);
       }
-      // Estado inicial + observar cambios de badge
+      
       toggleMarkAll();
       if (badgeEl) {
         const mo = new MutationObserver(toggleMarkAll);
@@ -4673,7 +4671,7 @@
               toggleMarkAll();
             })
             .catch(() => {
-              // Si falla, no cambiamos el DOM
+
             })
             .finally(() => {
               markAllBtn.disabled = false;
@@ -4684,7 +4682,6 @@
     })();
   </script>
 
-  <!-- 5) IIFE showLoading (deja igual, usa la global si existe) -->
   <script>
     (function () {
       function showLoading(btn, on) {
@@ -4698,21 +4695,11 @@
           if (btn.dataset._html) btn.innerHTML = btn.dataset._html;
         }
       }
-      // (deja el resto de tu script tal cual, usando showLoading)
     })();
   </script>
 
-  <!-- 6) NOTIFICACIONES — Ocultar en vista (sin borrar BD) -->
+  <!-- 6) NOTIFICACIONES, Ocultar vista no borra BD) -->
   <script>
-    /* =========================================================
-       NOTIFICACIONES — Ocultar en vista (sin borrar BD)
-       Guarda IDs ocultos en localStorage y los aplica al abrir.
-       Controles:
-         - “×” en cada item => oculta uno
-         - “Ocultar leídas” => oculta los que no están en negrita
-         - “Limpiar lista”  => oculta todos
-         - “Restaurar”      => muestra todo de nuevo
-       ========================================================= */
     (function () {
       const STORAGE_KEY = 'notif_hidden_ids_v1';
 
@@ -4733,7 +4720,6 @@
         li.classList.remove('d-none');
       }
 
-      // Aplica ocultos actuales al DOM
       function applyHiddenToDOM() {
         const hidden = loadHidden();
         document.querySelectorAll('.dropdown-menu .notif-item').forEach(item => {
@@ -4753,7 +4739,6 @@
         hideItemEl(li);
       }
 
-      // Handlers de los botones del header
       const hideReadBtn = document.getElementById('hideReadBtn');
       const hideAllBtn = document.getElementById('hideAllBtn');
       const restoreBtn = document.getElementById('restoreHiddenBtn');
@@ -4766,7 +4751,7 @@
             const li = item.closest('li') || item;
             const id = item.getAttribute('data-id') || item.querySelector('[data-id]')?.getAttribute('data-id');
             const isUnread = item.classList.contains('fw-semibold') || !!item.querySelector('.badge.bg-primary');
-            if (!id || isUnread) return;   // solo leídas
+            if (!id || isUnread) return;   // solo leidas
             hidden.add(String(id));
             hideItemEl(li);
           });
@@ -4809,27 +4794,20 @@
           || btn.closest('.notif-item')?.getAttribute('data-id');
         const li = btn.closest('li') || btn.closest('.notif-item');
 
-        // Si la que ocultas está NO leída, intenta marcarla leída primero para mantener el badge coherente.
         const item = btn.closest('.notif-item');
         const isUnread = item && (item.classList.contains('fw-semibold') || item.querySelector('.badge.bg-primary'));
         const markBtn = item && item.querySelector('.js-notif-mark-one');
 
         if (isUnread && markBtn) {
-          // Reutiliza el flujo de “marcar una”: dispara el click al ✓
           markBtn.click();
-          // (El badge se actualizará con tu lógica actual)
-          // Oculta visualmente ya:
           hideOneById(id, li);
         } else {
           hideOneById(id, li);
         }
       });
 
-      // Ejecuta cuando el menú exista en DOM (por si se renderiza luego)
       document.addEventListener('DOMContentLoaded', applyHiddenToDOM);
-      // Y también al abrir el dropdown (por si cambió el contenido)
       document.getElementById('notifDropdown')?.addEventListener('click', () => {
-        // pequeño delay para asegurar que el menú esté en el DOM
         setTimeout(applyHiddenToDOM, 0);
       });
     })();
@@ -4845,7 +4823,6 @@
           || document.querySelector('#notifDropdown ~ .dropdown-menu');
       }
 
-      // cuenta NO leídas visibles (fw-semibold o con la pill "nuevo")
       function unreadCount() {
         var menu = getMenu();
         if (!menu) return 0;
@@ -4866,7 +4843,6 @@
         b.style.display = n > 0 ? 'inline-block' : 'none';
       }
 
-      // wrapea setBadge si existe (para cuando tus fetch devuelven unread_count)
       var prev = window.setBadge;
       window.setBadge = function (n) {
         try { if (typeof prev === 'function') prev(n); } catch (e) { }
@@ -4876,10 +4852,8 @@
         b.style.display = (parseInt(n || 0, 10) > 0) ? 'inline-block' : 'none';
       };
 
-      // inicial + redesencadenadores típicos
       document.addEventListener('DOMContentLoaded', updateDot);
 
-      // cuando abres/cerras el dropdown (Eventos de Bootstrap si están, y fallback a click)
       var toggle = document.getElementById('notifDropdown');
       toggle && toggle.addEventListener('shown.bs.dropdown', updateDot);
       toggle && toggle.addEventListener('hidden.bs.dropdown', updateDot);
@@ -4897,7 +4871,6 @@
         }
       });
 
-      // red de seguridad periódica (por si el DOM cambió silenciosamente)
       setInterval(updateDot, 4000);
     })();
   </script>
@@ -4924,18 +4897,16 @@
       function setDotOn(has) {
         const b = document.getElementById('notifBadge');
         if (!b) return;
-        b.textContent = '';                         // sin número
-        b.classList.toggle('is-on', !!has);         // usa la clase que vence al !important
+        b.textContent = '';                         
+        b.classList.toggle('is-on', !!has);         
       }
 
-      // Hookea tu setBadge si existe
       const prev = window.setBadge;
       window.setBadge = function (n) {
         try { if (typeof prev === 'function') prev(n); } catch (e) { }
         setDotOn(parseInt(n || 0, 10) > 0);
       };
 
-      // Inicial + eventos que cambian el DOM
       document.addEventListener('DOMContentLoaded', function () {
         setDotOn(unreadCount() > 0);
       });
@@ -4952,19 +4923,11 @@
           setTimeout(() => setDotOn(unreadCount() > 0), 60);
         }
       });
-      // red de seguridad
       setInterval(() => setDotOn(unreadCount() > 0), 4000);
     })();
   </script>
 
 
-
-
-
-
-
-
-  <!-- -->
   <!-- -->
   <!-- -->
   <!-- -->
@@ -4984,14 +4947,14 @@
 
       // === Función que realiza el POST del sorteo ===
       async function drawEvent(eventId) {
-        const url = `/api/events/${eventId}/draw/`; // asegúrate que coincida con tu urls.py
+        const url = `/api/events/${eventId}/draw/`; 
         const response = await fetch(url, {
           method: 'POST',
           headers: {
             'X-CSRFToken': getCookie('csrftoken'),
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({}) // no enviamos nada, solo usamos el ID
+          body: JSON.stringify({}) 
         });
 
         let data = null;
@@ -5012,10 +4975,8 @@
         if (!btn) return;
 
         const eventId = btn.getAttribute('data-event-id');
-        // Validación más estricta: evita enviar 'undefined' o valores no numéricos
         if (!eventId || eventId === 'undefined' || isNaN(Number(eventId))) {
           console.warn('⚠️ data-event-id inválido en el botón Sortear:', eventId);
-          // Mostrar una advertencia amigable al usuario y evitar la petición
           alert('ID de evento inválido en el cliente. Por favor recarga la página e intenta nuevamente.');
           return;
         }
@@ -5028,7 +4989,6 @@
           const result = await drawEvent(eventId);
           console.log('✅ Sorteo realizado:', result);
           alert(`Sorteo completado correctamente con ${result.count} participantes.`);
-          // Aquí puedes actualizar tu lista de eventos o emitir un evento DOM si lo necesitas:
           document.dispatchEvent(new CustomEvent('gifters:event-sorteado', { detail: result }));
         } catch (err) {
           console.error(err);
@@ -5044,15 +5004,14 @@
       const drawer = document.getElementById('globalChatDrawer');
       if (!drawer) return;
 
-      const eventsEl = drawer.querySelector('#eventsList');      // lista izquierda
-      const actionsEl = drawer.querySelector('#eventActions');    // barra amarilla
+      const eventsEl = drawer.querySelector('#eventsList');      
+      const actionsEl = drawer.querySelector('#eventActions');    
       const sortBtnBig = actionsEl ? actionsEl.querySelector('[data-action="draw-event"]') : null;
 
       // 1) Cuando se renderiza la lista de eventos, enganchamos el click de cada fila
       //    para cargar el id en el botón grande y mostrar la barra amarilla.
       function wireEventRows() {
         if (!eventsEl) return;
-        // filas con data-event-id (las renderizas en tu map(...))
         eventsEl.querySelectorAll('.chat-list-item[data-event-id]').forEach(row => {
           row.addEventListener('click', () => {
             const id = row.getAttribute('data-event-id');
@@ -5062,29 +5021,21 @@
           });
         });
 
-        // Si hay al menos una fila, precarga el id en el botón grande para evitar
-        // que el usuario tenga que hacer click en la fila antes de poder sortear.
-        // Esto también cubre escenarios donde la lista se renderiza pero no se
-        // dispara un `click` en la fila (p. ej. navegación rápida).
+
         try {
           const firstRow = eventsEl.querySelector('.chat-list-item[data-event-id]');
           if (firstRow && sortBtnBig && actionsEl) {
             const firstId = firstRow.getAttribute('data-event-id');
             if (firstId) {
               sortBtnBig.setAttribute('data-event-id', firstId);
-              // no forzamos mostrar la barra amarilla aquí, solo pre-cargamos el id
             }
           }
         } catch (err) {
-          // no rompemos la UI por este paso adicional
           console.warn('wireEventRows: no pude precargar id en botón grande', err);
         }
       }
 
-      // 2) Llama a wireEventRows() justo DESPUÉS de que termines de inyectar
-      //    el HTML de la lista de eventos (tras tu `eventsEl.innerHTML = ...`).
-      //    Ejemplo: al final de loadEventsInbox() y/o loadEventsForCurrentGroup():
-      //      wireEventRows();
+      // 2) Llama a wireEventRows() justo DESPUÉS de que termines de inyectar el HTML de la lista de eventos
 
       sortBtnBig?.addEventListener('click', async (ev) => {
         const btn = ev.currentTarget;
@@ -5169,15 +5120,10 @@
 
       });
 
-      // Expón la función para que la llames después de pintar la lista:
       window.__wireEventRows = wireEventRows;
     })();
   </script>
   <style>
-    /* ============================================================
-       CORRECCIÓN RESPONSIVA MÓVIL (Estilo WhatsApp) - FORZADO
-       ============================================================ */
-
     /* 1. Estado Base (Escritorio y Móvil por defecto): Botón oculto */
     #btnMobileBack {
       display: none !important;
@@ -5186,8 +5132,7 @@
     /* 2. Solo en Pantallas Pequeñas (Móvil) */
     @media (max-width: 860px) {
 
-      /* --- AJUSTE DEL CONTENEDOR PRINCIPAL --- */
-      /* Forzamos que el drawer ocupe toda la pantalla y quite bordes redondos */
+
       .chat-drawer.phone-ui {
         /* Posición fija ocupando todo el viewport */
         position: fixed !important;
@@ -5216,9 +5161,7 @@
         pointer-events: none !important;
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
         z-index: 9999 !important;
-        /* Asegurar que tape todo */
         background: #fff;
-        /* Fondo blanco sólido para que no se trasluzca nada */
       }
 
       .chat-drawer.phone-ui.open {
@@ -5263,9 +5206,7 @@
         background: transparent;
         border: none;
         color: #fff;
-        /* Flecha blanca sobre fondo azul */
         font-size: 1.5rem;
-        /* Tamaño cómodo para el dedo */
         margin-right: 8px;
         padding: 0 5px;
         cursor: pointer;
@@ -5274,17 +5215,14 @@
 
       .chat-drawer.in-chat .brand {
         padding-left: 0 !important;
-        /* Quitar padding extra si lo hay */
       }
 
       .chat-drawer.in-chat .brand span#chat-header-title {
         display: none;
       }
 
-      /* Ajuste opcional: Ocultar el texto "Gifter's" si ocupa mucho espacio en chat */
       .chat-drawer.in-chat .brand-text {
         font-size: 1rem;
-        /* Reducir un poco el texto */
       }
     }
   </style>

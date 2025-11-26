@@ -185,7 +185,7 @@ document.addEventListener("DOMContentLoaded", function(){
 
   const btnContainer = document.querySelector('.edit-profile');
 
-  // (Opcional) Botón chatear
+  // Botón chatear
   const btnChat = document.getElementById('btnChatPerfilPrivado');
   const chatButtonClickHandler = function(ev){
     ev.preventDefault();
@@ -205,8 +205,6 @@ document.addEventListener("DOMContentLoaded", function(){
           setTimeout(goToTargetProfile, 650);
         } else {
           Toast.fire({ icon: 'success', title: data.reused ? 'Solicitud reenviada' : 'Solicitud enviada' });
-          // Si prefieres recargar también aquí:
-          // setTimeout(goToTargetProfile, 650);
           form.outerHTML = `
             <form method="post" action="{% url 'amistad_cancelar' usuario_publico.nombre_usuario %}" class="js-amistad-cancelar">
               {% csrf_token %}

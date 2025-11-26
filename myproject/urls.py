@@ -202,7 +202,7 @@ urlpatterns = [
     path('usuarios/bloquear/<int:user_id>/', views_block.block_user, name='block_user'),
     path('usuarios/desbloquear/<int:user_id>/', views_block.unblock_user, name='unblock_user'),
     path("chat/con-id/<str:username>/", views.conversacion_con_usuario_id, name="chat_con_usuario_id"),
-    ###para el escribiendo:::
+    ###para el escribiendo:
     path("api/chat/<int:conv_id>/typing/", views.TypingView.as_view(), name="chat_typing"),
     path("api/chat/typing/", views.TypingSummaryView.as_view(), name="chat_typing_summary"),
 
@@ -210,8 +210,6 @@ urlpatterns = [
     ##para el chat grupal:
     path('api/grupos/crear/', views.grupos_create, name='grupos_create'),
     path('api/conversaciones/<int:pk>/', views.conversacion_detalle, name='conversacion_detalle'),
-    ##path("chat/typing/<int:conv_id>/", views.chat_typing, name="chat_typing"),
-    ##path("chat/con-usuario/<str:username_or_id>/", views.chat_con_usuario_id, name="chat_con_usuario_id"),
 
     path('sugerencias-ia/<str:amigo_username>/', views.sugerencias_regalo_ia, name='sugerencias_regalo_ia'),
 
@@ -233,22 +231,12 @@ urlpatterns = [
     path('api/events/create_with_chat/', views.event_create_with_chat, name='event_create_with_chat'),
 
     # Sortear amigo secreto para un evento existente
-    # Sorteo (UN solo endpoint canónico)
-    
 
-        # Sorteo (UN solo endpoint canónico)
     path('api/events/<int:event_id>/draw/', views.api_event_draw, name='api_event_draw'),
-
-    # (Opcional) Alias legible en español que apunta a la MISMA vista
-    # (solo si realmente quieres tener /sortear/ también)
     path('api/events/<int:event_id>/sortear/', views.api_event_draw, name='api_event_draw_es'),
-
-    # (Opcional) Alias legible en español que apunta a la MISMA vista
- 
-    
     path("cards/s/<slug:slug>/", views.ver_card_publica, name="ver_card_publica"),
     
-    ##para resena jiji
+    ##para resena 
     path("resena/", views.resena_sitio_crear, name="resena_sitio_crear"),
     path("resena/editar/", views.resena_sitio_editar, name="resena_sitio_editar"),
     path("resena/eliminar/", views.resena_sitio_eliminar, name="resena_sitio_eliminar"),
@@ -277,15 +265,15 @@ urlpatterns = [
     # --- URLs PARA RESTABLECIMIENTO DE CONTRASEÑA (Flujo de Django) ---
     path('password_reset/',
          auth_views.PasswordResetView.as_view(
-             template_name='registration/password_reset_form.html', # Usa nuestra plantilla
-             email_template_name='registration/password_reset_email.html', # Plantilla para el cuerpo del email
-             subject_template_name='registration/password_reset_subject.txt', # Plantilla para el asunto
-             success_url='/password_reset/done/' # A dónde ir tras enviar el form
+             template_name='registration/password_reset_form.html', 
+             email_template_name='registration/password_reset_email.html', 
+             subject_template_name='registration/password_reset_subject.txt', 
+             success_url='/password_reset/done/' 
          ),
-         name='password_reset'), # <--- ESTE ES EL NOMBRE QUE BUSCA EL {% url %}
+         name='password_reset'), 
     path('password_reset/done/',
          auth_views.PasswordResetDoneView.as_view(
-             template_name='registration/password_reset_done.html' # Usa nuestra plantilla de "enviado"
+             template_name='registration/password_reset_done.html' 
          ),
          name='password_reset_done'),
     path('reset/<uidb64>/<token>/',
@@ -303,11 +291,11 @@ urlpatterns = [
 
     # --- Fin URLs para Restablecimiento ---
     path("accounts/resend-verification/", views.resend_verification_view, name="resend_verification"),
-###apartadiño de evento (amigo secret)
-    path('chat/<int:conversacion_id>/events/', views.events_list_create, name='events_list_create'),           # GET lista, POST crear
-    path('chat/events/<int:evento_id>/', views.event_detail, name='event_detail'),                             # GET detalle (admin)             # POST sortear
-    path('chat/events/<int:evento_id>/lock/', views.event_lock, name='event_lock'),                            # POST cerrar (opcional)
-    path('chat/events/<int:evento_id>/mine/', views.event_my_assignment, name='event_my_assignment'),          # GET mi asignación
+###a(amigo secreto)
+    path('chat/<int:conversacion_id>/events/', views.events_list_create, name='events_list_create'),           
+    path('chat/events/<int:evento_id>/', views.event_detail, name='event_detail'),                                        
+    path('chat/events/<int:evento_id>/lock/', views.event_lock, name='event_lock'),                            
+    path('chat/events/<int:evento_id>/mine/', views.event_my_assignment, name='event_my_assignment'),          
 
     
 

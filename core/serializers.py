@@ -25,7 +25,7 @@ class UsuarioLiteWithAvatarSerializer(serializers.ModelSerializer):
 
 # ---- Amistades ----
 class SolicitudAmistadSerializer(serializers.ModelSerializer):
-    # Si quieres avatar en solicitudes, puedes usar UsuarioLiteWithAvatarSerializer aquí también.
+    
     emisor = UsuarioLiteSerializer(read_only=True)
     receptor = UsuarioLiteSerializer(read_only=True)
 
@@ -70,7 +70,7 @@ class MensajeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Mensaje
         fields = (
-            "mensaje_id", "tipo", "contenido", "archivo_url",  # <-- añadido archivo_url
+            "mensaje_id", "tipo", "contenido", "archivo_url",  
             "remitente", "creado_en", "editado_en", "eliminado"
         )
 
@@ -119,7 +119,7 @@ class ConversacionLiteSerializer(serializers.ModelSerializer):
         fields = (
             "conversacion_id", "tipo", "nombre", "foto_url", "estado",
             "actualizada_en", "ultimo_mensaje", "participantes",
-            "is_group", "titulo", "evento_id"  # Añadido evento_id
+            "is_group", "titulo", "evento_id"  
         )
 
     def get_ultimo_mensaje(self, obj):
@@ -138,12 +138,12 @@ class ConversacionLiteSerializer(serializers.ModelSerializer):
         return UsuarioLiteWithAvatarSerializer(users, many=True).data
 
     def get_is_group(self, obj):
-        # marca como grupo por tipo o por # de participantes
+        
         try:
             tipo_val = (obj.tipo or "").lower()
         except Exception:
             tipo_val = ""
-        # Usa cache prefetch si ya está, sin hits extra a DB
+        
         count_parts = getattr(obj, "_prefetched_objects_cache", None)
         if count_parts and "participantes" in count_parts:
             n = len(count_parts["participantes"])
@@ -169,11 +169,11 @@ class ProductoSerializer(serializers.ModelSerializer):
             'nombre_producto', 
             'descripcion', 
             'precio', 
-            'id_categoria', # Mantenemos el ID por si lo necesitas
-            'categoria_nombre', # Nombre legible
-            'id_marca', # Mantenemos el ID
-            'marca_nombre', # Nombre legible
-            'imagen', # URL de la imagen si la tienes configurada
+            'id_categoria', 
+            'categoria_nombre',
+            'id_marca', 
+            'marca_nombre',
+            'imagen', 
             'activo' 
         )
         read_only_fields = ('categoria_nombre', 'marca_nombre','id_producto') 
@@ -194,6 +194,7 @@ class MarcaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Marca
         fields = ['id_marca', 'nombre_marca'] 
+        
 # ---- Usuarios (Admin) ----
 class AdminUserSerializer(serializers.ModelSerializer):
     class Meta:

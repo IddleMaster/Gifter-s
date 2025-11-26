@@ -148,7 +148,6 @@
 </div>
 
 <style>
-/* ... (Todos tus estilos de avatar y píldoras se mantienen igual) ... */
 .avatar-uploader { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .avatar-uploader__preview { position: relative; width: 104px; height: 104px; border-radius: 50%; overflow: hidden; box-shadow: 0 6px 18px rgba(0,0,0,.12); cursor: pointer; transition: transform .2s ease; }
 .avatar-uploader__preview:hover { transform: translateY(-2px); }
@@ -168,7 +167,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  // Script del avatar (sin cambios)
+  // Script del avatar 
   const fileInput = document.getElementById('{{ p_form.profile_picture.id_for_label }}');
   const avatarPreview = document.getElementById('avatarPreview');
   let avatarImg = document.getElementById('avatarImg');

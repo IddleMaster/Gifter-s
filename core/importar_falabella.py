@@ -24,7 +24,7 @@ class Command(BaseCommand):
         data = asyncio.run(scraper_module.scrape_falabella(url))
 
         if not data:
-            self.stdout.write(self.style.WARNING("⚠️ No se encontraron productos."))
+            self.stdout.write(self.style.WARNING("No se encontraron productos."))
             return
 
         nuevos = 0

@@ -1,4 +1,3 @@
-# core/services_social.py
 from django.db.models import Q
 from core.models import (
     User, Seguidor, SolicitudAmistad,
@@ -16,8 +15,8 @@ def amigos_qs(user):
       (b) Y.siguiendo__seguido = user     -> Y sigue a user
     """
     return (User.objects
-            .filter(seguidores__seguidor=user)   # user -> Y
-            .filter(siguiendo__seguido=user)     # Y -> user
+            .filter(seguidores__seguidor=user)   
+            .filter(siguiendo__seguido=user)    
             .exclude(pk=user.pk)
             .distinct())
 
@@ -53,7 +52,7 @@ def obtener_o_crear_conv_directa(user1, user2):
     Tu modelo Conversacion requiere: tipo, creador.
     El 'tipo' correcto según tu models.py es 'directa' (Conversacion.Tipo.DIRECTA).
     """
-    tipo_directa = Conversacion.Tipo.DIRECTA  # => 'directa'
+    tipo_directa = Conversacion.Tipo.DIRECTA  
 
     # ¿ya existe una conversación directa con ambos participantes?
     conv = (Conversacion.objects

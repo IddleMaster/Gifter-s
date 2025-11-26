@@ -13,18 +13,15 @@ from core.services.ollama_client import ollama_chat
 
 logger = logging.getLogger(__name__)
 
-# ==============================
 # Config
-# ==============================
 CACHE_TTL = getattr(settings, "GIFTER_AI_CACHE_TTL", 60 * 30)
 OLLAMA_MODEL = getattr(settings, "GIFTER_AI_MODEL", "llama3.2:1b")
 
 BULLET_RE = re.compile(r"^\s*[-•]\s*(.+)$")
 
 
-# ==============================
+
 # Helpers
-# ==============================
 def _sanitize(texto: str) -> str:
     return re.sub(r"\s+", " ", (texto or "").strip())
 

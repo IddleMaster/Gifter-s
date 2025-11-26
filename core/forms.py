@@ -171,7 +171,7 @@ class PostForm(forms.ModelForm):
         validators=[validate_image_size]
     )
 
-    # ✅ nuevo: campo invisible para el GIF seleccionado
+    # nuevo: campo invisible para el GIF seleccionado
     gif_url = forms.URLField(
         required=False,
         widget=forms.HiddenInput()
@@ -266,21 +266,21 @@ class PreferenciasUsuarioForm(forms.ModelForm):
             'email_on_event_invite',
             'email_on_birthday_reminder',
             'accepts_marketing_emails',
-            'allow_push_web',            # <- NUEVO
+            'allow_push_web',            
         ]
         labels = {
             'email_on_new_follower': 'Email por nuevo seguidor',
             'email_on_event_invite': 'Email por invitación a evento',
             'email_on_birthday_reminder': 'Recordatorio de cumpleaños',
             'accepts_marketing_emails': 'Acepta correos de marketing',
-            'allow_push_web': 'Recibir notificaciones push en este navegador',  # <- NUEVO
+            'allow_push_web': 'Recibir notificaciones push en este navegador', 
         }
         widgets = {
             'email_on_new_follower': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'email_on_event_invite': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'email_on_birthday_reminder': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'accepts_marketing_emails': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'allow_push_web': forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'allowPushWeb'}),  # <- NUEVO
+            'allow_push_web': forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'allowPushWeb'}),  
         }
 
         
@@ -304,9 +304,6 @@ def validate_image_size(file):
         raise ValidationError(f'El tamaño de la imagen no puede ser mayor a {max_size_mb} MB.')
 
 
-################################################################
-################################################################
-################################################################
 
 class ResenaSitioForm(forms.ModelForm):
     class Meta:

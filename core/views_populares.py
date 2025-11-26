@@ -1,4 +1,3 @@
-# core/views_populares.py
 from datetime import timedelta
 import json
 from django.http import JsonResponse
@@ -22,7 +21,7 @@ def safe_image(img):
     if not img:
         return None
 
-    # ImageField => devolver SOLO el filename, NO .url
+   
     try:
         return img.name
     except Exception:
@@ -30,11 +29,11 @@ def safe_image(img):
 
     img = str(img)
 
-    # Imagen externa por URL
+    
     if img.startswith("http"):
         return img
 
-    # Nombre de archivo local como string
+    
     return img
 
 
@@ -113,7 +112,7 @@ def populares_ai(request):
         })
 
     # ============================
-    # 🚀 IA OLLAMA (NUEVO)
+    # IA OLLAMA (NUEVO)
     # ============================
     try:
         prompt = (
@@ -134,13 +133,13 @@ def populares_ai(request):
         ai_output = "Tendencias basadas en actividad reciente de los usuarios."
 
     # ============================
-    # 🔥 Respuesta final
+    # Respuesta final
     # ============================
     return JsonResponse({
         "title": "Productos más populares",
         "pill": "TENDENCIAS",
         "rationale": "Lo que más guardan y reciben los usuarios.",
-        "ai_reason": ai_output,  # ≤ NUEVO (no afecta diseño)
+        "ai_reason": ai_output,  
         "items": items,
         "badges": [],
     })

@@ -128,12 +128,6 @@ class ProductoAdmin(admin.ModelAdmin):
     search_fields = ['nombre_producto', 'descripcion']
     list_editable = ['precio', 'activo']
 
-# @admin.register(ResenaSitio)
-# class ResenaSitioAdmin(admin.ModelAdmin):
-#     list_display = ('id_usuario', 'calificacion', 'fecha_resena')
-#     list_filter = ('calificacion', 'fecha_resena')
-#     search_fields = ('id_usuario__username', 'comentario')
-
 @admin.register(GeneratedCard)
 class GeneratedCardAdmin(admin.ModelAdmin):
     list_display = ("id", "user", "created_at")

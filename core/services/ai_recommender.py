@@ -1,5 +1,3 @@
-# core/services/ai_recommender.py
-
 from typing import Iterable, List, Optional, Sequence, Dict, Any
 import json
 import requests
@@ -65,7 +63,7 @@ def _embed_text(text: str) -> Optional[List[float]]:
         resp.raise_for_status()
         data = resp.json()
 
-        # ✔ Ollama devuelve "embeddings": [[...]]
+        
         emb = data.get("embeddings", [])
         return emb[0] if emb else None
 
@@ -112,7 +110,7 @@ def ensure_product_embeddings(productos: Iterable[Producto]) -> None:
 
 
 # =========================================
-# Perfil del usuario (embedding medio)
+# Perfil del usuario 
 # =========================================
 def _collect_user_history_products(usuario) -> List[Producto]:
     qs = ItemEnWishlist.objects.filter(
@@ -170,7 +168,7 @@ def rerank_products_with_embeddings(usuario, candidatos: Iterable[Producto], top
 
 
 # =========================================
-# Re-rank FoF (Amigos que quizá conozcas)
+# Re-rank FoF 
 # =========================================
 def _clean_json(text: str) -> str:
     """
@@ -226,7 +224,7 @@ def rerank_fof(usuario, candidatos: List[Dict[str, Any]], take: int = 20):
         return final
 
     except Exception:
-        # Fallback determinista
+    
         return sorted(
             candidatos,
             key=lambda x: (x.get("mutual_count", 0), x.get("last_login_ts", 0)),

@@ -1,4 +1,4 @@
-# productos_app/signals.py
+
 from django.db.models.signals import post_save, post_delete
 from django.conf import settings
 from django.apps import apps
@@ -21,7 +21,7 @@ def _on_producto_save(sender, instance, **kwargs):
     try:
         meili().index("products").add_documents([_doc_from_producto(instance)], primary_key="id")
     except Exception:
-        pass  # opcional: log
+        pass  
 
 def _on_producto_delete(sender, instance, **kwargs):
     if not getattr(settings, "USE_MEILI", False):
@@ -29,7 +29,7 @@ def _on_producto_delete(sender, instance, **kwargs):
     try:
         meili().index("products").delete_document(str(instance.id_producto))
     except Exception:
-        pass  # opcional: log
+        pass  
 
 def connect_signals():
     # Intentar primero en productos_app, luego en core

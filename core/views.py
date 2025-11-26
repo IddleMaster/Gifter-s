@@ -120,7 +120,7 @@ log = logging.getLogger("gifters.health")  # salus de los gifters
 ##########
 
 
-#### notificaioens
+#### notificaciones
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse, HttpResponseBadRequest, HttpResponseForbidden, HttpResponseRedirect,HttpRequest
@@ -243,7 +243,7 @@ def usuarios_list(request):
          except Exception as e:
              print(f"Error al guardar historial de búsqueda de usuarios: {e}")
 
-    # Si no hay query, mostramos vacío (o podrías redirigir a home si prefieres)
+    # Si no hay query, mostramos vacío
     if not query:
         context = {
             "query": "",
@@ -252,7 +252,7 @@ def usuarios_list(request):
         }
         return render(request, "usuarios_list.html", context)
 
-    # Usa el helper que YA creaste con los campos correctos (nombre, apellido, nombre_usuario, correo)
+    # helper con los campos correctos (nombre, apellido, nombre_usuario, correo)
     personas_amigos, personas_otros = _people_matches(
         request,
         query,
@@ -485,7 +485,7 @@ def home(request):
             favoritos_ids_list = []
             favoritos_ids_set = set()
 
-        # --- 👇 PASO 1: OBTENER PRODUCTOS MARCADOS CON "NO ME GUSTA" 👇 ---
+        # ---  PASO 1: OBTENER PRODUCTOS MARCADOS CON "NO ME GUSTA"  ---
         try:
             disliked_product_ids = set(
                 RecommendationFeedback.objects.filter(
@@ -500,7 +500,7 @@ def home(request):
         exclude_ids = favoritos_ids_set.union(disliked_product_ids)
         # -----------------------------------------------------------------
 
-        # --- 👇 LÍNEA DE DEPURACIÓN CLAVE 👇 ---
+        # ---  LÍNEA DE DEPURACIÓN CLAVE  ---
         try:
             print(f"--- DEBUG HOME VIEW ---")
             print(f"Usuario: {getattr(request.user, 'nombre_usuario', request.user)}")
@@ -613,7 +613,7 @@ def register_view(request):
     if request.method == 'POST':
         
         # ============================================================
-        # 🤖 INICIO RECAPTCHA (NUEVO)
+        #  INICIO RECAPTCHA (NUEVO)
         # ============================================================
         recaptcha_response = request.POST.get('g-recaptcha-response')
         data = {
@@ -645,7 +645,7 @@ def register_view(request):
                 'recaptcha_site_key': settings.RECAPTCHA_SITE_KEY
             })
         # ============================================================
-        # 🤖 FIN RECAPTCHA (A partir de aquí sigue tu código original)
+        #  FIN RECAPTCHA (A partir de aquí sigue tu código original)
         # ============================================================
 
         form = RegisterForm(request.POST)
@@ -706,7 +706,7 @@ def register_view(request):
     else:
         form = RegisterForm()
 
-    # ✅ MODIFICADO: Pasamos la site_key al contexto para que el HTML la lea
+    #  MODIFICADO: Pasamos la site_key al contexto para que el HTML la lea
     context = {
         'form': form,
         'recaptcha_site_key': settings.RECAPTCHA_SITE_KEY
@@ -1000,7 +1000,7 @@ def producto_detalle(request, producto_id):
 
 
 # Protege la página para que solo usuarios logueados puedan verla
-## TODO LO QUE TENGA QUE VER CON EL FEED AQUI
+## FEED AQUI
 @login_required
 def feed_view(request):
 
@@ -1431,7 +1431,7 @@ def url_tienda_toggle_activo(request, url_id):
 
 def buscar_productos(request):
     """Búsqueda avanzada de productos (Meilisearch + fallback DB robusto, sin reseñas)"""
-    # --- Params ---
+    # --- Parametros ---
     query = (request.GET.get('q') or '').strip()
     personas_amigos, personas_otros = _people_matches(request, query)
     categoria_id = (request.GET.get('categoria') or '').strip()
@@ -2107,7 +2107,7 @@ def profile_edit(request):
             user.is_private = 'is_private' in request.POST
             user.save(update_fields=['is_private'])
             
-            # --- 👇 NUEVA LÓGICA PARA GUARDAR INTERESES 👇 ---
+            # ---  NUEVA LÓGICA PARA GUARDAR INTERESES  ---
             # Obtenemos las listas de IDs de los checkboxes marcados
             selected_category_ids = request.POST.getlist('intereses_categorias')
             selected_brand_ids = request.POST.getlist('intereses_marcas')
@@ -2127,7 +2127,7 @@ def profile_edit(request):
         p_form    = PerfilForm(instance=perfil)
         pref_form = PreferenciasUsuarioForm(instance=prefs)
 
-    # --- 👇 NUEVO CONTEXTO PARA MOSTRAR LAS OPCIONES 👇 ---
+    # ---  NUEVO CONTEXTO PARA MOSTRAR LAS OPCIONES  ---
     # Obtenemos todas las categorías y marcas disponibles
     all_categories = Categoria.objects.all().order_by('nombre_categoria')
     all_brands = Marca.objects.all().order_by('nombre_marca')
@@ -2141,7 +2141,7 @@ def profile_edit(request):
         'u_form': u_form,
         'p_form': p_form,
         'pref_form': pref_form,
-        # --- 👇 AÑADIMOS LAS NUEVAS VARIABLES AL CONTEXTO 👇 ---
+        # ---  AÑADIMOS LAS NUEVAS VARIABLES AL CONTEXTO  ---
         'all_categories': all_categories,
         'all_brands': all_brands,
         'user_category_ids': user_category_ids,
@@ -2164,7 +2164,7 @@ def chat_room(request, conversacion_id):
         "user_perfil": perfil,
     })
 
-    ##########   ##########   ##########   ##########   ##########   
+ 
   ##########   ##########     ##########   ##########   ##########   
   ########## SECCION DE LOS AMIGOS (solicitudes y demas) ###############   
   ##########   ##########   ##########   ##########   ##########   ## 
@@ -2373,7 +2373,7 @@ class ConversacionesList(APIView):
               .order_by("-actualizada_en")
               .distinct())
 
-        # ✅ pasa request en context (evita 500 cuando el serializer lo necesita)
+        #  pasa request en context (evita 500 cuando el serializer lo necesita)
         data = ConversacionLiteSerializer(qs, many=True, context={"request": request}).data
         # === Inyectar unread_count por conversación (sin tocar el serializer) ===
         # Un no-leído = EntregaMensaje con estado ENTREGADO para este usuario, dentro de esa conversación
@@ -2515,7 +2515,7 @@ class MensajesListCreate(APIView):
             })
 
         # ===========================================================
-        # 📊 2. BOT DE GRÁFICOS (Versión URL Manual - Estable)
+        #  2. BOT DE GRÁFICOS (Versión URL Manual - Estable)
         # ===========================================================
         if tipo == Mensaje.Tipo.TEXTO and contenido.lower().startswith('/grafico '):
             try:
@@ -2567,7 +2567,7 @@ class MensajesListCreate(APIView):
                         conversacion=conv,
                         remitente=request.user,
                         tipo=Mensaje.Tipo.SISTEMA,
-                        contenido="📊 Resultados de la votación:",
+                        contenido=" Resultados de la votación:",
                         metadatos={'tipo': 'chart_card', 'chart_url': chart_url}
                     )
 
@@ -2594,7 +2594,7 @@ class MensajesListCreate(APIView):
 
 
 
-##nuevas funciones hoy 1 del 10 (abajo):
+#nuevas funciones hoy 1 del 10 (abajo):
 @login_required
 def amistad_enviar(request, username):
     User = get_user_model()
@@ -2728,7 +2728,7 @@ def amistad_cancelar(request, username):
     )
     sol.cancelar()
 
-    # 👇 Responder JSON si es AJAX
+    #  Responder JSON si es AJAX
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
         return JsonResponse({"ok": True, "username": receptor.nombre_usuario})
 
@@ -2810,7 +2810,6 @@ def perfil_publico(request, username):
             .order_by('-fecha_comprado', '-pk')
         )
 
-        # --- 👇 ESTA ES LA CORRECCIÓN 👇 ---
         # Se elimina la condición "if es_amigo". Ahora la wishlist se carga si el perfil es público
         # O si es privado y son amigos (porque ya pasamos el filtro de arriba).
         wishlist_items_publicos = (
@@ -3528,13 +3527,6 @@ class ProductoListAPIView(generics.ListCreateAPIView): # <-- CAMBIO AQUÍ
     serializer_class = ProductoSerializer
     # Mantenemos IsAuthenticated, pero podrías cambiar a IsAdminUser si solo admins pueden crear
     permission_classes = [IsAuthenticated]
-    # pagination_class = ... (si usas paginación)
-
-    # Opcional: Para asegurar que al crear se asignen bien categoría/marca por ID
-    # def perform_create(self, serializer):
-    #     # Aquí podrías añadir lógica extra si fuera necesario antes de guardar
-    #     # por ejemplo, validar IDs de categoría/marca, pero el serializer ya lo hace.
-    #     serializer.save()
 class ProductoDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     """
     Vista de API para ver, actualizar (parcial o total) o eliminar un producto específico.
@@ -4337,10 +4329,8 @@ class UserActivityDetailAPIView(APIView):
 
 
 
-#######################
-#####################
-###################
-##########FINN REPORTS FUNCTIONS    
+
+#FIN funcion de reportes   
 def producto_detalle(request, id_producto=None, pk=None):
     """
     Vista de detalle del producto.
@@ -4784,7 +4774,7 @@ def events_my_list_create(request):
 
     with transaction.atomic():
         ev = ConversationEvent.objects.create(
-            conversacion=None,                     # ⬅️ standalone
+            conversacion=None,                
             tipo='secret_santa',
             creado_por=request.user,
             titulo=titulo,
@@ -4840,7 +4830,7 @@ def record_recommendation_feedback(request):
             defaults={'feedback_type': 'dislike'}
         )
         
-        # --- 👇 2. LLAMA A LA FUNCIÓN PARA ROMPER LA CACHÉ 👇 ---
+        # ---  2. LLAMA A LA FUNCIÓN PARA ROMPER LA CACHÉ  ---
         # Justo después de guardar el feedback, invalidamos la caché de recomendaciones.
         invalidate_user_reco_cache(request.user)
         # --------------------------------------------------------
@@ -4856,53 +4846,86 @@ def record_recommendation_feedback(request):
 @require_POST
 def recommendation_feedback(request):
     """
-    Vista para manejar feedback de recomendaciones (me gusta/no me gusta)
+    Maneja feedback (dislike) y entrega una nueva recomendación excluyendo
+    el producto rechazado y todos los productos visibles actualmente.
     """
     try:
-        product_id = request.POST.get('product_id')
-        feedback_type = request.POST.get('feedback_type', 'dislike')  # 'like' o 'dislike'
-        
+        product_id = request.POST.get("product_id")
+        feedback_type = request.POST.get("feedback_type", "dislike")
+
         if not product_id:
-            return JsonResponse({'status': 'error', 'message': 'Falta product_id'}, status=400)
-            
+            return JsonResponse(
+                {"status": "error", "message": "Falta product_id"},
+                status=400
+            )
+
         product = get_object_or_404(Producto, pk=product_id)
-        
-        # Registrar o actualizar el feedback
+
+        # Registrar feedback
         RecommendationFeedback.objects.update_or_create(
             user=request.user,
             product=product,
-            defaults={'feedback_type': feedback_type}
+            defaults={"feedback_type": feedback_type},
         )
 
-        # Invalidamos la caché del recomendador para que no vuelva a sugerir
-        # este producto inmediatamente. También intentamos devolver una nueva
-        # recomendación para que el frontend la reemplace en la UI.
+        # limpiar cache
         try:
-            from .services.recommendations import invalidate_user_reco_cache, recommend_products_for_user
             invalidate_user_reco_cache(request.user)
-            new_recs = recommend_products_for_user(request.user, limit=1, exclude_ids=[int(product_id)])
-            new_rec = None
-            if new_recs:
-                p = new_recs[0]
-                imagen = None
-                try:
-                    imagen = p.imagen.url if p.imagen else None
-                except Exception:
-                    imagen = None
-                new_rec = {
-                    'id': getattr(p, 'id_producto', p.pk),
-                    'nombre': getattr(p, 'nombre_producto', str(p)),
-                    'precio': getattr(p, 'precio', None),
-                    'imagen_url': imagen,
-                    'url': getattr(p, 'url_tienda_principal', None) or getattr(p, 'url', None),
-                }
         except Exception:
-            new_rec = None
+            pass
 
-        return JsonResponse({'status': 'ok', 'message': f'Feedback {feedback_type} registrado', 'new_recommendation': new_rec})
-        
+        # -------------------------
+        # NUEVO: obtener visible_ids
+        # -------------------------
+        visible_ids_raw = request.POST.get("visible_ids", "[]")
+        try:
+            visible_ids = json.loads(visible_ids_raw)
+            if not isinstance(visible_ids, list):
+                visible_ids = []
+        except:
+            visible_ids = []
+
+        # excluir producto actual + visibles
+        excluir = set(visible_ids)
+        excluir.add(int(product_id))
+
+        # obtener nueva recomendación
+        try:
+            nuevos = recomendar_productos_ia(
+                request.user,
+                limit=1,
+                exclude_ids=list(excluir)
+            )
+        except Exception:
+            nuevos = []
+
+        new_rec = None
+        if nuevos:
+            p = nuevos[0]
+
+            # obtener imagen segura
+            try:
+                imagen = p.imagen.url if hasattr(p.imagen, "url") else p.imagen
+            except:
+                imagen = None
+
+            new_rec = {
+                "id": getattr(p, "id_producto", p.pk),
+                "nombre": getattr(p, "nombre_producto", str(p)),
+                "precio": getattr(p, "precio", None),
+                "imagen_url": imagen,
+                "url": getattr(p, "url_tienda_principal", None) or getattr(p, "url", None),
+            }
+
+        return JsonResponse(
+            {
+                "status": "ok",
+                "new_recommendation": new_rec,
+            }
+        )
+
     except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
 
 
@@ -4970,7 +4993,7 @@ def notificacion_click(request, notificacion_id):
     return redirect(destino)
 
 
-#############################################
+
 #######################################
 
 
@@ -4995,7 +5018,7 @@ def event_create_with_chat(request):
         presupuesto_raw = payload.get("presupuesto_fijo", None)
         miembros_ids = payload.get("miembros") or []
         
-        # ✅ 1. OBTENER LA FECHA DEL PAYLOAD
+        #  OBTENER LA FECHA DEL PAYLOAD
         fecha_str = payload.get("fecha_intercambio") 
 
         # Comprueba si el usuario ya tiene un evento con el mismo título
@@ -5030,7 +5053,7 @@ def event_create_with_chat(request):
             except Exception:
                 return JsonResponse({"ok": False, "error": "Monto inválido."}, status=400)
         
-        # ✅ 2. PARSEAR LA FECHA (String -> Date Object)
+        # PARSEAR LA FECHA (String -> Date Object)
         fecha_obj = parse_date(fecha_str) if fecha_str else None
 
         User = get_user_model()
@@ -5060,7 +5083,7 @@ def event_create_with_chat(request):
             creado_por=request.user,
             titulo=titulo,
             presupuesto_fijo=presupuesto if presupuesto is not None else None,
-            fecha_intercambio=fecha_obj,  # 👈 ✅ GUARDAMOS LA FECHA EN LA BD
+            fecha_intercambio=fecha_obj,  #  GUARDAMOS LA FECHA EN LA BD
             estado='borrador'
         )
 
@@ -5072,7 +5095,7 @@ def event_create_with_chat(request):
                 defaults={"estado": "inscrito"}
             )
 
-        # ✅ 5. MENSAJE DE SISTEMA MEJORADO
+        #  5. MENSAJE DE SISTEMA MEJORADO
         # Formateamos datos para el mensaje
         fecha_txt = fecha_obj.strftime('%d/%m/%Y') if fecha_obj else "Por definir"
         monto_txt = f"${presupuesto:,.0f}" if presupuesto else "Libre"
@@ -5089,7 +5112,7 @@ def event_create_with_chat(request):
                 conversacion=conv,
                 remitente=request.user,
                 tipo=Mensaje.Tipo.SISTEMA,
-                contenido=texto_bienvenida  # 👈 Usamos el texto enriquecido
+                contenido=texto_bienvenida  
             )
         except Exception:
             pass
@@ -5614,7 +5637,6 @@ def api_event_sortear(request, event_id: int):
             return JsonResponse({"ok": False, "msg": "No fue posible completar el sorteo. Intente nuevamente."}, status=500)
 
     # Envía mensaje privado a cada uno indicando a quién le tocó
-    # (usa tu helper de “chat privado” si lo tienes; aquí muestro uno simple)
     def get_or_create_dm(u1, u2):
         # ordena por id para no duplicar
         a, b = (u1, u2) if u1.id < u2.id else (u2, u1)
@@ -5874,7 +5896,7 @@ def api_post_comments(request, post_id):
     if usar_filtro:
         for idx, c in enumerate(comentarios_list):
             if idx < MAX_COMMENTS_AI:
-                visible = censurar(c.contenido or "")   # ← SOLO ESTO
+                visible = censurar(c.contenido or "") 
             else:
                 visible = c.contenido
             c._contenido_visible = visible
@@ -5910,7 +5932,7 @@ def resend_verification_view(request):
             return redirect("resend_verification")
 
         User = get_user_model()
-        user = User.objects.filter(correo__iexact=email_input).first()  # tu campo es 'correo'
+        user = User.objects.filter(correo__iexact=email_input).first()  
 
         # Mensaje neutro SIEMPRE (no revelamos si existe)
         success_msg = "Si el correo existe, te enviamos un nuevo enlace de verificación."
@@ -6159,10 +6181,9 @@ def change_password_forced_api(request, pk):
     except Exception as e:
         return Response({"detail": f"Error interno al cambiar la contraseña: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
-# core/views.py
-# ... (imports: send_mail, logging, User, etc.) ...
 
-# --- 👇 AÑADE ESTA VISTA NUEVA 👇 ---
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny]) 
 @transaction.atomic

@@ -30,11 +30,11 @@ def _push_inbox(user_ids, payload: dict):
             async_to_sync(channel_layer.group_send)(
                 f"user_inbox_{uid}",
                 {
-                    "type": "inbox.update",  # ← nombre del handler en el consumer
-                    "payload": payload,      # lo que el FE necesita para refrescar
+                    "type": "inbox.update",  
+                    "payload": payload,      
                 },
             )
     except Exception:
-        # No romper el flujo si no hay WS configurado
+        
         pass
 

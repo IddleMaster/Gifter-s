@@ -6,7 +6,6 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 WORKDIR /app
 
-# SO deps: build chain, MySQL client, Cairo (pycairo), Pillow (jpeg/zlib/freetype)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     pkg-config \
@@ -35,7 +34,7 @@ RUN python -m pip install --upgrade pip setuptools wheel
 COPY requirements2.txt .
 RUN pip install --no-cache-dir -r requirements2.txt
 
-# ⬇️ INSTALAR PLAYWRIGHT + CHROMIUM DENTRO DEL CONTENEDOR
+# INSTALAR PLAYWRIGHT + CHROMIUM DENTRO DEL CONTENEDOR
 RUN python -m playwright install chromium --with-deps
 
 COPY . .

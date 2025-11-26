@@ -590,7 +590,6 @@
   <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Cargando...</span></div>
 </div>`;
 
-      // 👇 NUEVO: le pasamos al endpoint si el filtro está activo
       const urlActual = new URL(window.location.href);
       const filtro = urlActual.searchParams.get('filtro_malas_palabras');
 
@@ -615,7 +614,6 @@
       e.preventDefault();
       const fd = new FormData(modalForm);
 
-      // Usamos directamente la bandera del backend
       let comentarioUrl = "{% url 'comentario_crear' %}";
       if (USAR_FILTRO) {
         comentarioUrl += '?filtro_malas_palabras=1';
@@ -675,10 +673,10 @@
 
     e.preventDefault();
 
-    // Cambia el estado visual
+    // Cambia estado visual
     btn.classList.toggle('liked');
 
-    // Si quieres hacer el "toggle" real del backend (like/unlike):
+    // "toggle" real del backend (like/unlike):
     const postId = btn.dataset.postId;
     fetch(`/api/post/${postId}/like/`, {
       method: 'POST',

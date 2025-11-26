@@ -16,14 +16,14 @@ def _clear_gifter_ai_cache(user_id: int, extra: str = ""):
 
 @receiver(post_save, sender=Perfil)
 def refresh_ai_on_profile_update(sender, instance, **kwargs):
-    """Si el usuario actualiza su bio o perfil, limpiamos su IA."""
+    """Si el usuario actualiza su bio o perfil, limpiamos IA."""
     if instance and instance.user_id:
         _clear_gifter_ai_cache(instance.user_id)
 
 
 @receiver(post_save, sender=ItemEnWishlist)
 def refresh_ai_on_wishlist_change(sender, instance, **kwargs):
-    """Si cambia algo en su wishlist (añade, marca recibido, etc.), limpiamos su IA."""
+    """Si cambia algo en su wishlist (añade, marca recibido, etc.), limpiamos IA."""
     wl = getattr(instance, "id_wishlist", None)
     if wl and isinstance(wl, Wishlist):
         _clear_gifter_ai_cache(wl.usuario_id)

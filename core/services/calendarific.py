@@ -1,5 +1,3 @@
-# core/services/calendarific.py
-
 import requests
 from datetime import date, datetime
 from django.conf import settings
@@ -45,7 +43,7 @@ OCASIONES_PRIORITARIAS = {
 
 
 # ===============================================================
-#  Calendarific (principal)
+#  Calendarific 
 # ===============================================================
 def _fetch_calendarific(year: int, country: str):
     try:
@@ -105,7 +103,7 @@ def _normalize_calendarific(raw, country: str):
 
 
 # ===============================================================
-#  API OFICIAL DE CHILE (fallback)
+#  API OFICIAL DE CHILE 
 # ===============================================================
 def _fetch_chile_api():
     try:
@@ -170,7 +168,6 @@ def next_holiday(country=None):
     except Exception:
         pass  # ignoramos errores de Calendarific
 
-    # === 2) API oficial de Chile ===
     try:
         data = _fetch_chile_api()
         for h in data:

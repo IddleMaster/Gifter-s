@@ -194,7 +194,6 @@
   }
 </style>
 <style>
-  /* Tabs: ocultar todo salvo .active */
   .tab-content {
     display: none;
   }
@@ -230,11 +229,6 @@
           data-username="{{ usuario_publico.nombre_usuario }}">
           <i class="bi bi-chat-dots"></i> Chatear
         </a>
-        <!--
-        <a href="{% url 'cards_crear' usuario_publico.nombre_usuario %}" class="btn-edit btn-postal mt-2">
-          <i class="bi bi-envelope-paper-heart"></i> Regala una Imagen
-        </a>
-        -->
       </div>
 
 
@@ -444,18 +438,7 @@
 
     {# --- IA 100% (texto): ideas debajo de la wishlist --- #}
     {% if sugerencias_ia and sugerencias_ia|length > 0 %}
-    <div class="card mt-4">
-      <div class="card-header fw-bold">💡 Ideas de regalo</div>
-      <div class="card-body">
-        <ul class="mb-0 ps-3">
-          {% for sug in sugerencias_ia %}
-          <li class="mb-1">
-            <strong>{{ sug.idea }}</strong>{% if sug.explicacion %}: {{ sug.explicacion }}{% endif %}
-          </li>
-          {% endfor %}
-        </ul>
-      </div>
-    </div>
+
     {% endif %}
 
     {% endif %}
@@ -474,38 +457,51 @@
       {% for it in recibidos_publicos %}
       {% with p=it.id_producto %}
       <div class="gift-card received-gift" id="recibido-{{ it.id_item }}" data-product-id="{{ p.id_producto }}">
-        {% if p.imagen %}
-    {% if p.imagen.url %}
-        {{ p.imagen.url }}
-    {% elif p.imagen|slice:':4' == 'http' %}
-        {{ p.imagen }}
-    {% else %}
-        /media/{{ p.imagen }}
-    {% endif %}
-{% else %}
-    {% static 'img/Gifters/favicongift.png' %}
-{% endif %}
+        
+  <img 
+    src="
+      {% if p.imagen %}
+          {% if p.imagen.url %}
+              {{ p.imagen.url }}
+          {% elif p.imagen|slice:':4' == 'http' %}
+              {{ p.imagen }}
+          {% else %}
+              /media/{{ p.imagen }}
+          {% endif %}
+      {% else %}
+          {% static 'img/Gifters/favicongift.png' %}
+      {% endif %}
+    "
+    alt="{{ p.nombre_producto }}"
+    style="width: 100%; height: auto; border-radius: 6px;"
+  >
 
-        <div class="gift-info">
-          <h4>{{ p.nombre_producto }}</h4>
-          <p>{{ p.id_marca.nombre_marca|default:"" }}</p>
-          {% if it.fecha_comprado %}
-          <div class="text-muted received-date">
-            Recibido el {{ it.fecha_comprado|date:"d/m/Y" }}
-          </div>
-          {% endif %}
-        </div>
-        <div class="gift-actions">
-          <a class="btn btn-sm btn-outline-primary" href="{% url 'producto_detalle' p.id_producto %}"
-            title="Ver detalle">Ver</a>
-          {% with url_tienda=p.url_tienda_principal|default:p.urls_tienda.first %}
-          {% if url_tienda %}
-          <a class="btn btn-sm btn-outline-secondary" href="{{ url_tienda.url }}" target="_blank" rel="noopener"
-            title="Ver en tienda {{ url_tienda.nombre_tienda }}">Tienda</a>
-          {% endif %}
-          {% endwith %}
-        </div>
-      </div>
+  <div class="gift-info">
+    <h4>{{ p.nombre_producto }}</h4>
+    <p>{{ p.id_marca.nombre_marca|default:"" }}</p>
+
+    {% if it.fecha_comprado %}
+    <div class="text-muted received-date">
+      Recibido el {{ it.fecha_comprado|date:"d/m/Y" }}
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="gift-actions">
+    <a class="btn btn-sm btn-outline-primary" 
+       href="{% url 'producto_detalle' p.id_producto %}" title="Ver detalle">Ver</a>
+
+    {% with url_tienda=p.url_tienda_principal|default:p.urls_tienda.first %}
+    {% if url_tienda %}
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_tienda.url }}" 
+       target="_blank" rel="noopener"
+       title="Ver en tienda {{ url_tienda.nombre_tienda }}">Tienda</a>
+    {% endif %}
+    {% endwith %}
+  </div>
+
+</div>
+
       {% endwith %}
       {% endfor %}
     </div>
@@ -519,9 +515,6 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
   document.addEventListener("DOMContentLoaded", function () {
-    /* =========================
-     *  TABS (con hash + back/forward)
-     * ========================= */
     (function () {
       const tabs = Array.from(document.querySelectorAll(".profile-nav a[data-tab]"));
       const sections = Array.from(document.querySelectorAll(".profile-content .tab-content"));
@@ -563,9 +556,7 @@
     })();
 
 
-    /* =========================
-     *  ACORDEÓN DE EVENTOS
-     * ========================= */
+    /* ACORDEÓN DE EVENTOS */
     const eventItems = document.querySelectorAll(".events-list .event-item");
     const setMaxHeight = (el) => { if (el) el.style.maxHeight = el.scrollHeight + "px"; };
 
@@ -636,9 +627,7 @@
     });
 
 
-    /* =========================
-     *  BOTÓN DE CHAT (delegado)
-     * ========================= */
+    /* BOTÓN DE CHAT */
     document.addEventListener("click", function (ev) {
       const btn = ev.target.closest("#btnChatPerfilPublico");
       if (!btn) return;
@@ -649,18 +638,11 @@
     });
 
 
-    /* =========================
-     *  SWEETALERT TOAST (fallback)
-     * ========================= */
     const Toast = (window.Swal
       ? Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 1800, timerProgressBar: true })
       : { fire: ({ title }) => console.log(title) }
     );
 
-
-    /* =========================
-     *  CSRF
-     * ========================= */
     function getCookie(name) {
       const value = `; ${document.cookie}`;
       const parts = value.split(`; ${name}=`);
@@ -670,9 +652,6 @@
     const csrftoken = getCookie('csrftoken');
 
 
-    /* =========================
-     *  AJAX AMISTAD
-     * ========================= */
     async function handleAmistadForm(form, successCallback) {
       if (!csrftoken) {
         Toast.fire({ icon: 'error', title: 'Error de seguridad (CSRF). Recarga la página.' });
@@ -743,7 +722,6 @@
       window.location.href = "{% url 'perfil_publico' usuario_publico.nombre_usuario %}";
     };
 
-    // Manejo de los formularios de amistad (delegado en .edit-profile)
     btnContainer?.addEventListener('submit', async (e) => {
       if (e.target.matches('.js-amistad-enviar')) {
         e.preventDefault();

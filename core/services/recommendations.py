@@ -1,4 +1,3 @@
-# core/services/recommendations.py
 from typing import List, Tuple, Optional
 from django.core.cache import cache
 from django.db.models import Q, Case, When, Value, IntegerField, F, ExpressionWrapper, Max

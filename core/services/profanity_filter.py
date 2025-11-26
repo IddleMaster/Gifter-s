@@ -4,7 +4,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # ============================================================
-# 1. LISTA BASE DE INSULTOS (forma simple, sin símbolos leet)
+# 1. LISTA BASE DE INSULTOS 
 # ============================================================
 BAD_WORDS = [
     "weon","weón","weona","weonas","wn","qlo","qliao","qlia","culiao","culiá",
@@ -71,7 +71,7 @@ def _mask(word: str) -> str:
     return core[0] + "*" * (len(core) - 2) + core[-1]
 
 # ============================================================
-# 4. FUNCIÓN PRINCIPAL (CENSURA PERFECTA)
+# 4. FUNCIÓN PRINCIPAL 
 # ============================================================
 
 def censurar(texto: str) -> str:

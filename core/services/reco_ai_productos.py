@@ -1,9 +1,9 @@
-# core/services/reco_ai_productos.py
 import hashlib
 import logging
 from django.core.cache import cache
 from core.models import Producto, Wishlist, ItemEnWishlist
 from core.services.ollama_client import ollama_chat   # IA local
+from core.models import RecommendationFeedback
 
 logger = logging.getLogger(__name__)
 
@@ -26,32 +26,71 @@ def _build_user_context(user):
     return ", ".join(nombres) + (f". Bio: {bio}" if bio else "")
 
 
-def recomendar_productos_ia(user, limit=6):
+from core.models import Producto, Wishlist, ItemEnWishlist, RecommendationFeedback
+import hashlib
+import logging
+from django.core.cache import cache
+from core.services.ollama_client import ollama_chat
+
+logger = logging.getLogger(__name__)
+
+
+def recomendar_productos_ia(user, limit=6, exclude_ids=None):
     """
-    IA local: Usa OLLAMA para elegir productos recomendados
-    sin depender de OpenAI.
+    IA local: Usa OLLAMA para elegir productos recomendados,
+    considerando wishlist, bio y feedback (dislikes).
     """
+    exclude_ids = exclude_ids or []
+
+    # -----------------------------
+    # 1) Contexto del usuario
+    # -----------------------------
     datos = _build_user_context(user)
     if not datos.strip():
         logger.info("[IA Productos] Usuario sin contexto suficiente.")
         return []
 
-    # Cache
-    cache_key = f"ia_prods_home_{user.id}_{hashlib.sha1(datos.encode()).hexdigest()}"
+    # -----------------------------
+    # 2) Excluir productos rechazados
+    # -----------------------------
+    rechazados = list(
+        RecommendationFeedback.objects.filter(
+            user=user,
+            feedback_type='dislike'
+        ).values_list('product_id', flat=True)
+    )
+
+    # Combinar dislikes + exclude_ids para excluir ambos
+    excluir_total = set(rechazados + list(exclude_ids))
+
+    # -----------------------------
+    # 3) Cache (incluye exclusiones)
+    # -----------------------------
+    clave_hash = hashlib.sha1(
+        (datos + ''.join(map(str, excluir_total))).encode()
+    ).hexdigest()
+    cache_key = f"ia_prods_home_{user.id}_{clave_hash}"
+
     cached = cache.get(cache_key)
     if cached:
         return cached
 
-    #  Candidatos reales
+    # -----------------------------
+    # 4) Candidatos válidos
+    # -----------------------------
     candidatos = list(
         Producto.objects.filter(activo=True)
+        .exclude(id_producto__in=excluir_total)
         .select_related("id_marca", "id_categoria")
         .order_by("?")[:60]
     )
+
     if not candidatos:
         return []
 
-    #  Texto para IA
+    # -----------------------------
+    # 5) Lista para IA
+    # -----------------------------
     lista_txt = "\n".join(
         f"- {p.nombre_producto} (marca {p.id_marca.nombre_marca if p.id_marca else 'Sin marca'})"
         for p in candidatos
@@ -66,7 +105,9 @@ def recomendar_productos_ia(user, limit=6):
         f"{lista_txt}"
     )
 
-    #  IA local
+    # -----------------------------
+    # 6) Llamada a IA
+    # -----------------------------
     try:
         respuesta = ollama_chat(
             messages=[
@@ -79,13 +120,16 @@ def recomendar_productos_ia(user, limit=6):
 
         if not respuesta:
             logger.warning("[IA Productos] Ollama devolvió vacío. Fallback.")
-            return candidatos[:limit]
+            recomendados = candidatos[:limit]
+            cache.set(cache_key, recomendados, 60 * 30)
+            return recomendados
 
-        # Normalizamos la respuesta
+        # -----------------------------
+        # 7) Procesar respuesta IA
+        # -----------------------------
         texto = respuesta.lower().strip()
         lineas = [l.strip("-• ").strip() for l in texto.split("\n") if l.strip()]
 
-        #  Match más robusto
         recomendados = []
         for linea in lineas:
             for p in candidatos:
@@ -93,17 +137,16 @@ def recomendar_productos_ia(user, limit=6):
                 marca_norm = (p.id_marca.nombre_marca.lower().strip()
                               if p.id_marca else "")
 
-                #  Matching inteligente
                 if (
                     nombre_norm == linea
                     or nombre_norm in linea
                     or linea in nombre_norm
-                    or marca_norm and marca_norm in linea
+                    or (marca_norm and marca_norm in linea)
                 ):
                     if p not in recomendados:
                         recomendados.append(p)
 
-        # si no hubo match → fallback
+        # Fallback si no hay match
         if not recomendados:
             recomendados = candidatos[:limit]
 
@@ -113,4 +156,7 @@ def recomendar_productos_ia(user, limit=6):
 
     except Exception as e:
         logger.exception("[IA Productos] Error con OLLAMA: %s", e)
-        return candidatos[:limit]
+        recomendados = candidatos[:limit]
+        cache.set(cache_key, recomendados, 60 * 30)
+        return recomendados
+

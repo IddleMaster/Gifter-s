@@ -132,7 +132,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_private = models.BooleanField(default=False, verbose_name="Perfil Privado")
     must_change_password = models.BooleanField(default=False, verbose_name="Debe Cambiar Contraseña")
 
-    # --- 👇 CAMPOS NUEVOS PARA INTERESES 👇 ---
+    # --- CAMPOS NUEVOS PARA INTERESES ---
     intereses_categorias = models.ManyToManyField(
         'Categoria', 
         blank=True, 
@@ -610,7 +610,7 @@ class ItemEnWishlist(models.Model):
         related_name='items'
     )
 
-    # 🔹 Producto interno (puede ser NULL si es un externo)
+    # Producto interno (puede ser NULL si es un externo)
     id_producto = models.ForeignKey(
         'Producto',
         on_delete=models.CASCADE,
@@ -620,7 +620,7 @@ class ItemEnWishlist(models.Model):
         related_name='en_wishlists'
     )
 
-    # 🔹 Producto externo (nuevo)
+    # Producto externo (nuevo)
     producto_externo = models.ForeignKey(
         'ProductoExterno',
         on_delete=models.CASCADE,
@@ -701,7 +701,7 @@ class ItemEnWishlist(models.Model):
         if self.cantidad < 1:
             raise ValidationError("La cantidad debe ser al menos 1")
 
-        # 🔥 Validación: DEBE tener interno O externo, no ambos
+        # Validación: DEBE tener interno O externo, no ambos
         if not self.id_producto and not self.producto_externo:
             raise ValidationError("Debe seleccionar un producto interno o externo")
         if self.id_producto and self.producto_externo:
@@ -1184,11 +1184,11 @@ class Evento(models.Model):
         verbose_name='Usuario creador'
     )
 
-    titulo = models.CharField(max_length=120)                 # VARCHAR
-    descripcion = models.CharField(max_length=255, blank=True, null=True)  # VARCHAR
-    fecha_evento = models.DateField()                         # DATE
-    creado_en = models.DateTimeField(auto_now_add=True)       # TIMESTAMP
-    actualizado_en = models.DateTimeField(auto_now=True)      # TIMESTAMP
+    titulo = models.CharField(max_length=120)                 
+    descripcion = models.CharField(max_length=255, blank=True, null=True)  
+    fecha_evento = models.DateField()                        
+    creado_en = models.DateTimeField(auto_now_add=True)       
+    actualizado_en = models.DateTimeField(auto_now=True)      
 
     class Meta:
         db_table = 'evento'
@@ -1311,10 +1311,6 @@ class InvitacionEvento(models.Model):
             models.Index(fields=['evento'], name='idx_inv_evento'),
             models.Index(fields=['receptor', 'estado'], name='idx_inv_receptor_estado'),
         ]
-        # Si no quieres invitaciones duplicadas para el mismo evento y receptor, descomenta:
-        # constraints = [
-        #     models.UniqueConstraint(fields=['evento', 'receptor'], name='uq_invitacion_evento_receptor')
-        # ]
 
     def __str__(self):
         return f"Invitación {self.invitacion_id} → {self.receptor} [{self.estado}]"
@@ -1394,11 +1390,6 @@ class Tag(models.Model):
 
 
 
-##################################################################
-##################################################################
-##################################################################
-
-
 class ResenaSitio(models.Model):
     id_resena = models.AutoField(primary_key=True, verbose_name='ID Reseña')
 
@@ -1431,13 +1422,8 @@ class ResenaSitio(models.Model):
     def __str__(self):
         return f"Reseña sitio #{self.id_resena} · {self.id_usuario} ({self.calificacion}/5)"
 
-
-##################################################################
-##################################################################
-##################################################################    
+ 
     
-    
-#MatiasD
 
 class Perfil(models.Model):
     id_perfil = models.AutoField(primary_key=True)
@@ -1833,9 +1819,8 @@ class Mensaje(models.Model):
 
     tipo = models.CharField(max_length=10, choices=Tipo.choices, default=Tipo.TEXTO)
 
-    contenido = models.TextField()  # cuerpo del mensaje
-    metadatos = models.JSONField(null=True, blank=True)  # urls, thumbs, etc. opcional
-
+    contenido = models.TextField()  
+    metadatos = models.JSONField(null=True, blank=True) 
     creado_en  = models.DateTimeField(auto_now_add=True)
     editado_en = models.DateTimeField(null=True, blank=True)
     eliminado  = models.BooleanField(default=False)
@@ -1847,13 +1832,13 @@ class Mensaje(models.Model):
         ordering = ['-creado_en']
         indexes = [
             models.Index(fields=['conversacion', 'creado_en'], name='idx_msg_conv_fecha'),
-            models.Index(fields=['remitente'], name='idx_msg_remitente'),  # <-- campo, no db_column
+            models.Index(fields=['remitente'], name='idx_msg_remitente'),  
         ]
 
     def __str__(self):
         return f"Msg {self.mensaje_id} en conv {self.conversacion_id} por {self.remitente_id}"  
         
-  # Helpers para frontend/API (no cambian la BD)
+  # Helpers para frontend/API 
     @property
     def author_id(self):
         return self.creador_id
@@ -1868,6 +1853,7 @@ class Mensaje(models.Model):
 
     def __str__(self):
         return f"Msg {self.mensaje_id} en conv {self.conversacion_id} por {self.remitente_id}"
+    
     # --- ParticipanteConversacion ---
 
 class ParticipanteConversacion(models.Model):
@@ -1978,7 +1964,7 @@ class ConversationEvent(models.Model):
     tipo = models.CharField(max_length=40, choices=TIPO_CHOICES)
     creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='eventos_creados')
     titulo = models.CharField(max_length=120, blank=True, default='')
-    # ✅ NUEVO CAMPO AQUÍ:
+    # NUEVO CAMPO AQUÍ:
     fecha_intercambio = models.DateField(null=True, blank=True, verbose_name="Fecha del intercambio")
     presupuesto_fijo = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     estado = models.CharField(max_length=20, default='borrador')  # borrador | sorteado | cerrado
@@ -1998,7 +1984,7 @@ class SecretSantaAssignment(models.Model):
         unique_together = (('evento', 'da'), ('evento', 'recibe'))
 
 
-# ⬇ NUEVO: participantes explícitos del evento standalone
+# NUEVO: participantes explícitos del evento standalone
 class EventParticipant(models.Model):
     evento = models.ForeignKey(ConversationEvent, on_delete=models.CASCADE, related_name='participantes')
     usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
@@ -2110,7 +2096,7 @@ class ProductoExterno(models.Model):
 
         # --- Copiar la imagen externa si existe ---
         if self.imagen:
-            # Guardar la URL externa directamente (válido en ImageField si usas media remota)
+            # Guardar la URL externa directamente 
             p.imagen = self.imagen
             p.save(update_fields=['imagen'])
 
