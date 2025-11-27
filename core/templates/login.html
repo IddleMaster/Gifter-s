@@ -34,9 +34,9 @@ getOrCreateToken{# templates/login.html #}
       {% endif %}
 
       <div class="form-group">
-        <label for="email" class="form-label">Correo electrónico</label>
-        <input type="email" class="form-control" id="email" name="correo" placeholder="nombre@ejemplo.com"
-          value="{{ request.POST.correo|default:'' }}" required>
+        <label for="login" class="form-label">Correo o nombre de usuario</label>
+        <input type="text" class="form-control" id="login" name="login" placeholder="correo o nombre de usuario"
+          value="{{ request.POST.login|default:'' }}" required>
       </div>
 
       <div class="form-group">
