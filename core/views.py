@@ -1033,38 +1033,25 @@ def feed_view(request):
                 nuevo_post.save()
                 return redirect('feed')
 
- # SUPERUSER ve todos los posts, usuario normal solo amigos
-    if request.user.is_superuser:
+    try:
+        ids_yo_sigo = set(Seguidor.objects.filter(seguidor=request.user).values_list('seguido_id', flat=True))
+        ids_me_siguen = set(Seguidor.objects.filter(seguido=request.user).values_list('seguidor_id', flat=True))
+        amigos_ids = ids_yo_sigo.intersection(ids_me_siguen)
+        amigos_ids.add(request.user.id)
+
+        all_posts = (
+            Post.objects.filter(id_usuario_id__in=amigos_ids)
+            .select_related('id_usuario')
+            .prefetch_related('likes', 'comentarios__usuario__perfil')
+            .order_by('-fecha_publicacion')
+        )
+    except Exception:
         all_posts = (
             Post.objects.all()
             .select_related('id_usuario')
             .prefetch_related('likes', 'comentarios__usuario__perfil')
             .order_by('-fecha_publicacion')
         )
-    else:
-        try:
-            ids_yo_sigo = set(
-                Seguidor.objects.filter(seguidor=request.user).values_list('seguido_id', flat=True)
-            )
-            ids_me_siguen = set(
-                Seguidor.objects.filter(seguido=request.user).values_list('seguidor_id', flat=True)
-            )
-            amigos_ids = ids_yo_sigo.intersection(ids_me_siguen)
-            amigos_ids.add(request.user.id)
-
-            all_posts = (
-                Post.objects.filter(id_usuario_id__in=amigos_ids)
-                .select_related('id_usuario')
-                .prefetch_related('likes', 'comentarios__usuario__perfil')
-                .order_by('-fecha_publicacion')
-            )
-        except Exception:
-            all_posts = (
-                Post.objects.all()
-                .select_related('id_usuario')
-                .prefetch_related('likes', 'comentarios__usuario__perfil')
-                .order_by('-fecha_publicacion')
-            )
 
     liked_post_ids = set(
         Like.objects.filter(id_usuario=request.user, id_post__in=all_posts)
