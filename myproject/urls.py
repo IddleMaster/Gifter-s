@@ -139,6 +139,7 @@ urlpatterns = [
     path('api/reports/moderation/', views.ModerationReportAPIView.as_view(), name='api_report_moderation'),
     path('api/reports/popular-searches/', views.PopularSearchReportAPIView.as_view(), name='api_report_popular_searches'),
     path('api/reports/site-reviews/', views.SiteReviewsReportAPIView.as_view(), name='api_report_site_reviews'),
+    path('api/reports/site-reviews/download/pdf/', views.download_site_reviews_report_pdf, name='api_report_site_reviews_pdf_download'),
     path('api/reports/top-active-users/', views.TopActiveUsersReportAPIView.as_view(), name='api_report_top_active_users'),
     
     path('api/admin/logs/', views.get_web_app_logs, name='api_get_web_logs'),

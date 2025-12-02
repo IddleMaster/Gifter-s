@@ -651,13 +651,19 @@ class ApiClient:
     def download_site_reviews_report_pdf(self):
         """
         Descarga el reporte PDF de reseñas del sitio desde la API.
+        Asumimos que el endpoint correcto es /reports/site-reviews/download/pdf/
         """
         if not self.token:
             logger.warning("download_site_reviews_report_pdf llamado sin token.")
             return None, "No autenticado."
     
+        # <<< CORRECCIÓN: Usar la ruta completa y corregida, manteniendo la extensión. >>>
+        # Si la ruta no está en tu urls.py (como parece), tu backend no está listo.
+        # Pero intentaremos la ruta estándar:
         report_url = f"{self.base_url}/reports/site-reviews/download/pdf/"
-    
+        
+        # ... (el resto del código sigue igual, usando _download_report_file) ...
+
         try:
             # Preparamos headers sin 'Content-Type' o 'Accept' de JSON
             temp_headers = self.headers.copy()
@@ -665,12 +671,15 @@ class ApiClient:
             if 'Accept' in temp_headers: del temp_headers['Accept']
     
             logger.info(f"Iniciando descarga de reporte PDF de reseñas desde {report_url}")
-            response = requests.get(report_url, headers=temp_headers, stream=True)
+            response = requests.get(report_url, headers=temp_headers, stream=True, timeout=self.timeout) # Añadí timeout
             response.raise_for_status()
-    
+            
+            # ... (manejo de Content-Type y errores sigue igual) ...
+            
             # Verificar que la respuesta sea un PDF
             content_type = response.headers.get('content-type', '').lower()
             if 'pdf' not in content_type:
+                # Si el servidor responde con HTML, Django lo reporta como 404 (como en la imagen)
                 error_detail = "Respuesta inesperada del servidor (no es PDF)."
                 try:
                     error_data = response.json()
@@ -681,7 +690,7 @@ class ApiClient:
                 return None, error_detail
     
             logger.info(f"Reporte PDF de reseñas descargado exitosamente ({len(response.content)} bytes).")
-            return response.content, None # Devuelve los bytes del PDF
+            return response.content, None
     
         except requests.exceptions.HTTPError as http_err:
             error_detail = http_err.response.text

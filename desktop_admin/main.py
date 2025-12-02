@@ -721,6 +721,7 @@ class WarningTypeDialog(QDialog):
 # ---
 class MainWindow(QMainWindow):
     def __init__(self, api_client, is_offline=False,user_email=""): 
+        self.local_log_text_area = QTextEdit() # Inicializar con el widget real o un None/False.
         super().__init__()
         
        # --- CÓDIGO PARA AÑADIR EL ÍCONO (Ajustado) ---
@@ -1711,9 +1712,9 @@ class MainWindow(QMainWindow):
         self.btn_download_top_users_pdf.setStyleSheet("background-color: #dc3545; color: white; padding: 10px; font-size: 14px; border-radius: 5px;")
         
         # --- IMPORTANTE: Deshabilitado hasta que creemos el backend ---
-        self.btn_download_top_users_pdf.setEnabled(False)
-        self.btn_download_top_users_pdf.setToolTip("Esta función se implementará en el futuro.")
-        # self.btn_download_top_users_pdf.clicked.connect(self.handle_download_top_users_pdf)
+        #self.btn_download_top_users_pdf.setEnabled(False)
+        #self.btn_download_top_users_pdf.setToolTip("Esta función se implementará en el futuro.")
+        self.btn_download_top_users_pdf.clicked.connect(self.handle_download_top_users_pdf)
         
         card_download_layout.addWidget(self.btn_download_top_users_pdf)
         card_download_layout.addStretch()
@@ -1894,7 +1895,7 @@ class MainWindow(QMainWindow):
         log_layout.addWidget(self.local_log_text_area)
         layout.addWidget(log_group, 1) # Añade la tarjeta al layout principal
         
-        self.load_local_logs() # Carga inicial
+        #self.load_local_logs() # Carga inicial
         
         # (Atajo F5 ELIMINADO, ya no es necesario)
         
@@ -3046,26 +3047,22 @@ class MainWindow(QMainWindow):
                 with open(LOG_FILE_PATH, 'r', encoding='utf-8', errors='replace') as f:
                     content = f.read()
                 
-                # Guarda la posición actual del scroll
                 scroll_bar = self.local_log_text_area.verticalScrollBar()
                 is_at_bottom = scroll_bar.value() >= (scroll_bar.maximum() - 10)
 
                 self.local_log_text_area.setPlainText(content)
                 
-                # Si el usuario estaba al final, lo mantenemos al final
                 if is_at_bottom:
                     scroll_bar.setValue(scroll_bar.maximum())
                 
             else:
                 self.local_log_text_area.setPlainText(f"--- El archivo de log '{LOG_FILE_PATH}' no existe. ---")
             
-            # --- 👇 AÑADE ESTA LÍNEA 👇 ---
-            # Vuelve a añadir la ruta por si el archivo fue borrado y re-creado
             self.log_watcher.addPath(LOG_FILE_PATH)
-            # --- ---------------------- ---
 
         except Exception as e:
-            self.local_log_text_area.setPlainText(f"Error al cargar log local: {e}")
+            # Si el widget NO existe (AttributeError), esto lanzará otro error.
+            # Pero si ya lo inicializamos en __init__, esto debería ser seguro.
             logging.error(f"Error al cargar log local: {e}", exc_info=True)
             self.statusBar().showMessage("Error al cargar log local.", 5000)
     # ---
@@ -3679,6 +3676,15 @@ class MainWindow(QMainWindow):
         else:
             logging.info("Descarga de reporte de reseñas cancelada.")
             self.statusBar().showMessage("Descarga cancelada.", 3000)
+            
+    def handle_download_top_users_pdf(self):
+        """Maneja el clic en el botón 'Descargar como PDF' para Top Usuarios."""
+        # Llama al método implementado en api_client.py
+        self._generic_download_handler(
+            api_call=self.api_client.download_top_users_report_pdf,
+            report_name="Top Usuarios Activos",
+            file_extension=".pdf"
+        )
             
     def handle_download_search_pdf(self):
         """
