@@ -3676,15 +3676,69 @@ class MainWindow(QMainWindow):
         else:
             logging.info("Descarga de reporte de reseñas cancelada.")
             self.statusBar().showMessage("Descarga cancelada.", 3000)
-            
+    
+    
     def handle_download_top_users_pdf(self):
-        """Maneja el clic en el botón 'Descargar como PDF' para Top Usuarios."""
-        # Llama al método implementado en api_client.py
-        self._generic_download_handler(
-            api_call=self.api_client.download_top_users_report_pdf,
-            report_name="Top Usuarios Activos",
-            file_extension=".pdf"
+        """
+        Maneja el clic en el botón 'Descargar como PDF' para Top Usuarios,
+        usando la función de API específica y la lógica de guardado.
+        """
+        report_name = "Top Usuarios Activos"
+        report_format = 'pdf'
+        file_extension = '.pdf'
+        file_filter = "PDF Files (*.pdf)"
+
+        if self.is_offline:
+            QMessageBox.warning(self, "Modo Offline", "Esta función no está disponible en modo offline.")
+            return
+
+        logging.info(f"Iniciando descarga de reporte: {report_name} en formato: {report_format}")
+        self.statusBar().showMessage(f"Generando reporte de {report_name} ({report_format.upper()})...")
+        QApplication.processEvents()
+        
+        # 1. Llamar a la función específica de la API
+        content_bytes, error = self.api_client.download_top_users_report_pdf()
+
+        if error:
+            logging.error(f"Error al descargar reporte de {report_name}: {error}")
+            QMessageBox.critical(self, "Error al Descargar Reporte", error)
+            self.statusBar().showMessage(f"Error al descargar reporte de {report_name}.", 5000)
+            return
+        
+        if not content_bytes:
+            logging.warning(f"Descarga de reporte {report_name} no devolvió contenido.")
+            QMessageBox.warning(self, "Descargar Reporte", "No se recibió contenido para el reporte.")
+            self.statusBar().showMessage("No se recibió contenido del reporte.", 3000)
+            return
+
+        # 2. Abrir diálogo de guardado
+        default_filename = f"reporte_top_usuarios_{datetime.date.today()}{file_extension}"
+        save_path, _ = QFileDialog.getSaveFileName(
+            self,
+            f"Guardar Reporte {report_format.upper()} ({report_name})",
+            os.path.join(os.path.expanduser("~"), "Downloads", default_filename),
+            file_filter
         )
+
+        # 3. Guardar el archivo
+        if save_path:
+            if not save_path.lower().endswith(file_extension):
+                save_path += file_extension
+            try:
+                with open(save_path, 'wb') as f:
+                    f.write(content_bytes)
+                
+                logging.info(f"Reporte {report_name} guardado en: {save_path}")
+                self.statusBar().showMessage(f"Reporte {report_name} guardado.", 5000)
+                QMessageBox.information(self, "Reporte Guardado", f"El reporte ({report_format.upper()}) se guardó en:\n{save_path}")
+                
+            except Exception as e:
+                logging.error(f"Error al guardar reporte de {report_name} en {save_path}: {e}", exc_info=True)
+                QMessageBox.critical(self, "Error al Guardar Archivo", f"No se pudo guardar el archivo:\n{e}")
+                self.statusBar().showMessage("Error al guardar el archivo.", 5000)
+        else:
+            logging.info(f"Descarga de reporte de {report_name} cancelada.")
+            self.statusBar().showMessage("Descarga cancelada.", 3000)
             
     def handle_download_search_pdf(self):
         """

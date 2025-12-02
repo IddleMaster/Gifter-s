@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Reporte de Top Usuarios Activos</title>
+    <style>
+        @page { size: letter; margin: 1.5cm; } /* Reducimos el margen */
+        body { font-family: "Helvetica", sans-serif; font-size: 9pt; color: #333; } /* Reducimos la fuente general */
+        h1 { text-align: center; color: #0a2342; border-bottom: 2px solid #ccc; padding-bottom: 10px; font-size: 16pt; }
+        h2 { color: #004a99; margin-top: 20px; font-size: 13pt; }
+        h4 { text-align: right; font-weight: normal; color: #777; font-size: 9pt; }
+        .graph-container { text-align: center; margin-top: 15px; margin-bottom: 15px; }
+        
+        /* Estilo de tabla ajustado para que quepa */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; } 
+        th, td { 
+            border: 1px solid #ddd; 
+            padding: 4px; /* Reducimos el padding */
+            text-align: center;
+            overflow: hidden; /* Oculta si se desborda */
+        }
+        th { background-color: #f8f9fa; font-weight: bold; font-size: 9pt; }
+        .puntaje { font-weight: bold; color: #004a99; }
+        
+        /* Definir anchos para las columnas que no se extienden */
+        .col-user { width: 20%; text-align: left; }
+        .col-score { width: 10%; }
+        .col-metric { width: 10%; } /* Para Posts, Comentarios, Likes, S.A, F.A, Otros */
+
+    </style>
+</head>
+<body>
+    <h1>Reporte de Top Usuarios Activos</h1>
+    <h4>Generado el: {{ generation_date|date:"d/m/Y H:i" }}</h4>
+
+    <h2>1. Resumen Gráfico de Actividad</h2>
+
+    {% if image_base64 %}
+    <div class="graph-container">
+        <img src="data:image/png;base64,{{ image_base64 }}" style="width: 95%; height: auto;">
+    </div>
+    {% else %}
+    <p style="text-align: center; color: #dc3545;">No hay datos suficientes o el entorno falló al generar el gráfico de actividad.</p>
+    {% endif %}
+
+    <h2 style="margin-top: 40px;">2. Desglose Detallado por Usuario</h2>
+
+    {% if table_data %}
+    <table>
+        <thead>
+            <tr>
+                {% for header in breakdown_headers %}
+                    <th class="{% if header == 'Usuario' %}col-user-name{% else %}col-metric{% endif %}">{{ header }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in table_data %}
+            <tr>
+                <td class="col-user-name">{{ row.Usuario }}</td> 
+                
+                <td class="col-metric puntaje">{{ row.Puntaje_Total }}</td>
+                
+                <td class="col-metric">{{ row.Posts }}</td>
+                <td class="col-metric">{{ row.Comentarios }}</td>
+                <td class="col-metric">{{ row.Likes }}</td>
+                
+                <td class="col-metric">{{ row.SA }}</td>
+                <td class="col-metric">{{ row.FA }}</td>
+                
+                <td class="col-metric">{{ row.Otros }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No hay usuarios con actividad registrada en el top 10.</p>
+    {% endif %}
+
+<style>
+/* (Asegúrate de mantener el bloque <style> que define las clases col-user-name y col-metric) */
+    .col-user-name { width: 22%; text-align: left; font-weight: bold; }
+    .col-metric { width: 11.3%; }
+</style>
+</body>
+</html>

@@ -429,65 +429,55 @@ class ApiClient:
             
     def download_product_report(self, report_format='csv'):
         """
-        Descarga el reporte CSV, Excel o PDF de productos activos...
+        Descarga el reporte CSV, Excel o PDF de productos activos.
         """
         if not self.token:
-            logger.warning("download_product_report llamado sin token.")
+            self.logger.warning("download_product_report llamado sin token.")
             return None, "No autenticado."
     
         if report_format == 'pdf':
+            # Ruta para PDF
             report_url = f"{self.base_url}/reports/products/download/pdf/"
         elif report_format == 'excel':
+            # Ruta para Excel
             report_url = f"{self.base_url}/reports/products/download/excel/"
-        else: # Default a CSV
+        else:
+            # Ruta para CSV (default)
             report_url = f"{self.base_url}/reports/products/download/"
         
         try:
+            # Creamos una copia de los encabezados, EXCLUYENDO Content-Type si existe, 
+            # ya que vamos a recibir un archivo binario.
             temp_headers = self.headers.copy()
-            if 'Content-Type' in temp_headers: del temp_headers['Content-Type']
-            if 'Accept' in temp_headers: del temp_headers['Accept']
+            if 'Content-Type' in temp_headers: 
+                del temp_headers['Content-Type']
+            if 'Accept' in temp_headers:
+                del temp_headers['Accept'] # No forzamos JSON
     
-            logger.info(f"Iniciando descarga de reporte: {report_format} desde {report_url}")
-            response = requests.get(report_url, headers=temp_headers, stream=True)
+            self.logger.info(f"Iniciando descarga de reporte: {report_format} desde {report_url}")
+            
+            # Hacemos la petición con los encabezados limpios
+            response = requests.get(report_url, headers=temp_headers, stream=True, timeout=self.timeout)
             response.raise_for_status()
     
+            # Validación de contenido (para saber si falló y nos devolvió JSON de error)
             content_type = response.headers.get('content-type', '').lower()
-            if report_format == 'csv':
-                expected_content_type = 'csv'
-            elif report_format == 'excel':
-                expected_content_type = 'spreadsheetml' # Parte del content-type de Excel
-            elif report_format == 'pdf':
-                expected_content_type = 'pdf'
-            else:
-                expected_content_type = 'desconocido'
-    
-            if expected_content_type not in content_type:
-                error_detail = f"Respuesta inesperada del servidor (no es {expected_content_type})."
-                try:
-                    error_data = response.json()
-                    error_detail = error_data.get("error", f"Respuesta inesperada (esperaba {report_format.upper()}).")
-                except json.JSONDecodeError:
-                    pass
-                logger.error(f"Error en descarga de reporte: {error_detail}. Content-Type recibido: {content_type}")
-                return None, error_detail
-    
-            logger.info(f"Reporte {report_format} descargado exitosamente ({len(response.content)} bytes).")
+            if 'json' in content_type and response.text:
+                 # Si devuelve JSON, asumimos que es un error del servidor (400, 500, etc.)
+                error_data = response.json()
+                error_detail = error_data.get('detail', error_data.get('error', response.text))
+                self.logger.error(f"Error en descarga: Servidor devolvió JSON de error. Detalle: {error_detail}")
+                return None, f"Error del servidor ({response.status_code}): {error_detail}"
+
+            # Si no es JSON, asumimos que es el archivo
+            self.logger.info(f"Reporte {report_format} descargado exitosamente ({len(response.content)} bytes).")
             return response.content, None
     
-        except requests.exceptions.HTTPError as http_err:
-            error_detail = http_err.response.text
-            try:
-                error_data = http_err.response.json()
-                error_detail = error_data.get("error", error_data.get("detail", http_err.response.text))
-            except json.JSONDecodeError:
-                pass
-            logger.error(f"Error HTTP al descargar reporte. Status: {http_err.response.status_code}, Error: {error_detail}", exc_info=True)
-            return None, f"Error del servidor ({http_err.response.status_code}): {error_detail}"
         except requests.exceptions.RequestException as e:
-            logger.error(f"download_product_report: Error de conexión: {e}", exc_info=True)
+            self.logger.error(f"download_product_report: Error de conexión: {e}", exc_info=True)
             return None, f"Error de conexión: {e}"
         except Exception as e:
-            logger.critical(f"Error inesperado en download_product_report: {e}", exc_info=True)
+            self.logger.critical(f"Error inesperado en download_product_report: {e}", exc_info=True)
             return None, f"Error inesperado: {str(e)}"
             
     # desktop_admin/api_client.py (REEMPLAZAR create_product)
@@ -647,7 +637,42 @@ class ApiClient:
             f"{self.base_url}/admin/logs/"
         )
         
-
+    def download_top_users_report_pdf(self):
+        """
+        Descarga el reporte PDF de Top Usuarios Activos desde la API.
+        """
+        if not self.token:
+            self.logger.warning("download_top_users_report_pdf llamado sin token.")
+            return None, "No autenticado."
+    
+        # URL mapeada en urls.py
+        report_url = f"{self.base_url}/reports/top-active-users/download/pdf/"
+    
+        try:
+            temp_headers = self.headers.copy()
+            if 'Content-Type' in temp_headers: del temp_headers['Content-Type']
+            if 'Accept' in temp_headers: del temp_headers['Accept']
+    
+            self.logger.info(f"Iniciando descarga de reporte PDF de Top Usuarios desde {report_url}")
+            response = requests.get(report_url, headers=temp_headers, stream=True, timeout=self.timeout)
+            response.raise_for_status()
+    
+            content_type = response.headers.get('content-type', '').lower()
+            if 'pdf' not in content_type:
+                error_detail = "Respuesta inesperada del servidor (no es PDF)."
+                try: error_data = response.json(); error_detail = error_data.get("error", error_data.get("detail", error_detail))
+                except json.JSONDecodeError: pass
+                self.logger.error(f"Error en descarga de reporte PDF: {error_detail}. Content-Type recibido: {content_type}")
+                return None, error_detail
+    
+            self.logger.info(f"Reporte PDF de Top Usuarios descargado exitosamente.")
+            return response.content, None
+    
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"download_top_users_report_pdf: Error de conexión: {e}", exc_info=True)
+            return None, f"Error de conexión: {e}"
+    
+    
     def download_site_reviews_report_pdf(self):
         """
         Descarga el reporte PDF de reseñas del sitio desde la API.

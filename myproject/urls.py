@@ -141,7 +141,7 @@ urlpatterns = [
     path('api/reports/site-reviews/', views.SiteReviewsReportAPIView.as_view(), name='api_report_site_reviews'),
     path('api/reports/site-reviews/download/pdf/', views.download_site_reviews_report_pdf, name='api_report_site_reviews_pdf_download'),
     path('api/reports/top-active-users/', views.TopActiveUsersReportAPIView.as_view(), name='api_report_top_active_users'),
-    
+    path('api/reports/top-active-users/download/pdf/', views.download_top_users_report_pdf, name='api_report_top_users_pdf_download'),
     path('api/admin/logs/', views.get_web_app_logs, name='api_get_web_logs'),
     path('api/reports/popular-searches/download/pdf/', views.download_popular_search_report_pdf, name='api_report_search_pdf_download'),
     
